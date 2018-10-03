@@ -417,6 +417,8 @@ public class RouterAdmin extends Configured implements Tool {
    *
    * @param parameters Parameters for the mount point.
    * @param i Index in the parameters.
+   * @return If it was successful.
+   * @throws IOException If it cannot add the mount point.
    */
   public boolean addMount(String[] parameters, int i) throws IOException {
     // Mandatory parameters
@@ -576,6 +578,8 @@ public class RouterAdmin extends Configured implements Tool {
    *
    * @param parameters Parameters for the mount point.
    * @param i Index in the parameters.
+   * @return If it updated the mount point successfully.
+   * @throws IOException If there is an error.
    */
   public boolean updateMount(String[] parameters, int i) throws IOException {
     String mount = parameters[i++];
@@ -705,6 +709,7 @@ public class RouterAdmin extends Configured implements Tool {
    * Remove mount point.
    *
    * @param path Path to remove.
+   * @return If the mount point was removed successfully.
    * @throws IOException If it cannot be removed.
    */
   public boolean removeMount(String path) throws IOException {

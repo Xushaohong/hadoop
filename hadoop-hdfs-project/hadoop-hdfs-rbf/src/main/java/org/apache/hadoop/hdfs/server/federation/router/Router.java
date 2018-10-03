@@ -579,7 +579,7 @@ public class Router extends CompositeService implements
   /**
    * Update the router state and heartbeat to the state store.
    *
-   * @param state The new router state.
+   * @param newState The new router state.
    */
   public void updateRouterState(RouterServiceState newState) {
     this.state = newState;
@@ -724,7 +724,8 @@ public class Router extends CompositeService implements
   }
 
   /**
-   * If the quota system is enabled in Router.
+   * Check if the quota system is enabled in Router.
+   * @return True if the quota system is enabled in Router.
    */
   public boolean isQuotaEnabled() {
     return this.quotaManager != null;
