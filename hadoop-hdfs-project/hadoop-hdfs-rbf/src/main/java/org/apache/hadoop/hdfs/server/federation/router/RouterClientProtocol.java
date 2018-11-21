@@ -121,6 +121,8 @@ public class RouterClientProtocol implements ClientProtocol {
   private final String superGroup;
   /** Erasure coding calls. */
   private final ErasureCoding erasureCoding;
+  /** StoragePolicy calls. **/
+  private final RouterStoragePolicy storagePolicy;
 
   RouterClientProtocol(Configuration conf, RouterRpcServer rpcServer) {
     this.rpcServer = rpcServer;
@@ -138,6 +140,7 @@ public class RouterClientProtocol implements ClientProtocol {
         DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
         DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
     this.erasureCoding = new ErasureCoding(rpcServer);
+    this.storagePolicy = new RouterStoragePolicy(rpcServer);
   }
 
   @Override
@@ -271,22 +274,12 @@ public class RouterClientProtocol implements ClientProtocol {
   @Override
   public void setStoragePolicy(String src, String policyName)
       throws IOException {
-    rpcServer.checkOperation(NameNode.OperationCategory.WRITE);
-
-    List<RemoteLocation> locations = rpcServer.getLocationsForPath(src, true);
-    RemoteMethod method = new RemoteMethod("setStoragePolicy",
-        new Class<?>[] {String.class, String.class},
-        new RemoteParam(), policyName);
-    rpcClient.invokeSequential(locations, method, null, null);
+    storagePolicy.setStoragePolicy(src, policyName);
   }
 
   @Override
   public BlockStoragePolicy[] getStoragePolicies() throws IOException {
-    rpcServer.checkOperation(NameNode.OperationCategory.READ);
-
-    RemoteMethod method = new RemoteMethod("getStoragePolicies");
-    String ns = subclusterResolver.getDefaultNamespace();
-    return (BlockStoragePolicy[]) rpcClient.invokeSingle(ns, method);
+    return storagePolicy.getStoragePolicies();
   }
 
   @Override
@@ -1456,13 +1449,12 @@ public class RouterClientProtocol implements ClientProtocol {
 
   @Override
   public void unsetStoragePolicy(String src) throws IOException {
-    rpcServer.checkOperation(NameNode.OperationCategory.WRITE, false);
+    storagePolicy.unsetStoragePolicy(src);
   }
 
   @Override
   public BlockStoragePolicy getStoragePolicy(String path) throws IOException {
-    rpcServer.checkOperation(NameNode.OperationCategory.READ, false);
-    return null;
+    return storagePolicy.getStoragePolicy(path);
   }
 
   @Override
@@ -1550,7 +1542,7 @@ public class RouterClientProtocol implements ClientProtocol {
 
   @Override
   public void satisfyStoragePolicy(String path) throws IOException {
-    rpcServer.checkOperation(NameNode.OperationCategory.WRITE, false);
+    storagePolicy.satisfyStoragePolicy(path);
   }
 
   @Override
