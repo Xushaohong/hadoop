@@ -692,4 +692,9 @@ public class NamenodeBeanMetrics
   public int getNumEncryptionZones() {
     return 0;
   }
+
+  @Override
+  public String getVerifyECWithTopologyResult() {
+    return null;
+  }
 }
