@@ -87,9 +87,9 @@ public class RouterQuotaManager {
   }
 
   /**
-   * Get children paths (can including itself) under specified federation path.
-   * @param parentPath
-   * @return Set<String> Children path set.
+   * Get children paths (can include itself) under specified federation path.
+   * @param parentPath Federated path.
+   * @return Set of children paths.
    */
   public Set<String> getPaths(String parentPath) {
     readLock.lock();
