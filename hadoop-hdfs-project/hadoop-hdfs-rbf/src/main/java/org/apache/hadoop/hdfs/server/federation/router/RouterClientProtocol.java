@@ -1640,6 +1640,7 @@ public class RouterClientProtocol implements ClientProtocol {
     long quota = 0;
     long spaceConsumed = 0;
     long spaceQuota = 0;
+    String ecPolicy = "";
 
     for (ContentSummary summary : summaries) {
       length += summary.getLength();
@@ -1648,6 +1649,11 @@ public class RouterClientProtocol implements ClientProtocol {
       quota += summary.getQuota();
       spaceConsumed += summary.getSpaceConsumed();
       spaceQuota += summary.getSpaceQuota();
+      // We return from the first response as we assume that the EC policy
+      // of each sub-cluster is same.
+      if (ecPolicy.isEmpty()) {
+        ecPolicy = summary.getErasureCodingPolicy();
+      }
     }
 
     ContentSummary ret = new ContentSummary.Builder()
@@ -1657,6 +1663,7 @@ public class RouterClientProtocol implements ClientProtocol {
         .quota(quota)
         .spaceConsumed(spaceConsumed)
         .spaceQuota(spaceQuota)
+        .erasureCodingPolicy(ecPolicy)
         .build();
     return ret;
   }
