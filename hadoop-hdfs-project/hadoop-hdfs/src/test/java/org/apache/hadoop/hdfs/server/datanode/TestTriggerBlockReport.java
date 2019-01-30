@@ -17,9 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.timeout;
 
@@ -34,7 +33,6 @@ import org.apache.hadoop.hdfs.MiniDFSNNTopology;
 import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
@@ -92,7 +90,7 @@ public final class TestTriggerBlockReport {
           any(DatanodeRegistration.class),
           anyString(),
           any(StorageBlockReport[].class),
-          Mockito.<BlockReportContext>anyObject());
+          any());
       Mockito.verify(spyOnNn0, times(1)).blockReceivedAndDeleted(
           any(DatanodeRegistration.class),
           anyString(),
@@ -157,7 +155,7 @@ public final class TestTriggerBlockReport {
           any(DatanodeRegistration.class),
           anyString(),
           any(StorageBlockReport[].class),
-          Mockito.<BlockReportContext>anyObject());
+          any());
     }
 
     cluster.shutdown();

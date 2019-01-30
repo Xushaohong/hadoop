@@ -46,10 +46,12 @@ import org.junit.Test;
 
 import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
 import static org.junit.Assert.assertEquals;
-import org.mockito.Matchers;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
@@ -315,15 +317,13 @@ public class TestRequestHedgingProxyProvider {
   public void testFileNotFoundExceptionWithSingleProxy() throws Exception {
     ClientProtocol active = Mockito.mock(ClientProtocol.class);
     Mockito
-        .when(active.getBlockLocations(Matchers.anyString(),
-            Matchers.anyLong(), Matchers.anyLong()))
+        .when(active.getBlockLocations(anyString(), anyLong(), anyLong()))
         .thenThrow(new RemoteException("java.io.FileNotFoundException",
             "File does not exist!"));
 
     ClientProtocol standby = Mockito.mock(ClientProtocol.class);
     Mockito
-        .when(standby.getBlockLocations(Matchers.anyString(),
-            Matchers.anyLong(), Matchers.anyLong()))
+        .when(standby.getBlockLocations(anyString(), anyLong(), anyLong()))
         .thenThrow(
             new RemoteException("org.apache.hadoop.ipc.StandbyException",
                 "Standby NameNode"));
@@ -353,18 +353,16 @@ public class TestRequestHedgingProxyProvider {
     } catch (RemoteException ex) {
       Exception rEx = ex.unwrapRemoteException();
       if (rEx instanceof StandbyException) {
-        Mockito.verify(active).getBlockLocations(Matchers.anyString(),
-            Matchers.anyLong(), Matchers.anyLong());
+        Mockito.verify(active).getBlockLocations(anyString(), anyLong(),
+            anyLong());
         Mockito.verify(standby, Mockito.times(2))
-            .getBlockLocations(Matchers.anyString(),
-            Matchers.anyLong(), Matchers.anyLong());
+            .getBlockLocations(anyString(), anyLong(), anyLong());
       } else {
         Assert.assertTrue(rEx instanceof FileNotFoundException);
         Mockito.verify(active, Mockito.times(2))
-            .getBlockLocations(Matchers.anyString(),
-            Matchers.anyLong(), Matchers.anyLong());
-        Mockito.verify(standby).getBlockLocations(Matchers.anyString(),
-            Matchers.anyLong(), Matchers.anyLong());
+            .getBlockLocations(anyString(), anyLong(), anyLong());
+        Mockito.verify(standby).getBlockLocations(anyString(), anyLong(),
+            anyLong());
       }
     }
   }
@@ -383,8 +381,7 @@ public class TestRequestHedgingProxyProvider {
         RandomStringUtils.randomAlphabetic(8) + ".foo.bar:9820");
     ClientProtocol active = Mockito.mock(ClientProtocol.class);
     Mockito
-        .when(active.getBlockLocations(Matchers.anyString(),
-            Matchers.anyLong(), Matchers.anyLong()))
+        .when(active.getBlockLocations(anyString(), anyLong(), anyLong()))
         .thenThrow(new RemoteException("java.io.FileNotFoundException",
             "File does not exist!"));
 
@@ -538,15 +535,15 @@ public class TestRequestHedgingProxyProvider {
   public void testHedgingWhenFileNotFoundException() throws Exception {
     ClientProtocol active = Mockito.mock(ClientProtocol.class);
     Mockito
-        .when(active.getBlockLocations(Matchers.anyString(),
-            Matchers.anyLong(), Matchers.anyLong()))
+        .when(active.getBlockLocations(anyString(),
+            anyLong(), anyLong()))
         .thenThrow(new RemoteException("java.io.FileNotFoundException",
             "File does not exist!"));
 
     ClientProtocol standby = Mockito.mock(ClientProtocol.class);
     Mockito
-        .when(standby.getBlockLocations(Matchers.anyString(),
-            Matchers.anyLong(), Matchers.anyLong()))
+        .when(standby.getBlockLocations(anyString(),
+            anyLong(), anyLong()))
         .thenThrow(
             new RemoteException("org.apache.hadoop.ipc.StandbyException",
             "Standby NameNode"));
@@ -567,10 +564,10 @@ public class TestRequestHedgingProxyProvider {
         Assert.assertTrue(rEx instanceof FileNotFoundException);
       }
     }
-    Mockito.verify(active).getBlockLocations(Matchers.anyString(),
-        Matchers.anyLong(), Matchers.anyLong());
-    Mockito.verify(standby).getBlockLocations(Matchers.anyString(),
-        Matchers.anyLong(), Matchers.anyLong());
+    Mockito.verify(active).getBlockLocations(anyString(),
+        anyLong(), anyLong());
+    Mockito.verify(standby).getBlockLocations(anyString(),
+        anyLong(), anyLong());
   }
 
   @Test

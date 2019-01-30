@@ -24,7 +24,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
@@ -96,7 +96,6 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import com.google.protobuf.BlockingService;
-import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
 import org.apache.hadoop.fs.StorageType;
@@ -307,8 +306,7 @@ public class TestBlockToken {
         .getIdentifier())));
 
     doAnswer(new GetLengthAnswer(sm, id)).when(mockDN)
-        .getReplicaVisibleLength(any(RpcController.class),
-            any(GetReplicaVisibleLengthRequestProto.class));
+        .getReplicaVisibleLength(any(), any());
 
     RPC.setProtocolEngine(conf, ClientDatanodeProtocolPB.class,
         ProtobufRpcEngine.class);

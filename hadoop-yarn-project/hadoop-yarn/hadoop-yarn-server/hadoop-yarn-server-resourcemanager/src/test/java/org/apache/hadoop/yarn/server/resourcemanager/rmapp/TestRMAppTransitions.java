@@ -111,8 +111,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Matchers;
-
 
 @RunWith(value = Parameterized.class)
 public class TestRMAppTransitions {
@@ -246,7 +244,7 @@ public class TestRMAppTransitions {
 
     ResourceScheduler resourceScheduler = mock(ResourceScheduler.class);
     doReturn(null).when(resourceScheduler)
-              .getAppResourceUsageReport((ApplicationAttemptId)Matchers.any());
+         .getAppResourceUsageReport(any());
     doReturn(resourceScheduler).when(rmContext).getScheduler();
 
     doReturn(mock(RMTimelineCollectorManager.class)).when(rmContext)

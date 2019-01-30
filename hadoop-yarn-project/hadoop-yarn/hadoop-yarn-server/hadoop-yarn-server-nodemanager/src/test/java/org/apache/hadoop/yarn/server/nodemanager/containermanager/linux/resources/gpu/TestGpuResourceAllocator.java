@@ -66,7 +66,7 @@ import com.google.common.collect.Lists;
 public class TestGpuResourceAllocator {
   private static final int WAIT_PERIOD_FOR_RESOURCE = 100;
 
-  private static class ContainerMatcher extends ArgumentMatcher<Container> {
+  private static class ContainerMatcher implements ArgumentMatcher<Container> {
 
     private Container container;
 
@@ -75,13 +75,7 @@ public class TestGpuResourceAllocator {
     }
 
     @Override
-    public boolean matches(Object o) {
-      if (!(o instanceof Container)) {
-        return false;
-      }
-
-      Container other = (Container) o;
-
+    public boolean matches(Container other) {
       long expectedId = container.getContainerId().getContainerId();
       long otherId = other.getContainerId().getContainerId();
       return expectedId == otherId;

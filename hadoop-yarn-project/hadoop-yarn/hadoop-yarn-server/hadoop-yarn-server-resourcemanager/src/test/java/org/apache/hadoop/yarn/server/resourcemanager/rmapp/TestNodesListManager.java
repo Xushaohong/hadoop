@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import static org.mockito.Matchers.argThat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.spy;
 
@@ -231,14 +231,14 @@ public class TestNodesListManager {
    * Create dispatcher object
    */
   private Dispatcher getDispatcher() {
-    Dispatcher dispatcher = new DrainDispatcher() {
-      @SuppressWarnings({ "rawtypes", "unchecked" })
+    return new DrainDispatcher() {
+      @SuppressWarnings("unchecked")
       @Override
       public EventHandler<Event> getEventHandler() {
 
-        class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
+        class EventArgMatcher implements ArgumentMatcher<AbstractEvent> {
           @Override
-          public boolean matches(Object argument) {
+          public boolean matches(AbstractEvent argument) {
             if (argument instanceof RMAppNodeUpdateEvent) {
               ApplicationId appid =
                   ((RMAppNodeUpdateEvent) argument).getApplicationId();
@@ -253,7 +253,6 @@ public class TestNodesListManager {
         return handler;
       }
     };
-    return dispatcher;
   }
 
 }

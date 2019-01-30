@@ -107,10 +107,9 @@ import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.r
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.SIGNAL;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.USER;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.USER_FILECACHE_DIRS;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -359,17 +358,14 @@ public class TestDockerContainerRuntime {
     return capturePrivilegedOperation(1);
   }
 
-  @SuppressWarnings("unchecked")
   private PrivilegedOperation capturePrivilegedOperation(int invocations)
       throws PrivilegedOperationException {
     ArgumentCaptor<PrivilegedOperation> opCaptor = ArgumentCaptor.forClass(
         PrivilegedOperation.class);
 
-    //due to type erasure + mocking, this verification requires a suppress
-    // warning annotation on the entire method
     verify(mockExecutor, times(invocations))
-        .executePrivilegedOperation(anyList(), opCaptor.capture(), any(
-            File.class), anyMap(), anyBoolean(), anyBoolean());
+        .executePrivilegedOperation(any(), opCaptor.capture(), any(),
+            any(), anyBoolean(), anyBoolean());
 
     //verification completed. we need to isolate specific invocations.
     // hence, reset mock here
@@ -1734,8 +1730,8 @@ public class TestDockerContainerRuntime {
       throws ContainerExecutionException, PrivilegedOperationException,
       IOException {
     when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-        any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
+        .executePrivilegedOperation(any(), any(PrivilegedOperation.class),
+        any(), any(), anyBoolean(), anyBoolean())).thenReturn(
         DockerCommandExecutor.DockerContainerStatus.RUNNING.getName());
     List<String> dockerCommands = getDockerCommandsForDockerStop(
         ContainerExecutor.Signal.TERM);
@@ -1748,8 +1744,8 @@ public class TestDockerContainerRuntime {
       throws ContainerExecutionException, PrivilegedOperationException,
       IOException {
     when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-            any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
+        .executePrivilegedOperation(any(), any(PrivilegedOperation.class),
+            any(), any(), anyBoolean(), anyBoolean())).thenReturn(
         DockerCommandExecutor.DockerContainerStatus.RUNNING.getName() +
             ",SIGQUIT");
 
@@ -1803,8 +1799,8 @@ public class TestDockerContainerRuntime {
         submittingUser);
     env.put(ENV_DOCKER_CONTAINER_RUN_PRIVILEGED_CONTAINER, "true");
     when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-        any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
+        .executePrivilegedOperation(any(), any(PrivilegedOperation.class),
+        any(), any(), anyBoolean(), anyBoolean())).thenReturn(
         DockerCommandExecutor.DockerContainerStatus.RUNNING.getName());
     List<String> dockerCommands = getDockerCommandsForDockerStop(
         ContainerExecutor.Signal.TERM);
@@ -1820,8 +1816,8 @@ public class TestDockerContainerRuntime {
         submittingUser);
     env.put(ENV_DOCKER_CONTAINER_RUN_PRIVILEGED_CONTAINER, "true");
     when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-        any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
+        .executePrivilegedOperation(any(), any(PrivilegedOperation.class),
+        any(), any(), anyBoolean(), anyBoolean())).thenReturn(
         DockerCommandExecutor.DockerContainerStatus.RUNNING.getName());
     List<String> dockerCommands = getDockerCommandsForDockerStop(
         ContainerExecutor.Signal.KILL);
@@ -1842,8 +1838,8 @@ public class TestDockerContainerRuntime {
         submittingUser);
     env.put(ENV_DOCKER_CONTAINER_RUN_PRIVILEGED_CONTAINER, "true");
     when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-        any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
+        .executePrivilegedOperation(any(), any(PrivilegedOperation.class),
+        any(), any(), anyBoolean(), anyBoolean())).thenReturn(
         DockerCommandExecutor.DockerContainerStatus.RUNNING.getName());
     List<String> dockerCommands = getDockerCommandsForDockerStop(
         ContainerExecutor.Signal.QUIT);
@@ -1869,8 +1865,8 @@ public class TestDockerContainerRuntime {
     runtime.initialize(enableMockContainerExecutor(conf), null);
     runtime.reapContainer(builder.build());
     verify(mockExecutor, times(1))
-        .executePrivilegedOperation(anyList(), any(), any(
-            File.class), anyMap(), anyBoolean(), anyBoolean());
+        .executePrivilegedOperation(any(), any(), any(),
+            any(), anyBoolean(), anyBoolean());
   }
 
   @Test
@@ -1886,8 +1882,8 @@ public class TestDockerContainerRuntime {
     runtime.initialize(enableMockContainerExecutor(conf), null);
     runtime.reapContainer(builder.build());
     verify(mockExecutor, never())
-        .executePrivilegedOperation(anyList(), any(), any(
-            File.class), anyMap(), anyBoolean(), anyBoolean());
+        .executePrivilegedOperation(any(), any(), any(),
+            anyMap(), anyBoolean(), anyBoolean());
   }
 
   private List<String> getDockerCommandsForDockerStop(
@@ -2020,9 +2016,9 @@ public class TestDockerContainerRuntime {
     //single invocation expected
     //due to type erasure + mocking, this verification requires a suppress
     // warning annotation on the entire method
-    verify(mockExecutor, times(2))
-        .executePrivilegedOperation(anyList(), opCaptor.capture(), any(
-            File.class), anyMap(), anyBoolean(), anyBoolean());
+    verify(mockExecutor, times(3))
+        .executePrivilegedOperation(any(), opCaptor.capture(), any(),
+            any(), anyBoolean(), anyBoolean());
 
     //verification completed. we need to isolate specific invications.
     // hence, reset mock here
@@ -2096,13 +2092,9 @@ public class TestDockerContainerRuntime {
     DockerLinuxContainerRuntime runtime = new DockerLinuxContainerRuntime(
         mockExecutor, mockCGroupsHandler);
     when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-            any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
-        null);
-    when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-            any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
-        dockerVolumeListOutput);
+        .executePrivilegedOperation(any(), any(PrivilegedOperation.class),
+            any(), any(), anyBoolean(), anyBoolean())).thenReturn(
+        null, dockerVolumeListOutput);
 
     Context mockNMContext = createMockNMContext();
     ResourcePluginManager rpm = mock(ResourcePluginManager.class);
@@ -2193,13 +2185,9 @@ public class TestDockerContainerRuntime {
     DockerLinuxContainerRuntime runtime =
         new DockerLinuxContainerRuntime(mockExecutor, mockCGroupsHandler);
     when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-            any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
-        null);
-    when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-            any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
-        "volume1,local");
+        .executePrivilegedOperation(any(), any(PrivilegedOperation.class),
+            any(), any(), anyBoolean(), anyBoolean())).thenReturn(
+        null, "volume1,local");
 
     Context mockNMContext = createMockNMContext();
     ResourcePluginManager rpm = mock(ResourcePluginManager.class);
@@ -2415,8 +2403,8 @@ public class TestDockerContainerRuntime {
     DockerLinuxContainerRuntime runtime =
         new DockerLinuxContainerRuntime(mockExecutor, mockCGroupsHandler);
     when(mockExecutor
-        .executePrivilegedOperation(anyList(), any(PrivilegedOperation.class),
-        any(File.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(
+        .executePrivilegedOperation(any(), any(PrivilegedOperation.class),
+        any(), any(), anyBoolean(), anyBoolean())).thenReturn(
         DockerCommandExecutor.DockerContainerStatus.STOPPED.getName());
     runtime.initialize(conf, nmContext);
     runtime.relaunchContainer(builder.build());

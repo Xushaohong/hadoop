@@ -74,7 +74,8 @@ import static org.apache.hadoop.yarn.conf.YarnConfiguration.NM_VMEM_CHECK_ENABLE
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.TIMELINE_SERVICE_ENABLED;
 import static org.apache.hadoop.yarn.service.conf.YarnServiceConf.AM_RESOURCE_MEM;
 import static org.apache.hadoop.yarn.service.conf.YarnServiceConf.YARN_SERVICE_BASE_PATH;
-import static org.mockito.Matchers.anyObject;
+
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -165,10 +166,10 @@ public class ServiceTestUtils {
     FileSystem mockFs = mock(FileSystem.class);
     JsonSerDeser<Service> jsonSerDeser = mock(JsonSerDeser.class);
     when(sfs.getFileSystem()).thenReturn(mockFs);
-    when(sfs.buildClusterDirPath(anyObject())).thenReturn(
+    when(sfs.buildClusterDirPath(any())).thenReturn(
         new Path("cluster_dir_path"));
     if (ext != null) {
-      when(jsonSerDeser.load(anyObject(), anyObject())).thenReturn(ext);
+      when(jsonSerDeser.load(any(), any())).thenReturn(ext);
     }
     ServiceApiUtil.setJsonSerDeser(jsonSerDeser);
     return sfs;

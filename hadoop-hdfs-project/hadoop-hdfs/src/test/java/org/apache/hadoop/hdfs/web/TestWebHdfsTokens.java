@@ -383,7 +383,7 @@ public class TestWebHdfsTokens {
     fs.create(p, (short)1).close();
     verify(fs, times(1)).getDelegationToken();
     verify(fs, never()).replaceExpiredDelegationToken();
-    verify(fs, times(1)).getDelegationToken(anyString());
+    verify(fs, times(1)).getDelegationToken(any());
     verify(fs, times(1)).setDelegationToken(any());
     token = fs.getRenewToken();
     Assert.assertNotNull(token);      

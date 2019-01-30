@@ -54,9 +54,14 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Random;
 
-import static org.junit.Assert.*;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyObject;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 
@@ -1343,8 +1348,8 @@ public class TestRenameWithSnapshots {
     
     INodeDirectory dir2 = fsdir.getINode4Write(sdir2.toString()).asDirectory();
     INodeDirectory mockDir2 = spy(dir2);
-    doReturn(false).when(mockDir2).addChild((INode) anyObject(), anyBoolean(),
-           Mockito.anyInt());
+    doReturn(false).when(mockDir2).addChild(any(), anyBoolean(),
+           anyInt());
     INodeDirectory root = fsdir.getINode4Write("/").asDirectory();
     root.replaceChild(dir2, mockDir2, fsdir.getINodeMap());
     
@@ -1413,8 +1418,8 @@ public class TestRenameWithSnapshots {
     
     INodeDirectory dir2 = fsdir.getINode4Write(sdir2.toString()).asDirectory();
     INodeDirectory mockDir2 = spy(dir2);
-    doReturn(false).when(mockDir2).addChild((INode) anyObject(), anyBoolean(),
-            Mockito.anyInt());
+    doReturn(false).when(mockDir2).addChild(any(), anyBoolean(),
+            anyInt());
     INodeDirectory root = fsdir.getINode4Write("/").asDirectory();
     root.replaceChild(dir2, mockDir2, fsdir.getINodeMap());
     
@@ -1477,8 +1482,8 @@ public class TestRenameWithSnapshots {
     
     INodeDirectory dir3 = fsdir.getINode4Write(sdir3.toString()).asDirectory();
     INodeDirectory mockDir3 = spy(dir3);
-    doReturn(false).when(mockDir3).addChild((INode) anyObject(), anyBoolean(),
-            Mockito.anyInt());
+    doReturn(false).when(mockDir3).addChild(any(), anyBoolean(),
+            anyInt());
     INodeDirectory root = fsdir.getINode4Write("/").asDirectory();
     root.replaceChild(dir3, mockDir3, fsdir.getINodeMap());
     
@@ -1580,10 +1585,10 @@ public class TestRenameWithSnapshots {
     INodeDirectory dir3 = fsdir.getINode4Write(sdir3.toString()).asDirectory();
     INodeDirectory mockDir3 = spy(dir3);
     // fail the rename but succeed in undo
-    doReturn(false).when(mockDir3).addChild((INode) Mockito.isNull(),
-        anyBoolean(), Mockito.anyInt());
-    Mockito.when(mockDir3.addChild((INode) Mockito.isNotNull(), anyBoolean(), 
-        Mockito.anyInt())).thenReturn(false).thenCallRealMethod();
+    doReturn(false).when(mockDir3).addChild(Mockito.isNull(),
+        anyBoolean(), anyInt());
+    Mockito.when(mockDir3.addChild(Mockito.isNotNull(), anyBoolean(),
+        anyInt())).thenReturn(false).thenCallRealMethod();
     INodeDirectory root = fsdir.getINode4Write("/").asDirectory();
     root.replaceChild(dir3, mockDir3, fsdir.getINodeMap());
     foo3Node.setParent(mockDir3);
@@ -1632,10 +1637,7 @@ public class TestRenameWithSnapshots {
     final Path foo2 = new Path(subdir2, foo.getName());
     FSDirectory fsdir2 = Mockito.spy(fsdir);
     Mockito.doThrow(new NSQuotaExceededException("fake exception")).when(fsdir2)
-        .addLastINode((INodesInPath) Mockito.anyObject(),
-            (INode) Mockito.anyObject(),
-            (FsPermission) Mockito.anyObject(),
-            Mockito.anyBoolean());
+        .addLastINode(any(), any(), any(), anyBoolean());
     Whitebox.setInternalState(fsn, "dir", fsdir2);
     // rename /test/dir1/foo to /test/dir2/subdir2/foo. 
     // FSDirectory#verifyQuota4Rename will pass since the remaining quota is 2.
@@ -1705,7 +1707,7 @@ public class TestRenameWithSnapshots {
     hdfs.setQuota(dir2, 4, Long.MAX_VALUE - 1);
     FSDirectory fsdir2 = Mockito.spy(fsdir);
     Mockito.doThrow(new RuntimeException("fake exception")).when(fsdir2)
-        .removeLastINode((INodesInPath) Mockito.anyObject());
+        .removeLastINode(any());
     Whitebox.setInternalState(fsn, "dir", fsdir2);
     // rename /test/dir1/foo to /test/dir2/sub_dir2/subsub_dir2. 
     // FSDirectory#verifyQuota4Rename will pass since foo only be counted 

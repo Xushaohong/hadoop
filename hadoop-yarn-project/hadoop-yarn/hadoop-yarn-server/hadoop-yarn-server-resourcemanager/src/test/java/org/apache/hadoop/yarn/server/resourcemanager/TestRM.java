@@ -23,7 +23,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
 import org.junit.Before;
-import static org.mockito.Matchers.argThat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.spy;
 
@@ -567,9 +567,9 @@ public class TestRM extends ParameterizedSchedulerTestBase {
       @Override
       public EventHandler<Event> getEventHandler() {
 
-        class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
+        class EventArgMatcher implements ArgumentMatcher<AbstractEvent> {
           @Override
-          public boolean matches(Object argument) {
+          public boolean matches(AbstractEvent argument) {
             if (argument instanceof RMAppAttemptEvent) {
               if (((RMAppAttemptEvent) argument).getType().equals(
                 RMAppAttemptEventType.KILL)) {
@@ -654,9 +654,9 @@ public class TestRM extends ParameterizedSchedulerTestBase {
       @Override
       public EventHandler<Event> getEventHandler() {
 
-        class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
+        class EventArgMatcher implements ArgumentMatcher<AbstractEvent> {
           @Override
-          public boolean matches(Object argument) {
+          public boolean matches(AbstractEvent argument) {
             if (argument instanceof RMAppAttemptEvent) {
               if (((RMAppAttemptEvent) argument).getType().equals(
                 RMAppAttemptEventType.KILL)) {
@@ -708,9 +708,9 @@ public class TestRM extends ParameterizedSchedulerTestBase {
       @Override
       public EventHandler<Event> getEventHandler() {
 
-        class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
+        class EventArgMatcher implements ArgumentMatcher<AbstractEvent> {
           @Override
-          public boolean matches(Object argument) {
+          public boolean matches(AbstractEvent argument) {
             if (argument instanceof RMAppAttemptEvent) {
               if (((RMAppAttemptEvent) argument).getType().equals(
                 RMAppAttemptEventType.KILL)) {
