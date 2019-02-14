@@ -260,7 +260,8 @@ public class DFSOutputStream extends FSOutputSummer
   static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
       FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
       short replication, long blockSize, Progressable progress,
-      DataChecksum checksum, String[] favoredNodes, String ecPolicyName)
+      DataChecksum checksum, String[] favoredNodes, String ecPolicyName,
+      String storagePolicy)
       throws IOException {
     dfsClient.checkReadOnly();
     try (TraceScope ignored =
@@ -276,7 +277,8 @@ public class DFSOutputStream extends FSOutputSummer
         try {
           stat = dfsClient.namenode.create(src, masked, dfsClient.clientName,
               new EnumSetWritable<>(flag), createParent, replication,
-              blockSize, SUPPORTED_CRYPTO_VERSIONS, ecPolicyName);
+              blockSize, SUPPORTED_CRYPTO_VERSIONS, ecPolicyName,
+              storagePolicy);
           break;
         } catch (RemoteException re) {
           IOException e = re.unwrapRemoteException(

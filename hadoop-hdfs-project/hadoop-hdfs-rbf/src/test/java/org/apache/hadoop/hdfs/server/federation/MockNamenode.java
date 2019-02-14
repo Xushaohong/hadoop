@@ -347,7 +347,7 @@ public class MockNamenode {
       return getMockHdfsFileStatus(src, fs.get(src));
     });
     HdfsFileStatus c = mockNn.create(anyString(), any(), anyString(), any(),
-        anyBoolean(), anyShort(), anyLong(), any(), anyString());
+        anyBoolean(), anyShort(), anyLong(), any(), anyString(), anyString());
     when(c).thenAnswer(invocation -> {
       String src = getSrc(invocation);
       LOG.info("{} create({})", nsId, src);

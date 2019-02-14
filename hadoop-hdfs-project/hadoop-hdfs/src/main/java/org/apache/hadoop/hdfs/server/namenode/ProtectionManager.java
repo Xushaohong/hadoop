@@ -326,7 +326,8 @@ public class ProtectionManager {
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag,
       boolean createParent, short replication, long blockSize,
-      CryptoProtocolVersion[] supportedVersions, String ecPolicyName)
+      CryptoProtocolVersion[] supportedVersions, String ecPolicyName,
+      String storagePolicy)
       throws IOException {
     readLock();
     try {
@@ -341,7 +342,8 @@ public class ProtectionManager {
     }
 
     return nameNodeRpcServer.createOriginal(src, masked, clientName, flag,
-        createParent, replication, blockSize, supportedVersions, ecPolicyName);
+        createParent, replication, blockSize, supportedVersions, ecPolicyName,
+        storagePolicy);
   }
 
   public boolean rename(String src, String dst) throws IOException {

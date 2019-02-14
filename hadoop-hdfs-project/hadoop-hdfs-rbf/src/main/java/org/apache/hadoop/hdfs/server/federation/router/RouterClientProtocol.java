@@ -228,7 +228,8 @@ public class RouterClientProtocol implements ClientProtocol {
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag,
       boolean createParent, short replication, long blockSize,
-      CryptoProtocolVersion[] supportedVersions, String ecPolicyName)
+      CryptoProtocolVersion[] supportedVersions, String ecPolicyName,
+      String storagePolicy)
       throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.WRITE);
 

@@ -407,7 +407,7 @@ public class TestLeaseRecovery {
         .create(file, new FsPermission("777"), "test client",
             new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)),
             true, (short) 1, 1024 * 1024 * 128L,
-            new CryptoProtocolVersion[0], null);
+            new CryptoProtocolVersion[0], null, null);
     // Add a block to the file
     LocatedBlock blk = client.getNamenode()
         .addBlock(file, "test client", null,

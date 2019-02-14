@@ -784,19 +784,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag,
       boolean createParent, short replication, long blockSize,
-      CryptoProtocolVersion[] supportedVersions, String ecPolicyName)
+      CryptoProtocolVersion[] supportedVersions, String ecPolicyName,
+      String storagePolicy)
       throws IOException {
     // forwards to protectionManager.create()
     return protectionManager.create(src, masked, clientName,
         flag, createParent, replication,
-        blockSize, supportedVersions, ecPolicyName);
+        blockSize, supportedVersions, ecPolicyName, storagePolicy);
   }
 
   // The original create implementation in Apache Hadoop
   public HdfsFileStatus createOriginal(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag,
       boolean createParent, short replication, long blockSize,
-      CryptoProtocolVersion[] supportedVersions, String ecPolicyName)
+      CryptoProtocolVersion[] supportedVersions, String ecPolicyName,
+      String storagePolicy)
       throws IOException {
     checkNNStartup();
     String clientMachine = getClientMachine();
@@ -820,7 +822,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
           .getShortUserName(), null, masked);
       status = namesystem.startFile(src, perm, clientName, clientMachine,
           flag.get(), createParent, replication, blockSize, supportedVersions,
-          ecPolicyName, cacheEntry != null);
+          ecPolicyName, storagePolicy, cacheEntry != null);
     } finally {
       RetryCache.setState(cacheEntry, status != null, status);
     }
