@@ -212,7 +212,7 @@ public class RouterClientProtocol implements ClientProtocol {
       throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.WRITE);
 
-    if (createParent && isPathAll(src)) {
+    if (createParent && rpcServer.isPathAll(src)) {
       int index = src.lastIndexOf(Path.SEPARATOR);
       String parent = src.substring(0, index);
       LOG.debug("Creating {} requires creating parent {}", src, parent);
@@ -272,9 +272,13 @@ public class RouterClientProtocol implements ClientProtocol {
     RemoteMethod method = new RemoteMethod("setReplication",
         new Class<?>[] {String.class, short.class}, new RemoteParam(),
         replication);
-    Object result = rpcClient.invokeSequential(
-        locations, method, Boolean.class, Boolean.TRUE);
-    return (boolean) result;
+    if (rpcServer.isInvokeConcurrent(src)) {
+      return !rpcClient.invokeConcurrent(locations, method, Boolean.class)
+          .containsValue(false);
+    } else {
+      return rpcClient.invokeSequential(locations, method, Boolean.class,
+          Boolean.TRUE);
+    }
   }
 
   @Override
@@ -298,7 +302,7 @@ public class RouterClientProtocol implements ClientProtocol {
     RemoteMethod method = new RemoteMethod("setPermission",
         new Class<?>[] {String.class, FsPermission.class},
         new RemoteParam(), permissions);
-    if (isPathAll(src)) {
+    if (rpcServer.isInvokeConcurrent(src)) {
       rpcClient.invokeConcurrent(locations, method);
     } else {
       rpcClient.invokeSequential(locations, method);
@@ -315,7 +319,7 @@ public class RouterClientProtocol implements ClientProtocol {
     RemoteMethod method = new RemoteMethod("setOwner",
         new Class<?>[] {String.class, String.class, String.class},
         new RemoteParam(), username, groupname);
-    if (isPathAll(src)) {
+    if (rpcServer.isInvokeConcurrent(src)) {
       rpcClient.invokeConcurrent(locations, method);
     } else {
       rpcClient.invokeSequential(locations, method);
@@ -548,7 +552,7 @@ public class RouterClientProtocol implements ClientProtocol {
     RemoteMethod method = new RemoteMethod("delete",
         new Class<?>[] {String.class, boolean.class}, new RemoteParam(),
         recursive);
-    if (isPathAll(src)) {
+    if (rpcServer.isPathAll(src)) {
       return rpcClient.invokeAll(locations, method);
     } else {
       return rpcClient.invokeSequential(locations, method,
@@ -568,7 +572,7 @@ public class RouterClientProtocol implements ClientProtocol {
         new RemoteParam(), masked, createParent);
 
     // Create in all locations
-    if (isPathAll(src)) {
+    if (rpcServer.isPathAll(src)) {
       return rpcClient.invokeAll(locations, method);
     }
 
@@ -706,7 +710,7 @@ public class RouterClientProtocol implements ClientProtocol {
 
     HdfsFileStatus ret = null;
     // If it's a directory, we check in all locations
-    if (isPathAll(src)) {
+    if (rpcServer.isPathAll(src)) {
       ret = getFileInfoAll(locations, method);
     } else {
       // Check for file information sequentially
@@ -1308,7 +1312,11 @@ public class RouterClientProtocol implements ClientProtocol {
     RemoteMethod method = new RemoteMethod("setXAttr",
         new Class<?>[] {String.class, XAttr.class, EnumSet.class},
         new RemoteParam(), xAttr, flag);
-    rpcClient.invokeSequential(locations, method);
+    if (rpcServer.isInvokeConcurrent(src)) {
+      rpcClient.invokeConcurrent(locations, method);
+    } else {
+      rpcClient.invokeSequential(locations, method);
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -1349,7 +1357,11 @@ public class RouterClientProtocol implements ClientProtocol {
         rpcServer.getLocationsForPath(src, true);
     RemoteMethod method = new RemoteMethod("removeXAttr",
         new Class<?>[] {String.class, XAttr.class}, new RemoteParam(), xAttr);
-    rpcClient.invokeSequential(locations, method);
+    if (rpcServer.isInvokeConcurrent(src)) {
+      rpcClient.invokeConcurrent(locations, method);
+    } else {
+      rpcClient.invokeSequential(locations, method);
+    }
   }
 
   @Override
@@ -1721,27 +1733,6 @@ public class RouterClientProtocol implements ClientProtocol {
         mask.getGroupAction(),
         mask.getOtherAction());
     return ret;
-  }
-
-  /**
-   * Check if a path should be in all subclusters.
-   *
-   * @param path Path to check.
-   * @return If a path should be in all subclusters.
-   */
-  private boolean isPathAll(final String path) {
-    if (subclusterResolver instanceof MountTableResolver) {
-      try {
-        MountTableResolver mountTable = (MountTableResolver)subclusterResolver;
-        MountTable entry = mountTable.getMountPoint(path);
-        if (entry != null) {
-          return entry.isAll();
-        }
-      } catch (IOException e) {
-        LOG.error("Cannot get mount point", e);
-      }
-    }
-    return false;
   }
 
   /**
