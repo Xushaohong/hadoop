@@ -285,8 +285,15 @@ public interface NameNodeMXBean {
   public String getCorruptFiles();
 
   /**
-   * Get the number of distinct versions of live datanodes
-   * 
+   * Get the length of the list of corrupt files.
+   *
+   * @return the length of the list of corrupt files.
+   */
+  int getCorruptFilesCount();
+
+  /**
+   * Get the number of distinct versions of live datanodes.
+   *
    * @return the number of distinct versions of live datanodes
    */
   public int getDistinctVersionCount();

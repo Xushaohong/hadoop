@@ -390,6 +390,11 @@ public class NamenodeBeanMetrics
   }
 
   @Override
+  public int getCorruptFilesCount() {
+    return 0;
+  }
+
+  @Override
   public int getThreads() {
     return ManagementFactory.getThreadMXBean().getThreadCount();
   }
