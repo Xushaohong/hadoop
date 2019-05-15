@@ -1306,7 +1306,11 @@ public class RouterClientProtocol implements ClientProtocol {
     RemoteMethod method = new RemoteMethod("modifyAclEntries",
         new Class<?>[] {String.class, List.class},
         new RemoteParam(), aclSpec);
-    rpcClient.invokeSequential(locations, method, null, null);
+    if (rpcServer.isInvokeConcurrent(src)) {
+      rpcClient.invokeConcurrent(locations, method);
+    } else {
+      rpcClient.invokeSequential(locations, method);
+    }
   }
 
   @Override
@@ -1320,7 +1324,11 @@ public class RouterClientProtocol implements ClientProtocol {
     RemoteMethod method = new RemoteMethod("removeAclEntries",
         new Class<?>[] {String.class, List.class},
         new RemoteParam(), aclSpec);
-    rpcClient.invokeSequential(locations, method, null, null);
+    if (rpcServer.isInvokeConcurrent(src)) {
+      rpcClient.invokeConcurrent(locations, method);
+    } else {
+      rpcClient.invokeSequential(locations, method);
+    }
   }
 
   @Override
@@ -1332,7 +1340,11 @@ public class RouterClientProtocol implements ClientProtocol {
         rpcServer.getLocationsForPath(src, true);
     RemoteMethod method = new RemoteMethod("removeDefaultAcl",
         new Class<?>[] {String.class}, new RemoteParam());
-    rpcClient.invokeSequential(locations, method);
+    if (rpcServer.isInvokeConcurrent(src)) {
+      rpcClient.invokeConcurrent(locations, method);
+    } else {
+      rpcClient.invokeSequential(locations, method);
+    }
   }
 
   @Override
@@ -1344,7 +1356,11 @@ public class RouterClientProtocol implements ClientProtocol {
         rpcServer.getLocationsForPath(src, true);
     RemoteMethod method = new RemoteMethod("removeAcl",
         new Class<?>[] {String.class}, new RemoteParam());
-    rpcClient.invokeSequential(locations, method);
+    if (rpcServer.isInvokeConcurrent(src)) {
+      rpcClient.invokeConcurrent(locations, method);
+    } else {
+      rpcClient.invokeSequential(locations, method);
+    }
   }
 
   @Override
@@ -1357,7 +1373,11 @@ public class RouterClientProtocol implements ClientProtocol {
     RemoteMethod method = new RemoteMethod(
         "setAcl", new Class<?>[] {String.class, List.class},
         new RemoteParam(), aclSpec);
-    rpcClient.invokeSequential(locations, method);
+    if (rpcServer.isInvokeConcurrent(src)) {
+      rpcClient.invokeConcurrent(locations, method);
+    } else {
+      rpcClient.invokeSequential(locations, method);
+    }
   }
 
   @Override
