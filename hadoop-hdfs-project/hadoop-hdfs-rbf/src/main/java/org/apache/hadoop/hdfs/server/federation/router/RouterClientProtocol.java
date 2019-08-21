@@ -1942,7 +1942,12 @@ public class RouterClientProtocol implements ClientProtocol {
         owner = ugi.getUserName();
         group = ugi.getPrimaryGroupName();
       } catch (IOException e) {
-        LOG.error("Cannot get remote user: {}", e.getMessage());
+        String msg = "Cannot get remote user: " + e.getMessage();
+        if (UserGroupInformation.isSecurityEnabled()) {
+          LOG.error(msg);
+        } else {
+          LOG.debug(msg);
+        }
       }
     }
     long inodeId = 0;
