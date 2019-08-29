@@ -3176,6 +3176,20 @@ public class DistributedFileSystem extends FileSystem
     return ret;
   }
 
+  /**
+   * Refreshes the protection configurations.
+   */
+  public void refreshProtection() throws IOException {
+    dfs.refreshProtection();
+  }
+
+  /**
+   * Gets the protection configurations.
+   */
+  public String getProtection() throws IOException {
+    return dfs.getProtection();
+  }
+
   @Override
   protected Path fixRelativePart(Path p) {
     return super.fixRelativePart(p);

@@ -2919,6 +2919,32 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     }
   }
 
+  /**
+   * Refresh the protection configurations.  (Rereads them.)
+   * See {@link ClientProtocol#refreshProtection()}
+   * for more details.
+   *
+   * @see ClientProtocol#refreshProtection()
+   */
+  public void refreshProtection() throws IOException {
+    try (TraceScope ignored = tracer.newScope("refreshProtection")) {
+      namenode.refreshProtection();
+    }
+  }
+
+  /**
+   * Get the protection configurations.
+   * See {@link ClientProtocol#getProtection()}
+   * for more details.
+   *
+   * @see ClientProtocol#getProtection()
+   */
+  public String getProtection() throws IOException {
+    try (TraceScope ignored = tracer.newScope("getProtection")) {
+      return namenode.getProtection();
+    }
+  }
+
   public DFSInotifyEventInputStream getInotifyEventStream() throws IOException {
     checkOpen();
     return new DFSInotifyEventInputStream(namenode, tracer);

@@ -82,6 +82,7 @@ import org.apache.hadoop.ha.protocolPB.HAServiceProtocolPB;
 import org.apache.hadoop.ha.protocolPB.HAServiceProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
 import org.apache.hadoop.hdfs.inotify.EventBatch;
@@ -245,6 +246,9 @@ public class NameNodeRpcServer implements NamenodeProtocols {
   protected final FSNamesystem namesystem;
   protected final NameNode nn;
   private final NameNodeMetrics metrics;
+
+  /** ProtectionManager provides data protection functionality. */
+  private final ProtectionManager protectionManager;
 
   private final RetryCache retryCache;
 
@@ -558,6 +562,8 @@ public class NameNodeRpcServer implements NamenodeProtocols {
         this.clientRpcServer.addAuxiliaryListener(auxiliaryPort);
       }
     }
+
+    this.protectionManager = new ProtectionManager(this, conf);
   }
 
   /** Allow access to the lifeline RPC server for testing */
@@ -776,6 +782,18 @@ public class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // ClientProtocol
   public HdfsFileStatus create(String src, FsPermission masked,
+      String clientName, EnumSetWritable<CreateFlag> flag,
+      boolean createParent, short replication, long blockSize,
+      CryptoProtocolVersion[] supportedVersions, String ecPolicyName)
+      throws IOException {
+    // forwards to protectionManager.create()
+    return protectionManager.create(src, masked, clientName,
+        flag, createParent, replication,
+        blockSize, supportedVersions, ecPolicyName);
+  }
+
+  // The original create implementation in Apache Hadoop
+  public HdfsFileStatus createOriginal(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag,
       boolean createParent, short replication, long blockSize,
       CryptoProtocolVersion[] supportedVersions, String ecPolicyName)
@@ -1021,6 +1039,12 @@ public class NameNodeRpcServer implements NamenodeProtocols {
   @Deprecated
   @Override // ClientProtocol
   public boolean rename(String src, String dst) throws IOException {
+    // forwards to protectionManager.reanme()
+    return protectionManager.rename(src, dst);
+  }
+
+  // The original rename implementation in Apache Hadoop
+  public boolean renameOriginal(String src, String dst) throws IOException {
     checkNNStartup();
     if(stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*DIR* NameNode.rename: " + src + " to " + dst);
@@ -1068,6 +1092,13 @@ public class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void rename2(String src, String dst, Options.Rename... options)
       throws IOException {
+    // forwards to protectionManager.reanme2()
+    protectionManager.rename2(src, dst, options);
+  }
+
+  // The original rename2 implementation in Apache Hadoop
+  public void rename2Original(String src, String dst, Options.Rename... options)
+      throws IOException {
     checkNNStartup();
     if(stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*DIR* NameNode.rename: " + src + " to " + dst);
@@ -1110,6 +1141,13 @@ public class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // ClientProtocol
   public boolean delete(String src, boolean recursive) throws IOException {
+    // forwards to protectionManager.delete()
+    return protectionManager.delete(src, recursive);
+  }
+
+  // The original delete implementation in Apache Hadoop
+  public boolean deleteOriginal(String src, boolean recursive)
+      throws IOException {
     checkNNStartup();
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*DIR* Namenode.delete: src=" + src
@@ -2613,5 +2651,20 @@ public class NameNodeRpcServer implements NamenodeProtocols {
           + "external SPS service is not allowed to fetch the path Ids");
     }
     return namesystem.getBlockManager().getSPSManager().getNextPathId();
+  }
+
+  @Override // ClientProtocol
+  public void refreshProtection() throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    protectionManager.refreshProtection(new HdfsConfiguration());
+  }
+
+  @Override // ClientProtocol
+  public String getProtection() throws IOException {
+    checkNNStartup();
+    // only get contents form active NN.
+    namesystem.checkOperation(OperationCategory.WRITE);
+    return protectionManager.getProtection();
   }
 }

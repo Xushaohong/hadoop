@@ -1284,6 +1284,18 @@ public class RouterRpcServer extends AbstractService
     return nnProto.getNextSPSPath();
   }
 
+  @Override
+  public String getProtection() throws IOException {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public void refreshProtection() throws IOException {
+    // TODO Auto-generated method stub
+
+  }
+
   /**
    * Locate the location with the matching block pool id.
    *

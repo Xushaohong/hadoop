@@ -831,6 +831,19 @@ message ListOpenFilesResponseProto {
   repeated OpenFilesTypeProto types = 3;
 }
 
+message RefreshProtectionRequestProto { // no parameters
+}
+
+message RefreshProtectionResponseProto { // void response
+}
+
+message GetProtectionRequestProto { // no parameters
+}
+
+message GetProtectionResponseProto {
+  required string value = 1;
+}
+
 message MsyncRequestProto {
 }
 
@@ -1038,6 +1051,10 @@ service ClientNamenodeProtocol {
       returns(GetQuotaUsageResponseProto);
   rpc listOpenFiles(ListOpenFilesRequestProto)
       returns(ListOpenFilesResponseProto);
+  rpc refreshProtection(RefreshProtectionRequestProto)
+      returns(RefreshProtectionResponseProto);
+  rpc getProtection(GetProtectionRequestProto)
+      returns(GetProtectionResponseProto);
   rpc msync(MsyncRequestProto)
       returns(MsyncResponseProto);
   rpc satisfyStoragePolicy(SatisfyStoragePolicyRequestProto)

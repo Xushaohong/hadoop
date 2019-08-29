@@ -464,6 +464,8 @@ public class DFSAdmin extends FsShell {
     "\t[-metasave filename]\n" +
     "\t[-triggerBlockReport [-incremental] <datanode_host:ipc_port> [-namenode <namenode_host:ipc_port>]]\n" +
     "\t[-listOpenFiles [-blockingDecommission] [-path <path>]]\n" +
+    "\t[-refreshProtection]\n" +
+    "\t[-printProtection]\n" +
     "\t[-help [cmd]]\n";
 
   /**
@@ -2174,6 +2176,10 @@ public class DFSAdmin extends FsShell {
     } else if ("-listOpenFiles".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
           + " [-listOpenFiles [-blockingDecommission] [-path <path>]]");
+    } else if ("-refreshProtection".equals(cmd)) {
+      System.err.println("Usage: hdfs dfsadmin [-refreshProtection]");
+    } else if ("-printProtection".equals(cmd)) {
+      System.err.println("Usage: hdfs dfsadmin [-printProtection]");
     } else {
       System.err.println("Usage: hdfs dfsadmin");
       System.err.println("Note: Administrative commands can only be run as the HDFS superuser.");
@@ -2422,6 +2428,10 @@ public class DFSAdmin extends FsShell {
         exitCode = triggerBlockReport(argv);
       } else if ("-listOpenFiles".equals(cmd)) {
         exitCode = listOpenFiles(argv);
+      } else if ("-refreshProtection".equals(cmd)) {
+        exitCode = refreshProtection();
+      } else if ("-printProtection".equals(cmd)) {
+        exitCode = printProtection();
       } else if ("-help".equals(cmd)) {
         if (i < argv.length) {
           printHelp(argv[i]);
@@ -2572,6 +2582,67 @@ public class DFSAdmin extends FsShell {
       throw new IOException("Datanode unreachable. " + ioe, ioe);
     }
     return 0;
+  }
+
+
+  /**
+   * Command to ask the namenode to refresh protection configuration.
+   * file.
+   * Usage: hdfs dfsadmin -refreshProtection
+   * @exception IOException
+   */
+  public int refreshProtection() throws IOException {
+    int exitCode = -1;
+
+    DistributedFileSystem dfs = getDFS();
+    Configuration dfsConf = dfs.getConf();
+    URI dfsUri = dfs.getUri();
+    boolean isHaEnabled = HAUtilClient.isLogicalUri(dfsConf, dfsUri);
+
+    if (isHaEnabled) {
+      String nsId = dfsUri.getHost();
+      List<ProxyAndInfo<ClientProtocol>> proxies =
+          HAUtil.getProxiesForAllNameNodesInNameservice(dfsConf,
+          nsId, ClientProtocol.class);
+      for (ProxyAndInfo<ClientProtocol> proxy: proxies) {
+        proxy.getProxy().refreshProtection();
+        System.out.println("Refresh protection successful for " +
+            proxy.getAddress());
+      }
+    } else {
+      dfs.refreshProtection();
+      System.out.println("Refresh protection successful");
+    }
+    exitCode = 0;
+
+    return exitCode;
+  }
+
+  /**
+   * Command to print the protection configuration retrieved from namenode.
+   *
+   * Usage: hdfs dfsadmin -printProtection
+   * @exception IOException
+   */
+  public int printProtection() throws IOException {
+    int exitCode = -1;
+
+    DistributedFileSystem dfs = getDFS();
+    Configuration dfsConf = dfs.getConf();
+    URI dfsUri = dfs.getUri();
+    boolean isHaEnabled = HAUtilClient.isLogicalUri(dfsConf, dfsUri);
+
+    String ret = dfs.getProtection();
+
+    if (isHaEnabled) {
+      System.out.println("Protection configurations retrieved from "
+          + "Active NameNode:");
+      System.out.println("---------------------------------------------------");
+    }
+    System.out.println(ret);
+    exitCode = 0;
+
+    return exitCode;
   }
 
   /**

@@ -1824,4 +1824,19 @@ public interface ClientProtocol {
    */
   @AtMostOnce
   void satisfyStoragePolicy(String path) throws IOException;
+
+  /**
+   * Tells the namenode to reread the protection related configurations.
+   * @throws IOException
+   */
+  @Idempotent
+  void refreshProtection() throws IOException;
+
+  /**
+   * Gets the protection related configurations from namenode.
+   * @return current protection configuration as a String.
+   * @throws IOException
+   */
+  @Idempotent
+  String getProtection() throws IOException;
 }
