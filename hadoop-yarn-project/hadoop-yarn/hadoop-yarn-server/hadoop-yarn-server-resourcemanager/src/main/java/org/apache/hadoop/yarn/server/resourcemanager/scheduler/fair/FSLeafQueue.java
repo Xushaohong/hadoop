@@ -794,4 +794,20 @@ public class FSLeafQueue extends FSQueue {
   public boolean isNeedResource() {
     return needResource;
   }
+
+  @Override
+  public List<Schedulable> simulateSchedule() {
+    List<FSAppAttempt> apps = null;
+    readLock.lock();
+    try {
+      apps = new ArrayList<>(runnableApps);
+    } finally {
+      readLock.unlock();
+    }
+    if (scheduler.getConf().isSortAppsEnabled()) {
+      return simulateSchedule(apps);
+    }else {
+      return simulateScheduleWithoutSort(apps);
+    }
+  }
 }
