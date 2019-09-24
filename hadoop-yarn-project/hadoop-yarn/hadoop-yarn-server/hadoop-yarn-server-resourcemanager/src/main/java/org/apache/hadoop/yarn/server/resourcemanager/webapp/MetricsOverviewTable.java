@@ -189,6 +189,8 @@ public class MetricsOverviewTable extends HtmlBlock {
             th().$class("ui-state-default").__("Apps Pending").__().
             th().$class("ui-state-default").__("Apps Running").__().
             th().$class("ui-state-default").__("Apps Completed").__().
+            th().$class("ui-state-default").__("Apps Failed").__().
+            th().$class("ui-state-default").__("Apps Killed").__().
             th().$class("ui-state-default").__("Containers Running").__().
             th().$class("ui-state-default").__("Containers Pending").__().
             th().$class("ui-state-default").__("Containers Reserved").__().
@@ -205,12 +207,9 @@ public class MetricsOverviewTable extends HtmlBlock {
             td(String.valueOf(userMetrics.getAppsSubmitted())).
             td(String.valueOf(userMetrics.getAppsPending())).
             td(String.valueOf(userMetrics.getAppsRunning())).
-            td(
-                String.valueOf(
-                    (userMetrics.getAppsCompleted() + 
-                     userMetrics.getAppsFailed() + userMetrics.getAppsKilled())
-                    )
-              ).
+            td(String.valueOf(clusterMetrics.getAppsCompleted())).
+            td(String.valueOf(clusterMetrics.getAppsFailed())).
+            td(String.valueOf(clusterMetrics.getAppsKilled())).
             td(String.valueOf(userMetrics.getRunningContainers())).
             td(String.valueOf(userMetrics.getPendingContainers())).
             td(String.valueOf(userMetrics.getReservedContainers())).
