@@ -366,4 +366,8 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   protected boolean isStopped() {
     return stopped;
   }
+
+  public int getEventQueueSize() {
+    return eventQueue.size();
+  }
 }

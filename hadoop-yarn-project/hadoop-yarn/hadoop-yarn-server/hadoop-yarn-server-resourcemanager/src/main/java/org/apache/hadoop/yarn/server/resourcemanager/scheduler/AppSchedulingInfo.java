@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.yarn.server.resourcemanager.ClusterMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -737,6 +738,7 @@ public class AppSchedulingInfo {
           containerAllocated.getContainer().getResource());
     }
     queue.getMetrics().incrNodeTypeAggregations(user, type);
+    ClusterMetrics.getMetrics().incrNumContainerAssigned();
   }
 
   // Get AppPlacementAllocator by specified schedulerKey

@@ -20,8 +20,12 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -50,13 +54,33 @@ public class ClusterMetrics {
   @Metric("AM register delay") MutableRate aMRegisterDelay;
   @Metric("AM container allocation delay")
   private MutableRate aMContainerAllocationDelay;
+  @Metric("# of Containers assigned in last second")
+    MutableGaugeInt numContainerAssignedPerSecond;
+  @Metric("# rm queue size") MutableGaugeInt rmQueueSize;
+  @Metric("# scheduler queue size") MutableGaugeInt schedulerQueueSize;
 
   private static final MetricsInfo RECORD_INFO = info("ClusterMetrics",
   "Metrics for the Yarn Cluster");
   
   private static volatile ClusterMetrics INSTANCE = null;
   private static MetricsRegistry registry;
+
+  private AtomicInteger numContainersAssigned =  new AtomicInteger(0);
+  private ScheduledThreadPoolExecutor assignCounterExecutor;
   
+  public ClusterMetrics() {
+    assignCounterExecutor  = new ScheduledThreadPoolExecutor(1,
+            new ThreadFactoryBuilder().
+                    setDaemon(true).setNameFormat("ContainerAssignmentCounterThread").
+                    build());
+    assignCounterExecutor.scheduleAtFixedRate(new Runnable() {
+      @Override
+      public void run() {
+        numContainerAssignedPerSecond.set(numContainersAssigned.getAndSet(0));
+      }
+    }, 1, 1, TimeUnit.SECONDS);
+  }
+
   public static ClusterMetrics getMetrics() {
     if(!isInitialized.get()){
       synchronized (ClusterMetrics.class) {
@@ -83,6 +107,9 @@ public class ClusterMetrics {
   synchronized static void destroy() {
     isInitialized.set(false);
     INSTANCE = null;
+    if (INSTANCE != null && INSTANCE.getAssignCounterExecutor() != null) {
+      INSTANCE.getAssignCounterExecutor().shutdownNow();
+    }
   }
   
   //Active Nodemanagers
@@ -198,5 +225,33 @@ public class ClusterMetrics {
 
   public MutableRate getAMContainerAllocationDelay() {
     return aMContainerAllocationDelay;
+  }
+
+  public int getnumContainerAssignedPerSecond() {
+    return numContainerAssignedPerSecond.value();
+  }
+
+  public void incrNumContainerAssigned() {
+    numContainersAssigned.incrementAndGet();
+  }
+
+  public void setRmQueueSize(int size) {
+    rmQueueSize.set(size);
+  }
+
+  public int getRmQueueSize() {
+    return rmQueueSize.value();
+  }
+
+  public void setSchedulerQueueSize(int size) {
+    schedulerQueueSize.set(size);
+  }
+
+  public int getSchedulerQueueSize() {
+    return schedulerQueueSize.value();
+  }
+
+  private ScheduledThreadPoolExecutor getAssignCounterExecutor(){
+    return assignCounterExecutor;
   }
 }

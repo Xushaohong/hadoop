@@ -131,4 +131,8 @@ public class EventDispatcher<T extends Event> extends
   public void disableExitOnError() {
     shouldExitOnError = false;
   }
+
+  public int getEventQueueSize() {
+    return eventQueue.size();
+  }
 }
