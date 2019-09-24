@@ -161,10 +161,11 @@ static void assert_valid_setup(char *argv0) {
     exit(INVALID_CONFIG_FILE);
   }
 
+  /*
   if (check_configuration_permissions(conf_file) != 0) {
     flush_and_close_log_files();
     exit(INVALID_CONFIG_FILE);
-  }
+  }*/
   read_executor_config(conf_file);
 
   // look up the node manager group in the config file
