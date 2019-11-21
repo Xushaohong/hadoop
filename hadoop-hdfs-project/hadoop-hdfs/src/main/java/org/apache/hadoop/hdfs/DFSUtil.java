@@ -74,6 +74,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.Util;
@@ -1762,6 +1763,34 @@ public class DFSUtil {
             + descendant);
       }
     }
+  }
+
+  /**
+   * Generates HdfsFileStatus flags.
+   * @param isEncrypted Sets HAS_CRYPT
+   * @param isErasureCoded Sets HAS_EC
+   * @param isSnapShottable Sets SNAPSHOT_ENABLED
+   * @param hasAcl Sets HAS_ACL
+   * @return HdfsFileStatus Flags
+   */
+  public static EnumSet<HdfsFileStatus.Flags> getFlags(
+      final boolean isEncrypted, final boolean isErasureCoded,
+      boolean isSnapShottable, boolean hasAcl) {
+    EnumSet<HdfsFileStatus.Flags> flags =
+        EnumSet.noneOf(HdfsFileStatus.Flags.class);
+    if (hasAcl) {
+      flags.add(HdfsFileStatus.Flags.HAS_ACL);
+    }
+    if (isEncrypted) {
+      flags.add(HdfsFileStatus.Flags.HAS_CRYPT);
+    }
+    if (isErasureCoded) {
+      flags.add(HdfsFileStatus.Flags.HAS_EC);
+    }
+    if (isSnapShottable) {
+      flags.add(HdfsFileStatus.Flags.SNAPSHOT_ENABLED);
+    }
+    return flags;
   }
 
 }
