@@ -319,6 +319,10 @@ public class JobHistoryUtils {
    * @return full qualified path (if necessary) in default file system
    */
   private static String ensurePathInDefaultFileSystem(String sourcePath, Configuration conf) {
+    //use specified default filesystem by conf
+    if (!conf.getBoolean("mapreduce.jobhistory.ensure.path.in.defaultFS", false)) {
+      return sourcePath;
+    }
     Path path = new Path(sourcePath);
     FileContext fc = getDefaultFileContext();
     if (fc == null ||
