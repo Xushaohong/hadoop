@@ -155,7 +155,6 @@ public class FSLeafQueue extends FSQueue {
   boolean removeNonRunnableApp(FSAppAttempt app) {
     writeLock.lock();
     try {
-      app.setRemoved();
       return nonRunnableApps.remove(app);
     } finally {
       writeLock.unlock();
