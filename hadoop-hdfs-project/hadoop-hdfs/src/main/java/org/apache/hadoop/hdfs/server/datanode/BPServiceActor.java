@@ -576,6 +576,9 @@ class BPServiceActor implements Runnable {
     if (bpThread != null) {
       bpThread.interrupt();
     }
+    if (commandProcessingThread != null) {
+      commandProcessingThread.interrupt();
+    }
   }
   
   //This must be called only by blockPoolManager
