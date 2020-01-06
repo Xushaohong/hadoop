@@ -1927,6 +1927,8 @@ public class RouterClientProtocol implements ClientProtocol {
     FsPermission permission = FsPermission.getDirDefault();
     String owner = this.superUser;
     String group = this.superGroup;
+    EnumSet<HdfsFileStatus.Flags> flags =
+        EnumSet.noneOf(HdfsFileStatus.Flags.class);
     if (subclusterResolver instanceof MountTableResolver) {
       try {
         String mName = name.startsWith("/") ? name : "/" + name;
@@ -1946,6 +1948,9 @@ public class RouterClientProtocol implements ClientProtocol {
             owner = fInfo.getOwner();
             group = fInfo.getGroup();
             childrenNum = fInfo.getChildrenNum();
+            flags = DFSUtil
+                .getFlags(fInfo.isEncrypted(), fInfo.isErasureCoded(),
+                    fInfo.isSnapshotEnabled(), fInfo.hasAcl());
           }
         }
       } catch (IOException e) {
@@ -1977,6 +1982,7 @@ public class RouterClientProtocol implements ClientProtocol {
         .path(DFSUtil.string2Bytes(name))
         .fileId(inodeId)
         .children(childrenNum)
+        .flags(flags)
         .build();
   }
 
