@@ -335,6 +335,10 @@ public class BlockManager implements BlockStatsMXBean {
   private final Daemon storageInfoDefragmenterThread =
       new Daemon(new StorageInfoDefragmenter());
   
+  /** Invalidation thread. */
+  private final Daemon invalidationThread =
+      new Daemon(new InvalidationMonitor());
+
   /** Block report thread for handling async reports. */
   private final BlockReportProcessingThread blockReportThread;
 
@@ -458,6 +462,8 @@ public class BlockManager implements BlockStatsMXBean {
 
   /** Storages accessible from multiple DNs. */
   private final ProvidedStorageMap providedStorageMap;
+
+  private boolean blockInvalidationIndependent = false;
 
   public BlockManager(final Namesystem namesystem, boolean haEnabled,
       final Configuration conf) throws IOException {
@@ -607,13 +613,20 @@ public class BlockManager implements BlockStatsMXBean {
         DFSConfigKeys.DFS_NAMENODE_BLOCKREPORT_QUEUE_SIZE_DEFAULT);
     blockReportThread = new BlockReportProcessingThread(queueSize);
 
-    LOG.info("defaultReplication         = {}", defaultReplication);
-    LOG.info("maxReplication             = {}", maxReplication);
-    LOG.info("minReplication             = {}", minReplication);
-    LOG.info("maxReplicationStreams      = {}", maxReplicationStreams);
-    LOG.info("redundancyRecheckInterval  = {}ms", redundancyRecheckIntervalMs);
-    LOG.info("encryptDataTransfer        = {}", encryptDataTransfer);
-    LOG.info("maxNumBlocksToLog          = {}", maxNumBlocksToLog);
+    this.blockInvalidationIndependent =
+        conf.getBoolean(DFSConfigKeys.DFS_NAMENODE_BLOCK_INDEPENDENT_KEY,
+            DFSConfigKeys.DFS_NAMENODE_BLOCK_INDEPENDENT_DEFAULT);
+
+    LOG.info("defaultReplication            = {}", defaultReplication);
+    LOG.info("maxReplication                = {}", maxReplication);
+    LOG.info("minReplication                = {}", minReplication);
+    LOG.info("maxReplicationStreams         = {}", maxReplicationStreams);
+    LOG.info("redundancyRecheckInterval     = {}ms",
+        redundancyRecheckIntervalMs);
+    LOG.info("encryptDataTransfer           = {}", encryptDataTransfer);
+    LOG.info("maxNumBlocksToLog             = {}", maxNumBlocksToLog);
+    LOG.info("blockInvalidationIndependent  = {}",
+        blockInvalidationIndependent);
   }
 
   private static BlockTokenSecretManager createBlockTokenSecretManager(
@@ -734,6 +747,7 @@ public class BlockManager implements BlockStatsMXBean {
     storageInfoDefragmenterThread.setName("StorageInfoMonitor");
     storageInfoDefragmenterThread.start();
     this.blockReportThread.start();
+    this.invalidationThread.start();
     mxBeanName = MBeans.register("NameNode", "BlockStats", this);
     bmSafeMode.activate(blockTotal);
   }
@@ -745,9 +759,11 @@ public class BlockManager implements BlockStatsMXBean {
     bmSafeMode.close();
     try {
       redundancyThread.interrupt();
+      invalidationThread.interrupt();
       storageInfoDefragmenterThread.interrupt();
       blockReportThread.interrupt();
       redundancyThread.join(3000);
+      invalidationThread.join(3000);
       storageInfoDefragmenterThread.join(3000);
       blockReportThread.join(3000);
     } catch (InterruptedException ie) {
@@ -4813,6 +4829,43 @@ public class BlockManager implements BlockStatsMXBean {
   }
 
   /**
+   * Periodically call invalidation blocks independent.
+   */
+  private class InvalidationMonitor implements Runnable {
+
+    @Override
+    public void run() {
+      while (namesystem.isRunning()) {
+        try {
+          // Process replication work only when active NN is out of safe mode.
+          if (isPopulatingReplQueues()) {
+            if (!blockInvalidationIndependent) {
+              break;
+            }
+            computeDatanodeWork(false, true);
+          }
+          TimeUnit.MILLISECONDS.sleep(redundancyRecheckIntervalMs);
+        } catch (Throwable t) {
+          if (!namesystem.isRunning()) {
+            LOG.info("Stopping InvalidationiMonitor.");
+            if (!(t instanceof InterruptedException)) {
+              LOG.info("InvalidationiMonitor received an exception"
+                  + " while shutting down.", t);
+            }
+            break;
+          } else if (!checkNSRunning && t instanceof InterruptedException) {
+            LOG.info("Stopping InvalidationiMonitor for testing.");
+            break;
+          }
+          LOG.error("InvalidationiMonitor thread received Runtime exception. ",
+              t);
+          terminate(1, t);
+        }
+      }
+    }
+  }
+
+  /**
    * Periodically calls computeBlockRecoveryWork().
    */
   private class RedundancyMonitor implements Runnable {
@@ -4823,7 +4876,11 @@ public class BlockManager implements BlockStatsMXBean {
         try {
           // Process recovery work only when active NN is out of safe mode.
           if (isPopulatingReplQueues()) {
-            computeDatanodeWork();
+            if (blockInvalidationIndependent) {
+              computeDatanodeWork(true, false);
+            } else {
+              computeDatanodeWork(true, true);
+            }
             processPendingReconstructions();
             rescanPostponedMisreplicatedBlocks();
             lastRedundancyCycleTS.set(Time.monotonicNow());
@@ -4935,6 +4992,12 @@ public class BlockManager implements BlockStatsMXBean {
     }
   }
 
+
+  @VisibleForTesting
+  int computeDatanodeWork() {
+    return computeDatanodeWork(true, true);
+  }
+
   /**
    * Compute block replication and block invalidation work that can be scheduled
    * on data-nodes. The datanode will be informed of this work at the next
@@ -4942,7 +5005,7 @@ public class BlockManager implements BlockStatsMXBean {
    * 
    * @return number of blocks scheduled for replication or removal.
    */
-  int computeDatanodeWork() {
+  int computeDatanodeWork(boolean replication, boolean invalidation) {
     // Blocks should not be replicated or removed if in safe mode.
     // It's OK to check safe mode here w/o holding lock, in the worst
     // case extra replications will be scheduled, and these will get
@@ -4957,7 +5020,10 @@ public class BlockManager implements BlockStatsMXBean {
     final int nodesToProcess = (int) Math.ceil(numlive
         * this.blocksInvalidateWorkPct);
 
-    int workFound = this.computeBlockReconstructionWork(blocksToProcess);
+    int workFound = 0;
+    if (replication) {
+      workFound += computeBlockReconstructionWork(blocksToProcess);
+    }
 
     // Update counters
     namesystem.writeLock();
@@ -4967,7 +5033,11 @@ public class BlockManager implements BlockStatsMXBean {
     } finally {
       namesystem.writeUnlock();
     }
-    workFound += this.computeInvalidateWork(nodesToProcess);
+
+    if (invalidation) {
+      workFound += computeInvalidateWork(nodesToProcess);
+    }
+
     return workFound;
   }
 

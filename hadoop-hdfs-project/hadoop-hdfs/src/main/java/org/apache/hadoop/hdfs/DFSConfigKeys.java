@@ -1639,6 +1639,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String  DFS_CLIENT_HTTPS_NEED_AUTH_KEY =
       HdfsClientConfigKeys.DeprecatedKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY;
   public static final boolean DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
+  public static final String DFS_NAMENODE_BLOCK_INDEPENDENT_KEY =
+      "dfs.namenode.block.invalidation.independent";
+  public static final boolean DFS_NAMENODE_BLOCK_INDEPENDENT_DEFAULT = false;
 
   // Much code in hdfs is not yet updated to use these keys.
   // the initial delay (unit is ms) for locateFollowingBlock, the delay time will increase exponentially(double) for each retry.
