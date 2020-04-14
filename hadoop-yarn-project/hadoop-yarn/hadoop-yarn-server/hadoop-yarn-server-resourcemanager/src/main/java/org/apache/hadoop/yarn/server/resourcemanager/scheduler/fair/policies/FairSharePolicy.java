@@ -103,14 +103,8 @@ public class FairSharePolicy extends SchedulingPolicy {
         res = compareFairShareUsage(s1, s2, resourceUsage1, resourceUsage2);
       }
 
-      // Break the tie by submit time
       if (res == 0) {
-        res = (int) Math.signum(s1.getStartTime() - s2.getStartTime());
-      }
-
-      // Break the tie by job name
-      if (res == 0) {
-        res = s1.getName().compareTo(s2.getName());
+        return FairCommonComparator.trivalCompare(s1, s2);
       }
 
       return res;

@@ -169,4 +169,12 @@ public class FakeSchedulable implements Schedulable {
   public final void start(long time) {
     startTime = time;
   }
+
+  @Override
+  public void updateNeedResource() {}
+
+  @Override
+  public boolean isNeedResource() {
+    return true;
+  }
 }

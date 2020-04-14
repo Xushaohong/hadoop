@@ -97,6 +97,8 @@ public class AppSchedulingInfo {
   private final Map<String, String> applicationSchedulingEnvs = new HashMap<>();
   private final RMContext rmContext;
 
+  boolean needResource = true;
+
   public AppSchedulingInfo(ApplicationAttemptId appAttemptId, String user,
       Queue queue, AbstractUsersManager abstractUsersManager, long epoch,
       ResourceUsage appResourceUsage,
@@ -393,6 +395,10 @@ public class AppSchedulingInfo {
         newPendingAsk.getPerAllocationResource(), newPendingAsk.getCount());
     queue.incPendingResource(newNodePartition, increasedResource);
     appResourceUsage.incPending(newNodePartition, increasedResource);
+
+    if (newPendingAsk.getCount() > 0) {
+      this.needResource = true;
+    }
   }
 
   public void addRequestedPartition(String partition) {
@@ -567,6 +573,9 @@ public class AppSchedulingInfo {
   public void checkForDeactivation() {
     if (schedulerKeys.isEmpty()) {
       abstractUsersManager.deactivateApplication(user, applicationId);
+      this.needResource = false;
+    }else {
+      this.needResource = true;
     }
   }
   
@@ -816,5 +825,9 @@ public class AppSchedulingInfo {
 
   public RMContext getRMContext() {
     return this.rmContext;
+  }
+
+  public boolean isNeedResource() {
+    return needResource;
   }
 }

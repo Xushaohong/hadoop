@@ -91,6 +91,8 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
   private long lastTimeAtFairShare;
   private long nextStarvationCheck;
 
+  private boolean isRemoved = false;
+
   // minShareStarvation attributed to this application by the leaf queue
   private Resource minshareStarvation = Resources.none();
 
@@ -1440,5 +1442,24 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
   @Override
   public boolean isPreemptable() {
     return getQueue().isPreemptable();
+  }
+
+  @Override
+  public void updateNeedResource() {
+    throw new RuntimeException(
+            "FSAppAttempt not surport updateNeedResource");
+  }
+
+  @Override
+  public boolean isNeedResource() {
+    return appSchedulingInfo.isNeedResource();
+  }
+
+  public void setRemoved() {
+    isRemoved = true;
+  }
+
+  public boolean isRemoved() {
+    return isRemoved;
   }
 }

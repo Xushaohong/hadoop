@@ -21,12 +21,13 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.TreeSet;
+import java.util.Comparator;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -55,9 +56,18 @@ public class FSParentQueue extends FSQueue {
   private Lock readLock = rwLock.readLock();
   private Lock writeLock = rwLock.writeLock();
 
+  private Resource minResource;
+
   public FSParentQueue(String name, FairScheduler scheduler,
       FSParentQueue parent) {
     super(name, scheduler, parent);
+    int minAllocMb = scheduler.getConf().getInt(
+            YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB);
+    int minAllocVcores = scheduler.getConf().getInt(
+            YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES,
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
+    this.minResource = Resource.newInstance(minAllocMb, minAllocVcores);
   }
 
   @Override
@@ -209,19 +219,47 @@ public class FSParentQueue extends FSQueue {
     // We do not have to handle the queue removal case as a queue must be
     // empty before removal. Assigning an application to a queue and removal of
     // that queue both need the scheduler lock.
-    TreeSet<FSQueue> sortedChildQueues = new TreeSet<>(policy.getComparator());
+    Comparator<Schedulable> comparator = policy.getComparator();
+    CuedFloydHeap<FSQueue> heap = new CuedFloydHeap<FSQueue>(comparator);
+    // If hasQueueInfo is true, even if nodeQueues.size() = 0,
+    // the node can be assigned.
     readLock.lock();
-    try {
-      sortedChildQueues.addAll(childQueues);
-      for (FSQueue child : sortedChildQueues) {
-        assigned = child.assignContainer(node);
-        if (!Resources.equals(assigned, Resources.none())) {
-          break;
+    List<FSQueue> queues = new ArrayList<>();
+    for (FSQueue queue : childQueues) {
+      if (!queue.fitsInMaxShare(minResource)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.info("Queue " + getName() + " could not get more resource, skip it, current usage: "
+                  + queue.getResourceUsage() + ", max share: " + queue.getMaxShare());
         }
+        continue;
       }
-    } finally {
-      readLock.unlock();
+      if (queue.isNeedResource()) {
+        queues.add(queue);
+      }
     }
+    heap.initElementsFromCollection(queues);
+    readLock.unlock();
+
+    scheduler.getSchedulerWriteLock().unlock();
+    try {
+      heap.heapify();
+    } finally {
+      scheduler.getSchedulerWriteLock().lock();
+    }
+
+    readLock.lock();
+    while (heap.size() > 0) {
+      FSQueue child = heap.poll();
+      if (!child.isNeedResource()) {
+        break;
+      }
+      assigned = child.assignContainer(node);
+      if (!Resources.equals(assigned, Resources.none())) {
+        break;
+      }
+    }
+    readLock.unlock();
+
     return assigned;
   }
 
@@ -308,5 +346,20 @@ public class FSParentQueue extends FSQueue {
       sb.append(", ");
       child.dumpStateInternal(sb);
     }
+  }
+
+  @Override
+  public void updateNeedResource() {
+    boolean hasRequest = false;
+    for (FSQueue childQueue : childQueues) {
+      childQueue.updateNeedResource();
+      hasRequest = hasRequest || childQueue.isNeedResource();
+    }
+    needResource = hasRequest;
+  }
+
+  @Override
+  public boolean isNeedResource() {
+    return needResource;
   }
 }

@@ -87,6 +87,8 @@ public abstract class FSQueue implements Queue, Schedulable {
   private boolean isDynamic = true;
   protected Resource maxContainerAllocation;
 
+  protected boolean needResource = true;
+
   public FSQueue(String name, FairScheduler scheduler, FSParentQueue parent) {
     this.name = name;
     this.scheduler = scheduler;
@@ -450,7 +452,13 @@ public abstract class FSQueue implements Queue, Schedulable {
             + dumpState());
       }
       return false;
-    } else {
+    } else if (node.isRemoved()){
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Assigning container failed on node '" + node.getNodeName()
+                + " because node is removed ");
+      }
+      return false;
+    }else {
       return true;
     }
   }
@@ -610,5 +618,15 @@ public abstract class FSQueue implements Queue, Schedulable {
 
   public void setDynamic(boolean dynamic) {
     this.isDynamic = dynamic;
+  }
+
+  @Override
+  public void updateNeedResource() {
+    throw new RuntimeException("FSQueue not support updateNeedResource");
+  }
+
+  @Override
+  public boolean isNeedResource() {
+    return needResource;
   }
 }

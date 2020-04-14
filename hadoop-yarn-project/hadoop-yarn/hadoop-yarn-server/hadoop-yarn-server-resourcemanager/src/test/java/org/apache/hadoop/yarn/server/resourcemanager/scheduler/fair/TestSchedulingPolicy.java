@@ -309,6 +309,14 @@ public class TestSchedulingPolicy {
       public boolean isPreemptable() {
         return true;
       }
+
+      @Override
+      public void updateNeedResource() {}
+
+      @Override
+      public boolean isNeedResource() {
+        return true;
+      }
     }
   }
 
