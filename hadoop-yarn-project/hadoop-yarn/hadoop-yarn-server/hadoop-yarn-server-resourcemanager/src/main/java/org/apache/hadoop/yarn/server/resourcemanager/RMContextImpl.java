@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
 import org.slf4j.Logger;
@@ -323,6 +324,16 @@ public class RMContextImpl implements RMContext {
   @Override
   public ConcurrentMap<NodeId, RMNode> getInactiveRMNodes() {
     return activeServiceContext.getInactiveRMNodes();
+  }
+
+  @Override
+  public Set<String> getDisabledSchedulingRMNodes() {
+    return activeServiceContext.getDisabledSchedulingRMNodes();
+  }
+
+  @Override
+  public void setDisabledSchedulingRMNodes(Set<String> set) {
+    activeServiceContext.setDisabledSchedulingRMNodes(set);
   }
 
   @Override

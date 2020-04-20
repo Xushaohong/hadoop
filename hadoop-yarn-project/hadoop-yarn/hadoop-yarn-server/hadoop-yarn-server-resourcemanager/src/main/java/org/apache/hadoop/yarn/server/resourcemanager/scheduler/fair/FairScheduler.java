@@ -1175,6 +1175,15 @@ public class FairScheduler extends
         return;
       }
 
+      Set<String> set = rmContext.getDisabledSchedulingRMNodes();
+      if (set.contains(nodeID.getHost())) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Skipping scheduling as the node " + nodeID +
+              " has been disabled scheduling");
+        }
+        return;
+      }
+
       // Assign new containers...
       // 1. Ensure containers are assigned to the apps that preempted
       // 2. Check for reserved applications

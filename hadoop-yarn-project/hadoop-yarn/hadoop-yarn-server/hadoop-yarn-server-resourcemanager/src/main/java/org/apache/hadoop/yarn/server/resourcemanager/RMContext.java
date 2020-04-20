@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import java.nio.ByteBuffer;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
 import org.apache.hadoop.conf.Configuration;
@@ -74,6 +75,10 @@ public interface RMContext extends ApplicationMasterServiceContext {
   ConcurrentMap<ApplicationId, ByteBuffer> getSystemCredentialsForApps();
 
   ConcurrentMap<NodeId, RMNode> getInactiveRMNodes();
+
+  Set<String> getDisabledSchedulingRMNodes();
+
+  void setDisabledSchedulingRMNodes(Set<String> set);
 
   ConcurrentMap<NodeId, RMNode> getRMNodes();
 

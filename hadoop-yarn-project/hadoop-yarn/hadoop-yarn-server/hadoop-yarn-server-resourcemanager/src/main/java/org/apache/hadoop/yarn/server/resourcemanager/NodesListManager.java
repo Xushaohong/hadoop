@@ -117,6 +117,7 @@ public class NodesListManager extends CompositeService implements
       this.hostsReader =
           createHostsFileReader(this.includesFile, this.excludesFile);
       setDecomissionedNMs();
+      setDisableSchedulingNMs();
       printConfiguredHosts(false);
     } catch (YarnException ex) {
       disableHostsFileReader(ex);
@@ -277,7 +278,7 @@ public class NodesListManager extends CompositeService implements
   // Gracefully decommission excluded nodes that are not already
   // DECOMMISSIONED nor DECOMMISSIONING; Take no action for excluded nodes
   // that are already DECOMMISSIONED or DECOMMISSIONING.
-  private void handleExcludeNodeList(boolean graceful, int timeout) {
+  private void handleExcludeNodeList(boolean graceful, int timeout) throws IOException {
     // DECOMMISSIONED/DECOMMISSIONING nodes need to be re-commissioned.
     List<RMNode> nodesToRecom = new ArrayList<RMNode>();
 
@@ -363,6 +364,22 @@ public class NodesListManager extends CompositeService implements
     }
 
     updateInactiveNodes();
+    setDisableSchedulingNMs();
+  }
+
+  private void setDisableSchedulingNMs() throws IOException {
+    String disableSchedulingFile = conf.get(YarnConfiguration.RM_NODES_DISABLE_SCHEDULING_FILE_PATH,
+        YarnConfiguration.DEFAULT_RM_NODES_DISABLE_SCHEDULING_FILE_PATH);
+    Set<String> set = new HashSet<>();
+    if(!org.apache.commons.lang3.StringUtils.isBlank(disableSchedulingFile)){
+      HostsFileReader.readFileToSet("disableSchedulingFile", disableSchedulingFile, set);
+    }
+    if (LOG.isDebugEnabled()) {
+      for (String host : set) {
+        LOG.info("Add " + host + " to disable scheduling list");
+      }
+    }
+    rmContext.setDisabledSchedulingRMNodes(set);
   }
 
   @VisibleForTesting

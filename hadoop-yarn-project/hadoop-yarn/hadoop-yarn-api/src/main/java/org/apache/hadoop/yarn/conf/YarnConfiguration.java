@@ -576,7 +576,12 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_NODES_EXCLUDE_FILE_PATH = 
     RM_PREFIX + "nodes.exclude-path";
   public static final String DEFAULT_RM_NODES_EXCLUDE_FILE_PATH = "";
-  
+
+  /** Path to file with nodes to disable scheduling.*/
+  public static final String RM_NODES_DISABLE_SCHEDULING_FILE_PATH =
+    RM_PREFIX + "nodes.disable-scheduling-path";
+  public static final String DEFAULT_RM_NODES_DISABLE_SCHEDULING_FILE_PATH = "";
+
   /** Number of threads to handle resource tracker calls.*/
   public static final String RM_RESOURCE_TRACKER_CLIENT_THREAD_COUNT =
     RM_PREFIX + "resource-tracker.client.thread-count";

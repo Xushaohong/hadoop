@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import java.nio.ByteBuffer;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -78,6 +80,9 @@ public class RMActiveServiceContext {
 
   private final ConcurrentMap<NodeId, RMNode> inactiveNodes =
       new ConcurrentHashMap<NodeId, RMNode>();
+
+  private Set<String> disabledSchedulingNodes =
+      new HashSet<>();
 
   private final ConcurrentMap<ApplicationId, ByteBuffer> systemCredentials =
       new ConcurrentHashMap<ApplicationId, ByteBuffer>();
@@ -202,6 +207,18 @@ public class RMActiveServiceContext {
   @Unstable
   public ConcurrentMap<NodeId, RMNode> getInactiveRMNodes() {
     return this.inactiveNodes;
+  }
+
+  @Private
+  @Unstable
+  public synchronized Set<String> getDisabledSchedulingRMNodes() {
+    return this.disabledSchedulingNodes;
+  }
+
+  @Private
+  @Unstable
+  public synchronized void setDisabledSchedulingRMNodes(Set<String> set) {
+    this.disabledSchedulingNodes = set;
   }
 
   @Private
