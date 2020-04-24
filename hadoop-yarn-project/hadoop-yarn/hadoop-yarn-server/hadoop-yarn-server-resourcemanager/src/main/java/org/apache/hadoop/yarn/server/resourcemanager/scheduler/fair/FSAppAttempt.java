@@ -766,6 +766,10 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
   public void unreserve(SchedulerRequestKey schedulerKey,
       FSSchedulerNode node) {
     RMContainer rmContainer = node.getReservedContainer();
+    if (rmContainer == null || rmContainer.getContainer() == null) {
+      LOG.error("Failed to get reserved container on node " + node.getNodeName());
+      return;
+    }
     unreserveInternal(schedulerKey, node);
     node.unreserveResource(this);
     clearReservation(node);
