@@ -65,6 +65,7 @@ public final class Util {
   public final static String MD5_HEADER = "X-MD5-Digest";
   public final static String CONTENT_TYPE = "Content-Type";
   public final static String CONTENT_TRANSFER_ENCODING = "Content-Transfer-Encoding";
+  public final static String CONNECTION = "connection";
 
   public final static int IO_FILE_BUFFER_SIZE;
   private static final boolean isSpnegoEnabled;

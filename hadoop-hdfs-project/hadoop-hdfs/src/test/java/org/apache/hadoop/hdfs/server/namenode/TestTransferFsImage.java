@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -28,6 +30,7 @@ import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -35,11 +38,18 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystemTestHelper;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.MiniDFSNNTopology;
+import org.apache.hadoop.hdfs.server.common.HttpPutFailedException;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeFile;
+import org.apache.hadoop.hdfs.server.namenode.TransferFsImage.TransferResult;
+import org.apache.hadoop.hdfs.server.namenode.ha.HATestUtil;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.http.HttpServerFunctionalTest;
 import org.apache.hadoop.test.PathUtils;
@@ -181,6 +191,121 @@ public class TestTransferFsImage {
       }
     } finally {
       testServer.stop();
+    }
+  }
+
+  /**
+   * Test if should put FsImage.
+   */
+  @Test(timeout = 30000)
+  public void testShouldPutImage() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_CHECK_PERIOD_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_TXNS_KEY, 5);
+    conf.setInt(DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY, 1);
+
+    MiniDFSCluster cluster = null;
+    try {
+      int basePort = 20060 + new Random().nextInt(100) * 2;
+      cluster = new MiniDFSCluster.Builder(conf)
+          .nnTopology(MiniDFSNNTopology.simpleHATopology(3, basePort))
+          .build();
+      cluster.waitActive();
+      HATestUtil.configureFailoverFs(cluster, conf);
+
+      // generate 10 edits
+      cluster.transitionToActive(0);
+      FileSystem fs = cluster.getFileSystem(0);
+      for (int i = 0; i < 10; i++) {
+        Path p = new Path("/test" + i);
+        fs.mkdirs(p);
+      }
+
+      cluster.getNameNode(0).getRpcServer().rollEditLog();
+
+      // Wait checkpoint on all standbay
+      HATestUtil.waitForCheckpoint(cluster, 1, ImmutableList.of(12));
+      HATestUtil.waitForCheckpoint(cluster, 2, ImmutableList.of(12));
+
+      // It should also upload it back to the active.
+      HATestUtil.waitForCheckpoint(cluster, 0, ImmutableList.of(12));
+
+      // Test should put image
+      NNStorage mockStorage = Mockito.mock(NNStorage.class);
+
+      File tmpDir = new File(new FileSystemTestHelper().getTestRootDir());
+      tmpDir.mkdirs();
+      File mockImageFile = File.createTempFile("image", "", tmpDir);
+      FileOutputStream imageFile = new FileOutputStream(mockImageFile);
+      imageFile.write("data".getBytes());
+      imageFile.close();
+
+      Mockito.when(mockStorage.findImageFile(Mockito.any(NameNodeFile.class),
+          Mockito.anyLong())).thenReturn(mockImageFile);
+      Mockito.when(mockStorage.toColonSeparatedString()).thenReturn(
+          cluster.getNamesystem(0).getFSImage().getStorage()
+                 .toColonSeparatedString());
+
+      URL url = null;
+      HttpPutFailedException e = null;
+
+      // NOT_ACTIVE_NAMENODE_FAILURE to nn1
+      e = null;
+      try {
+        url = new URL(new URL(cluster.getHttpUri(1)), ImageServlet.PATH_SPEC);
+        conf = cluster.getConfiguration(1);
+        TransferFsImage.checkShouldPut(url, conf, mockStorage,
+            NameNodeFile.IMAGE, 1, mockImageFile);
+      } catch (HttpPutFailedException ex) {
+        e = ex;
+      }
+      assertNotNull(e);
+      assertEquals(TransferResult.getResultForCode(e.getResponseCode()),
+          TransferResult.NOT_ACTIVE_NAMENODE_FAILURE);
+
+      // NOT_ACTIVE_NAMENODE_FAILURE to nn2
+      e = null;
+      try {
+        url = new URL(new URL(cluster.getHttpUri(2)), ImageServlet.PATH_SPEC);
+        conf = cluster.getConfiguration(2);
+        TransferFsImage.checkShouldPut(url, conf, mockStorage,
+            NameNodeFile.IMAGE, 1, mockImageFile);
+      } catch (HttpPutFailedException ex) {
+        e = ex;
+      }
+      assertNotNull(e);
+      assertEquals(TransferResult.getResultForCode(e.getResponseCode()),
+           TransferResult.NOT_ACTIVE_NAMENODE_FAILURE);
+
+      // OLD_TRANSACTION_ID_FAILURE to nn0
+      e = null;
+      try {
+        url = new URL(new URL(cluster.getHttpUri(0)), ImageServlet.PATH_SPEC);
+        conf = cluster.getConfiguration(0);
+        TransferFsImage.checkShouldPut(url, conf, mockStorage,
+            NameNodeFile.IMAGE, 0, mockImageFile);
+      } catch (HttpPutFailedException ex) {
+        e = ex;
+      }
+      assertNotNull(e);
+      assertEquals(TransferResult.getResultForCode(e.getResponseCode()),
+          TransferResult.OLD_TRANSACTION_ID_FAILURE);
+
+      // Successful case to nn0
+      e = null;
+      try {
+        url = new URL(new URL(cluster.getHttpUri(0)), ImageServlet.PATH_SPEC);
+        conf = cluster.getConfiguration(0);
+        TransferFsImage.checkShouldPut(url, conf, mockStorage,
+            NameNodeFile.IMAGE, 20, mockImageFile);
+      } catch (HttpPutFailedException ex) {
+        e = ex;
+      }
+      assertNull(e);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 

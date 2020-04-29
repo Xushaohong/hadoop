@@ -135,6 +135,7 @@ public class TransferFsImage {
       throw new IOException("No targets in destination storage!");
     }
 
+    LOG.info("Begin to download image to file " + dstFiles.get(0).getName());
     MD5Hash advertisedDigest = parseMD5Header(request);
     MD5Hash hash = Util.receiveFile(fileName, dstFiles, dstStorage, true,
         advertisedSize, advertisedDigest, fileName, stream, throttler);
@@ -255,6 +256,16 @@ public class TransferFsImage {
       throw new IOException("Could not find image with txid " + txId);
     }
 
+    // Check whether we really need to put a FsImage to the peer NameNode.
+    checkShouldPut(url, conf, storage, nnf, txId, imageFile);
+
+    // Write the file to output stream.
+    writeFileToPutRequest(url, conf, storage, nnf, txId, imageFile, canceler);
+  }
+
+  private static HttpURLConnection setupConnection(URL url, Configuration conf,
+      NNStorage storage, NameNodeFile nnf, long txId,
+      File imageFile, boolean checkShouldPut) throws IOException{
     HttpURLConnection connection = null;
     try {
       URIBuilder uriBuilder = new URIBuilder(url.toURI());
@@ -262,7 +273,7 @@ public class TransferFsImage {
       // write all params for image upload request as query itself.
       // Request body contains the image to be uploaded.
       Map<String, String> params = ImageServlet.getParamsForPutImage(storage,
-          txId, imageFile.length(), nnf);
+          txId, imageFile.length(), nnf, checkShouldPut);
       for (Entry<String, String> entry : params.entrySet()) {
         uriBuilder.addParameter(entry.getKey(), entry.getValue());
       }
@@ -291,18 +302,38 @@ public class TransferFsImage {
       // set headers for verification
       ImageServlet.setVerificationHeadersForPut(connection, imageFile);
 
-      // Write the file to output stream.
-      writeFileToPutRequest(conf, connection, imageFile, canceler);
+      connection.setRequestProperty(Util.CONTENT_TYPE,
+                                    "application/octet-stream");
+      connection.setRequestProperty(Util.CONTENT_TRANSFER_ENCODING, "binary");
 
+      // disable http keep-alive, it sometimes causes bugs.
+      connection.setRequestProperty(Util.CONNECTION, "close");
+
+      return connection;
+    } catch (AuthenticationException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  /**
+   * Current NameNode should terminate put as soon as possible if the peer
+   * NameNode is not in the appropriate state to receive an image (e.g.
+   * peer NameNode is also a Standby NameNode).
+   */
+  static void checkShouldPut(URL url, Configuration conf,
+      NNStorage storage, NameNodeFile nnf, long txId, File imageFile)
+      throws HttpPutFailedException, IOException {
+    HttpURLConnection connection = null;
+    try {
+      connection = setupConnection(url, conf, storage, nnf,
+          txId, imageFile, true);
       int responseCode = connection.getResponseCode();
       if (responseCode != HttpURLConnection.HTTP_OK) {
         throw new HttpPutFailedException(String.format(
             "Image uploading failed, status: %d, url: %s, message: %s",
-            responseCode, urlWithParams, connection.getResponseMessage()),
+            responseCode, connection.getURL(), connection.getResponseMessage()),
             responseCode);
       }
-    } catch (AuthenticationException | URISyntaxException e) {
-      throw new IOException(e);
     } finally {
       if (connection != null) {
         connection.disconnect();
@@ -310,17 +341,32 @@ public class TransferFsImage {
     }
   }
 
-  private static void writeFileToPutRequest(Configuration conf,
-      HttpURLConnection connection, File imageFile, Canceler canceler)
-      throws IOException {
-    connection.setRequestProperty(Util.CONTENT_TYPE, "application/octet-stream");
-    connection.setRequestProperty(Util.CONTENT_TRANSFER_ENCODING, "binary");
-    OutputStream output = connection.getOutputStream();
-    FileInputStream input = new FileInputStream(imageFile);
+  private static void writeFileToPutRequest(URL url, Configuration conf,
+      NNStorage storage, NameNodeFile nnf, long txId, File imageFile,
+      Canceler canceler) throws IOException {
+    HttpURLConnection connection = null;
+    OutputStream output = null;
+    FileInputStream input = null;
     try {
+      connection = setupConnection(url, conf, storage, nnf,
+          txId, imageFile, false);
+
+      output = connection.getOutputStream();
+      input = new FileInputStream(imageFile);
       copyFileToStream(output, imageFile, input,
           ImageServlet.getThrottler(conf), canceler);
+
+      int responseCode = connection.getResponseCode();
+      if (responseCode != HttpURLConnection.HTTP_OK) {
+        throw new HttpPutFailedException(String.format(
+            "Image uploading failed, status: %d, url: %s, message: %s",
+            responseCode, connection.getURL(), connection.getResponseMessage()),
+            responseCode);
+      }
     } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
       IOUtils.closeStream(input);
       IOUtils.closeStream(output);
     }
