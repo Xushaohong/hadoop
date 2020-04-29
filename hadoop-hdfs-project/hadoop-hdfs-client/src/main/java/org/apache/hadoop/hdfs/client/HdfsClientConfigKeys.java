@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.client;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 
@@ -300,6 +301,10 @@ public interface HdfsClientConfigKeys {
     int     CONNECTION_RETRIES_ON_SOCKET_TIMEOUTS_DEFAULT = 0;
     String  RANDOM_ORDER = PREFIX + "random.order";
     boolean RANDOM_ORDER_DEFAULT = false;
+    String  CACHE_ACTIVE_ENABLED_KEY = PREFIX + "cache-active.enabled";
+    boolean CACHE_ACTIVE_ENABLED_DEFAULT = true;
+    String  CACHE_ACTIVE_DIR_KEY = PREFIX + "cache-active.dir";
+    String  CACHE_ACTIVE_DIR_DEFAULT = FileUtils.getTempDirectoryPath();
   }
 
   /** dfs.client.write configuration properties */
