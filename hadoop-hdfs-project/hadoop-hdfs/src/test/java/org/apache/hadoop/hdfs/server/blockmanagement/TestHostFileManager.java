@@ -99,13 +99,14 @@ public class TestHostFileManager {
 
   @Test
   @SuppressWarnings("unchecked")
-  public void testIncludeExcludeLists() throws IOException {
+  public void testIncludeExcludeReadonlyLists() throws IOException {
     BlockManager bm = mock(BlockManager.class);
     FSNamesystem fsn = mock(FSNamesystem.class);
     Configuration conf = new Configuration();
     HostFileManager hm = new HostFileManager();
     HostSet includedNodes = new HostSet();
     HostSet excludedNodes = new HostSet();
+    HostSet readonlyNodes = new HostSet();
 
     includedNodes.add(entry("127.0.0.1:12345"));
     includedNodes.add(entry("localhost:12345"));
@@ -118,7 +119,7 @@ public class TestHostFileManager {
     Assert.assertEquals(2, includedNodes.size());
     Assert.assertEquals(2, excludedNodes.size());
 
-    hm.refresh(includedNodes, excludedNodes);
+    hm.refresh(includedNodes, excludedNodes, readonlyNodes);
 
     DatanodeManager dm = new DatanodeManager(bm, fsn, conf);
     Whitebox.setInternalState(dm, "hostConfigManager", hm);

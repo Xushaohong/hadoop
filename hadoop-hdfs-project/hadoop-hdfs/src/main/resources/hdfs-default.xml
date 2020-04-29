@@ -1009,6 +1009,15 @@
 </property> 
 
 <property>
+  <name>dfs.hosts.readonly</name>
+  <value></value>
+  <description>Names a file that contains a list of hosts that are
+  put to readonly status. The full pathname of the
+  file must be specified.  If the value is empty, no hosts are
+  put to readonly status.</description>
+</property>
+
+<property>
   <name>dfs.namenode.max.objects</name>
   <value>0</value>
   <description>The maximum number of files, directories and blocks

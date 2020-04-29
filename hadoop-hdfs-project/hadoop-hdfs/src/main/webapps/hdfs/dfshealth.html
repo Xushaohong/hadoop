@@ -325,6 +325,7 @@
       <th style="width:180px; text-align:center">Capacity</th>
       <th>Blocks</th>
       <th>Block pool used</th>
+      <th>Readonly</th>
       <th>Version</th>
     </tr>
   </thead>
@@ -345,6 +346,7 @@
     </td>
     <td title="Blocks Scheduled : {blockScheduled}">{numBlocks}</td>
     <td ng-value="{blockPoolUsedPercent}">{blockPoolUsed|fmt_bytes} ({blockPoolUsedPercent|fmt_percentage})</td>
+    <td>{readonly}</td>
     <td>{version}</td>
   </tr>
   {/LiveNodes}
@@ -356,6 +358,7 @@
     <td></td>
     <td></td>
     <td></td>
+    <td>{readonly}</td>
     <td></td>
   </tr>
   {/DeadNodes}

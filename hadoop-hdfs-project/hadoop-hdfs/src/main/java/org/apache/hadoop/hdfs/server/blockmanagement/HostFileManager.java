@@ -55,6 +55,7 @@ public class HostFileManager extends HostConfigManager {
   private Configuration conf;
   private HostSet includes = new HostSet();
   private HostSet excludes = new HostSet();
+  private HostSet readonlys = new HostSet();
 
   @Override
   public void setConf(Configuration conf) {
@@ -69,7 +70,8 @@ public class HostFileManager extends HostConfigManager {
   @Override
   public void refresh() throws IOException {
     refresh(conf.get(DFSConfigKeys.DFS_HOSTS, ""),
-        conf.get(DFSConfigKeys.DFS_HOSTS_EXCLUDE, ""));
+        conf.get(DFSConfigKeys.DFS_HOSTS_EXCLUDE, ""),
+        conf.get(DFSConfigKeys.DFS_HOSTS_READONLY, ""));
   }
   private static HostSet readFile(String type, String filename)
           throws IOException {
@@ -116,6 +118,11 @@ public class HostFileManager extends HostConfigManager {
     return excludes;
   }
 
+  @Override
+  public synchronized HostSet getReadonlys() {
+    return readonlys;
+  }
+
   // If the includes list is empty, act as if everything is in the
   // includes list.
   @Override
@@ -130,6 +137,11 @@ public class HostFileManager extends HostConfigManager {
 
   private boolean isExcluded(InetSocketAddress address) {
     return excludes.match(address);
+  }
+
+  @Override
+  public synchronized boolean isReadonly(DatanodeID dn) {
+    return readonlys.match(dn.getResolvedAddress());
   }
 
   @Override
@@ -150,14 +162,16 @@ public class HostFileManager extends HostConfigManager {
    * includes and excludes lists are discarded.
    * @param includeFile the path to the new includes list
    * @param excludeFile the path to the new excludes list
+   * @param readonlyFile the path to the new readonly list
    * @throws IOException thrown if there is a problem reading one of the files
    */
-  private void refresh(String includeFile, String excludeFile)
-      throws IOException {
+  private void refresh(String includeFile, String excludeFile,
+      String readonlyFile) throws IOException {
     HostSet newIncludes = readFile("included", includeFile);
     HostSet newExcludes = readFile("excluded", excludeFile);
+    HostSet newReadonlys = readFile("readonly", readonlyFile);
 
-    refresh(newIncludes, newExcludes);
+    refresh(newIncludes, newExcludes, newReadonlys);
   }
 
   /**
@@ -167,10 +181,11 @@ public class HostFileManager extends HostConfigManager {
    * @param newExcludes the new excludes list
    */
   @VisibleForTesting
-  void refresh(HostSet newIncludes, HostSet newExcludes) {
+  void refresh(HostSet newIncludes, HostSet newExcludes, HostSet newReadonlys) {
     synchronized (this) {
       includes = newIncludes;
       excludes = newExcludes;
+      readonlys = newReadonlys;
     }
   }
 }

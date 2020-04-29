@@ -388,6 +388,11 @@ public class Balancer {
           }
           g = s;
         } else {
+          // A readonly DN cannot be a balance target DN.
+          if (dn.getDatanodeInfo().getReadonly()) {
+            continue;
+          }
+
           g = dn.addTarget(t, maxSize2Move);
           if (thresholdDiff <= 0) { // within threshold
             belowAvgUtilized.add(g);

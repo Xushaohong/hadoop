@@ -549,7 +549,7 @@ public class TestDatanodeManager {
     twoNodes.add(entry("127.0.0.1:23456"));
     oneNode.add(entry("127.0.0.1:23456"));
 
-    hm.refresh(twoNodes, noNodes);
+    hm.refresh(twoNodes, noNodes, noNodes);
     Whitebox.setInternalState(dm, "hostConfigManager", hm);
 
     // Register two data nodes to simulate them coming up.
@@ -574,7 +574,7 @@ public class TestDatanodeManager {
         "127.0.0.1:23456", both.get(1).getInfoAddr());
 
     // Remove one node from includes, but do not add it to excludes.
-    hm.refresh(oneNode, noNodes);
+    hm.refresh(oneNode, noNodes, noNodes);
 
     // Make sure that only one node is still reported
     List<DatanodeDescriptor> onlyOne =
@@ -586,7 +586,7 @@ public class TestDatanodeManager {
         "127.0.0.1:23456", onlyOne.get(0).getInfoAddr());
 
     // Remove all nodes from includes
-    hm.refresh(noNodes, noNodes);
+    hm.refresh(oneNode, noNodes, noNodes);
 
     // Check that both nodes are reported again
     List<DatanodeDescriptor> bothAgain =

@@ -338,6 +338,7 @@
               { 'orderDataType': 'ng-value', 'type': 'num' , "defaultContent": 0},
               { 'type': 'num' , "defaultContent": 0},
               { 'orderDataType': 'ng-value', 'type': 'num' , "defaultContent": 0},
+              { 'type': 'string' },
               { 'type': 'string' , "defaultContent": ""}
             ]});
           renderHistogram(data);

@@ -170,6 +170,12 @@ public class CombinedHostFileManager extends HostConfigManager {
   }
 
   @Override
+  public Iterable<InetSocketAddress> getReadonlys() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
   }
@@ -220,6 +226,12 @@ public class CombinedHostFileManager extends HostConfigManager {
 
   private boolean isExcluded(final InetSocketAddress address) {
     return hostProperties.isExcluded(address);
+  }
+
+  @Override
+  public boolean isReadonly(DatanodeID dn) {
+    // TODO Auto-generated method stub
+    return false;
   }
 
   @Override

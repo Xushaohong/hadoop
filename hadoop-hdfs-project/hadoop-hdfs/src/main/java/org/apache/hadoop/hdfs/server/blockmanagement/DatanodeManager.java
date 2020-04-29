@@ -1001,6 +1001,18 @@ public class DatanodeManager {
   }
 
   /**
+   * Set the node readonly if it is in the host readonly list.
+   *
+   * @param nodeReg datanode
+   */
+  void setReadonlyIfInReadonlyList(DatanodeDescriptor nodeReg) {
+    // If the registered node is in readonly list, then set it readonly
+    if (getHostConfigManager().isReadonly(nodeReg)) {
+      nodeReg.setReadonly(true);
+    }
+  }
+
+  /**
    * Register the given datanode with the namenode. NB: the given
    * registration is mutated and given back to the datanode.
    *
@@ -1108,6 +1120,7 @@ public class DatanodeManager {
           // also treat the registration message as a heartbeat
           heartbeatManager.register(nodeS);
           incrementVersionCount(nodeS.getSoftwareVersion());
+          setReadonlyIfInReadonlyList(nodeS);
           startAdminOperationIfNecessary(nodeS);
           success = true;
         } finally {
@@ -1146,6 +1159,7 @@ public class DatanodeManager {
         heartbeatManager.addDatanode(nodeDescr);
         heartbeatManager.updateDnStat(nodeDescr);
         incrementVersionCount(nodeReg.getSoftwareVersion());
+        setReadonlyIfInReadonlyList(nodeDescr);
         startAdminOperationIfNecessary(nodeDescr);
         success = true;
       } finally {
@@ -1228,6 +1242,12 @@ public class DatanodeManager {
         } else {
           datanodeAdminManager.stopMaintenance(node);
           datanodeAdminManager.stopDecommission(node);
+        }
+
+        if (hostConfigManager.isReadonly(node)) {
+          node.setReadonly(true);
+        } else {
+          node.setReadonly(false);
         }
       }
       node.setUpgradeDomain(hostConfigManager.getUpgradeDomain(node));

@@ -268,6 +268,15 @@ public class JsonUtilClient {
     return (String) value;
   }
 
+  private static Boolean getBoolean(Map<?, ?> m, String key,
+      final Boolean defaultValue) {
+    Object value = m.get(key);
+    if (value == null) {
+      return defaultValue;
+    }
+    return (Boolean)value;
+  }
+
   static List<?> getList(Map<?, ?> m, String key) {
     Object list = m.get(key);
     if (list instanceof List<?>) {
@@ -343,6 +352,7 @@ public class JsonUtilClient {
         .setNetworkLocation(getString(m, "networkLocation", "")).setAdminState(
             DatanodeInfo.AdminStates
                 .valueOf(getString(m, "adminState", "NORMAL")))
+        .setReadonly(getBoolean(m, "readonly", false))
         .setUpgradeDomain(getString(m, "upgradeDomain", ""))
         .setLastBlockReportTime(getLong(m, "lastBlockReportTime", 0L))
         .setLastBlockReportMonotonic(getLong(m, "lastBlockReportMonotonic", 0L))

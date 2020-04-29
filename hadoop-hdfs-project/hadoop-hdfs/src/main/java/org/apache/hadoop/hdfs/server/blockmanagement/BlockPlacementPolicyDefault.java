@@ -76,7 +76,8 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     NODE_STALE("the node is stale"),
     NODE_TOO_BUSY("the node is too busy"),
     TOO_MANY_NODES_ON_RACK("the rack has too many chosen nodes"),
-    NOT_ENOUGH_STORAGE_SPACE("not enough storage space to place the block");
+    NOT_ENOUGH_STORAGE_SPACE("not enough storage space to place the block"),
+    NODE_READONLY("the node is readonly");
 
     private final String text;
 
@@ -1003,9 +1004,15 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
       }
     }
 
+    // check if the node is readonly.
+    if (node.getReadonly()) {
+      logNodeIsNotChosen(node, NodeNotChosenReason.NODE_READONLY);
+      return false;
+    }
+
     // check the communication traffic of the target machine
-    if(considerLoad){
-      if(excludeNodeByLoad(node)){
+    if (considerLoad) {
+      if (excludeNodeByLoad(node)) {
         return false;
       }
     }

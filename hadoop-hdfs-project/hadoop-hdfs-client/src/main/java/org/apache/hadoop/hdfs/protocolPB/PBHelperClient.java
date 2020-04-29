@@ -423,6 +423,7 @@ public class PBHelperClient {
         .setLastUpdateMonotonic(info.getLastUpdateMonotonic())
         .setXceiverCount(info.getXceiverCount())
         .setAdminState(convert(info.getAdminState()))
+        .setReadonly(info.getReadonly())
         .setLastBlockReportTime(info.getLastBlockReportTime())
         .setLastBlockReportMonotonic(info.getLastBlockReportMonotonic())
         .setNumBlocks(info.getNumBlocks())
@@ -797,7 +798,8 @@ public class PBHelperClient {
             .setCacheUsed(di.getCacheUsed()).setLastUpdate(di.getLastUpdate())
             .setLastUpdateMonotonic(di.getLastUpdateMonotonic())
             .setXceiverCount(di.getXceiverCount())
-            .setAdminState(convert(di.getAdminState())).setUpgradeDomain(
+            .setAdminState(convert(di.getAdminState()))
+            .setReadonly(di.getReadonly()).setUpgradeDomain(
             di.hasUpgradeDomain() ? di.getUpgradeDomain() : null)
             .setLastBlockReportTime(di.hasLastBlockReportTime() ?
                 di.getLastBlockReportTime() : 0)

@@ -6070,6 +6070,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           .put("lastContact", getLastContact(node))
           .put("usedSpace", getDfsUsed(node))
           .put("adminState", node.getAdminState().toString())
+          .put("readonly", Boolean.toString(node.getReadonly()))
           .put("nonDfsUsedSpace", node.getNonDfsUsed())
           .put("capacity", node.getCapacity())
           .put("numBlocks", node.numBlocks())
@@ -6114,6 +6115,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       Map<String, Object> innerinfo = ImmutableMap.<String, Object>builder()
           .put("lastContact", getLastContact(node))
           .put("decommissioned", node.isDecommissioned())
+          .put("readonly", Boolean.toString(node.getReadonly()))
           .put("adminState", node.getAdminState().toString())
           .put("xferaddr", node.getXferAddr())
           .build();

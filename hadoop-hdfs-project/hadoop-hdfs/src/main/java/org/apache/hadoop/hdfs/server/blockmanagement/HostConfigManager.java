@@ -53,6 +53,12 @@ public abstract class HostConfigManager implements Configurable {
   public abstract Iterable<InetSocketAddress> getExcludes();
 
   /**
+   * Return all datanodes that in readonly state.
+   * @return Iterable of those datanodes
+   */
+  public abstract Iterable<InetSocketAddress> getReadonlys();
+
+  /**
    * Check if a datanode is allowed to connect the namenode.
    * @param dn the DatanodeID of the datanode
    * @return boolean if dn is allowed to connect the namenode.
@@ -65,6 +71,13 @@ public abstract class HostConfigManager implements Configurable {
    * @return boolean if dn needs to be decommissioned.
    */
   public abstract boolean isExcluded(DatanodeID dn);
+
+  /**
+   * Check if a datanode is in readonly state.
+   * @param dn the DatanodeID of the datanode
+   * @return boolean if dn is in readonly state.
+   */
+  public abstract boolean isReadonly(DatanodeID dn);
 
   /**
    * Reload the configuration.

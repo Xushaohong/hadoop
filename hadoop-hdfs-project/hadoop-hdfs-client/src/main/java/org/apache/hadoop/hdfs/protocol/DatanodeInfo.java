@@ -17,6 +17,12 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
+import static org.apache.hadoop.hdfs.DFSUtilClient.percent2String;
+
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.DFSUtilClient;
@@ -26,12 +32,8 @@ import org.apache.hadoop.net.Node;
 import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-
-import java.util.Date;
-import java.util.LinkedList;
-import java.util.List;
-
-import static org.apache.hadoop.hdfs.DFSUtilClient.percent2String;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class extends the primary identifier of a Datanode with ephemeral
@@ -41,6 +43,8 @@ import static org.apache.hadoop.hdfs.DFSUtilClient.percent2String;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class DatanodeInfo extends DatanodeID implements Node {
+  public static final Logger LOG = LoggerFactory.getLogger(DatanodeInfo.class);
+
   private long capacity;
   private long dfsUsed;
   private long nonDfsUsed;
@@ -86,6 +90,12 @@ public class DatanodeInfo extends DatanodeID implements Node {
   }
 
   protected AdminStates adminState;
+
+  /**
+   * When set to true, the node is in readonly list and is readonly.
+   */
+  private boolean readonly = false;
+
   private long maintenanceExpireTimeInMS;
   private long lastBlockReportTime;
   private long lastBlockReportMonotonic;
@@ -105,6 +115,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.location = from.getNetworkLocation();
     this.adminState = from.getAdminState();
     this.upgradeDomain = from.getUpgradeDomain();
+    this.readonly = from.getReadonly();
     this.lastBlockReportTime = from.getLastBlockReportTime();
     this.lastBlockReportMonotonic = from.getLastBlockReportMonotonic();
     this.numBlocks = from.getNumBlocks();
@@ -123,6 +134,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.lastUpdateMonotonic = 0L;
     this.xceiverCount = 0;
     this.adminState = null;
+    this.readonly = false;
     this.lastBlockReportTime = 0L;
     this.lastBlockReportMonotonic = 0L;
     this.numBlocks = 0;
@@ -141,9 +153,9 @@ public class DatanodeInfo extends DatanodeID implements Node {
       final long blockPoolUsed, final long cacheCapacity, final long cacheUsed,
       final long lastUpdate, final long lastUpdateMonotonic,
       final int xceiverCount, final String networkLocation,
-      final AdminStates adminState, final String upgradeDomain,
-      final long lastBlockReportTime, final long lastBlockReportMonotonic,
-                       final int blockCount) {
+      final AdminStates adminState, final boolean readonly,
+      final String upgradeDomain, final long lastBlockReportTime,
+      final long lastBlockReportMonotonic, final int blockCount) {
     super(ipAddr, hostName, datanodeUuid, xferPort, infoPort, infoSecurePort,
         ipcPort);
     this.capacity = capacity;
@@ -158,6 +170,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.xceiverCount = xceiverCount;
     this.location = networkLocation;
     this.adminState = adminState;
+    this.readonly = readonly;
     this.upgradeDomain = upgradeDomain;
     this.lastBlockReportTime = lastBlockReportTime;
     this.lastBlockReportMonotonic = lastBlockReportMonotonic;
@@ -395,6 +408,10 @@ public class DatanodeInfo extends DatanodeID implements Node {
     } else {
       buffer.append("Normal\n");
     }
+
+    buffer.append("Readonly: ");
+    buffer.append(Boolean.toString(getReadonly()));
+
     buffer.append("Configured Capacity: ").append(c).append(" (")
         .append(StringUtils.byteDesc(c)).append(")").append("\n");
     buffer.append("DFS Used: ").append(u).append(" (")
@@ -456,6 +473,9 @@ public class DatanodeInfo extends DatanodeID implements Node {
       buffer.append(" EM");
     } else {
       buffer.append(" IN");
+    }
+    if (getReadonly()) {
+      buffer.append(" RO");
     }
     buffer.append(" ").append(c).append("(").append(StringUtils.byteDesc(c))
         .append(")");
@@ -635,6 +655,24 @@ public class DatanodeInfo extends DatanodeID implements Node {
     }
   }
 
+  /**
+   * Set the readonly state of this dataNode.
+   */
+  public void setReadonly(boolean ro) {
+    if (readonly != ro) {
+      LOG.info("Set datanode " + this + " readonly state to: " + ro + ".");
+      readonly = ro;
+    }
+  }
+
+  /**
+   * Get the readonly state of this dataNode.
+   */
+
+  public boolean getReadonly() {
+    return readonly;
+  }
+
   private transient int level; //which level of the tree the node resides
   private transient Node parent; //its parent
 
@@ -688,6 +726,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     private long lastUpdateMonotonic;
     private int xceiverCount;
     private DatanodeInfo.AdminStates adminState;
+    private boolean readonly;
     private String upgradeDomain;
     private String ipAddr;
     private String hostName;
@@ -716,6 +755,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
       this.location = from.getNetworkLocation();
       this.adminState = from.getAdminState();
       this.upgradeDomain = from.getUpgradeDomain();
+      this.readonly = from.getReadonly();
       this.lastBlockReportTime = from.getLastBlockReportTime();
       this.lastBlockReportMonotonic = from.getLastBlockReportMonotonic();
       this.numBlocks = from.getNumBlocks();
@@ -783,6 +823,11 @@ public class DatanodeInfo extends DatanodeID implements Node {
     public DatanodeInfoBuilder setAdminState(
         DatanodeInfo.AdminStates adminState) {
       this.adminState = adminState;
+      return this;
+    }
+
+    public DatanodeInfoBuilder setReadonly(boolean ro) {
+      this.readonly = ro;
       return this;
     }
 
@@ -854,7 +899,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
       return new DatanodeInfo(ipAddr, hostName, datanodeUuid, xferPort,
           infoPort, infoSecurePort, ipcPort, capacity, dfsUsed, nonDfsUsed,
           remaining, blockPoolUsed, cacheCapacity, cacheUsed, lastUpdate,
-          lastUpdateMonotonic, xceiverCount, location, adminState,
+          lastUpdateMonotonic, xceiverCount, location, adminState, readonly,
           upgradeDomain, lastBlockReportTime, lastBlockReportMonotonic,
           numBlocks);
     }
