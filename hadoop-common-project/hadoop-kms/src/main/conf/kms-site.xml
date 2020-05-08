@@ -16,5 +16,59 @@
 <!-- Put site-specific property overrides in this file. -->
 
 <configuration>
+  <!-- KMS Web Server address-->
+  <property>
+    <name>hadoop.kms.http.port</name>
+    <value>16000</value>
+    <description>
+      The HTTP port for KMS REST API.
+    </description>
+  </property>
+
+  <property>
+    <name>hadoop.kms.http.host</name>
+    <value>0.0.0.0</value>
+    <description>
+      The bind host for KMS REST API.
+    </description>
+  </property>
+
+  <!-- KMS Backend ZooKeeperKeyStoreProvider -->
+  <property>
+    <name>hadoop.kms.key.provider.uri</name>
+    <value>zks://zkHost1:2181,zkHost2:2181,zkHost3:2181/hadoop-kms/EZKeys/</value>
+    <description>
+      URI of the backing KeyProvider for the KMS.
+    </description>
+  </property>
+
+  <property>
+    <name>hadoop.security.keystore.zookeeper-keystore-provider.local.key-file</name>
+    <value>/tmp/local.keystore</value>
+  </property>
+
+  <property>
+    <name>hadoop.security.keystore.java-keystore-provider.password-file</name>
+    <value>kms.keystore.password</value>
+    <description>
+      If using the JavaKeyStoreProvider, the file name for the keystore password.
+    </description>
+  </property>
+
+  <property>
+    <name>hadoop.security.keystore.zookeeper-keystore-provider.zk.auth</name>
+    <value>digest:internalKmsServer:internalKmsServerPasswordToZookeeper</value>
+    <description>
+      If using the ZooKeeperKeyStoreProvider, the zookeeper auth info for current kms server.
+    </description>
+  </property>
+
+  <property>
+    <name>hadoop.security.keystore.zookeeper-keystore-provider.zk.acl</name>
+    <value>digest:internalKmsServer:RUW4IEeSDgmAK+tm7D/QwQgLSsQ=:rwcda</value>
+    <description>
+      If using the ZooKeeperKeyStoreProvider, the acl for each znode.
+    </description>
+  </property>
 
 </configuration>

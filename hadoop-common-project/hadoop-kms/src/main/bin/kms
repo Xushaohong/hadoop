@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This script runs the hadoop core commands.
+
+bin=`which $0`
+bin=`dirname ${bin}`
+bin=`cd "$bin"; pwd`
+
+DEFAULT_LIBEXEC_DIR="$bin"/../libexec
+
+HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
+. $HADOOP_LIBEXEC_DIR/hadoop-config.sh
+
+## @audience     private
+## @stability    evolving
+function print_usage(){
+  echo "Usage: kms [COMMAND]"
+  echo "  where COMMAND is one of:"
+  echo "  kms                  run the KMS Server"
+  echo ""
+  echo "Most commands print help when invoked w/o parameters."
+}
+
+if [ $# = 0 ]; then
+  print_usage
+  exit
+fi
+
+pwdpath=`pwd`
+for f in $pwdpath/*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+done
+
+# setup a default KMS_PATH
+KMS_JAR_PATH=$(find $HADOOP_PREFIX -name "hadoop-kms-*.jar")
+CLASSPATH=${CLASSPATH}:${KMS_JAR_PATH}
+
+COMMAND=$1
+case $COMMAND in
+  # usage flags
+  --help|-help|-h)
+    print_usage
+    exit
+    ;;
+
+  #core commands
+  *)
+    # the core commands
+    if [ "$COMMAND" = "kms" ]; then
+      CLASS=org.apache.hadoop.crypto.key.kms.server.KMSShell
+    fi
+
+    shift
+
+    # Always respect HADOOP_OPTS and HADOOP_CLIENT_OPTS
+    HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
+
+    #make sure security appender is turned off
+    HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.security.logger=${HADOOP_SECURITY_LOGGER:-INFO,NullAppender}"
+
+    export CLASSPATH=$CLASSPATH
+    exec "$JAVA" $JAVA_HEAP_MAX $HADOOP_OPTS $CLASS "$@"
+    ;;
+
+esac

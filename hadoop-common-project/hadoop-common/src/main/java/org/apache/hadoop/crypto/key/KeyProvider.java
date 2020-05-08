@@ -70,6 +70,8 @@ public abstract class KeyProvider implements Closeable {
           + "java.security.KeyRep$Type;"
           + "javax.crypto.spec.SecretKeySpec;"
           + "org.apache.hadoop.crypto.key.JavaKeyStoreProvider$KeyMetadata;"
+          + "org.apache.hadoop.crypto.key"
+            + ".ZooKeeperKeyStoreProvider$KeyMetadata;"
           + "!*";
   public static final String JCEKS_KEY_SERIAL_FILTER = "jceks.key.serialFilter";
 

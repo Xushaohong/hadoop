@@ -24,11 +24,11 @@
 
 # KMS log directory
 #
-# export KMS_LOG=${HADOOP_LOG_DIR}
+export KMS_LOG=${HADOOP_LOG_DIR}/kms
 
 # KMS temporary directory
 #
-# export KMS_TEMP=${HADOOP_HOME}/temp
+export KMS_TEMP=${HADOOP_HOME}/temp
 
 # The HTTP port used by KMS
 #
