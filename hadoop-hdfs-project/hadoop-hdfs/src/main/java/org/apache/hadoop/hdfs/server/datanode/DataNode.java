@@ -941,7 +941,12 @@ public class DataNode extends ReconfigurableBase
         fallbackToHosts = true;
       }
 
-      name = DNS.getDefaultHost(dnsInterface, nameServer, fallbackToHosts);
+      if (config.getBoolean(DFSConfigKeys.DFS_DATANODE_PREFER_IP_TO_HOSTNAME,
+          DFSConfigKeys.DFS_DATANODE_PREFER_IP_TO_HOSTNAME_DEFAULT)) {
+        name = DNS.getDefaultIP(dnsInterface);
+      } else {
+        name = DNS.getDefaultHost(dnsInterface, nameServer, fallbackToHosts);
+      }
     }
     return name;
   }

@@ -173,6 +173,11 @@ public class DatanodeManager {
   private boolean shouldSendCachingCommands = false;
 
   /**
+   * Whether we should prefer IP to HostName to represent a DN.
+   */
+  private boolean preferIP = true;
+
+  /**
    * The number of datanodes for each software version. This list should change
    * during rolling upgrades.
    * Software version -> Number of datanodes with this version
@@ -333,6 +338,9 @@ public class DatanodeManager {
     this.blocksPerPostponedMisreplicatedBlocksRescan = conf.getLong(
         DFSConfigKeys.DFS_NAMENODE_BLOCKS_PER_POSTPONEDBLOCKS_RESCAN_KEY,
         DFSConfigKeys.DFS_NAMENODE_BLOCKS_PER_POSTPONEDBLOCKS_RESCAN_KEY_DEFAULT);
+    this.preferIP = conf.getBoolean(
+        DFSConfigKeys.DFS_DATANODE_PREFER_IP_TO_HOSTNAME,
+        DFSConfigKeys.DFS_DATANODE_PREFER_IP_TO_HOSTNAME_DEFAULT);
   }
 
   private static long getStaleIntervalFromConf(Configuration conf,
@@ -1042,6 +1050,28 @@ public class DatanodeManager {
       nodeReg.setPeerHostName(hostname);
     }
     
+    // prefer IP to HostName
+    if (preferIP) {
+      String ip = null;
+      if (dnAddress != null) {
+        ip = dnAddress.getHostAddress();
+      } else {
+        String hostName = nodeReg.getHostName();
+        try {
+          ip = InetAddress.getByName(hostName).getHostAddress();
+        } catch (Throwable e) {
+          ip = hostName;
+        }
+      }
+      nodeReg.updateRegInfo(new DatanodeID(nodeReg.getIpAddr(),
+          ip,
+          nodeReg.getDatanodeUuid(),
+          nodeReg.getXferPort(),
+          nodeReg.getInfoPort(),
+          nodeReg.getInfoSecurePort(),
+          nodeReg.getIpcPort()));
+    }
+
     try {
       nodeReg.setExportedKeys(blockManager.getBlockKeys());
   

@@ -832,6 +832,10 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String  DFS_DATANODE_BP_READY_TIMEOUT_KEY = "dfs.datanode.bp-ready.timeout";
   public static final long    DFS_DATANODE_BP_READY_TIMEOUT_DEFAULT = 20;
 
+  public static final String  DFS_DATANODE_PREFER_IP_TO_HOSTNAME = "dfs"
+      + ".datanode.prefer.ip.to.hostname";
+  public static final boolean DFS_DATANODE_PREFER_IP_TO_HOSTNAME_DEFAULT = true;
+
   public static final String  DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY = "dfs.block.access.token.enable";
   public static final boolean DFS_BLOCK_ACCESS_TOKEN_ENABLE_DEFAULT = false;
   public static final String  DFS_BLOCK_ACCESS_KEY_UPDATE_INTERVAL_KEY = "dfs.block.access.key.update.interval";
