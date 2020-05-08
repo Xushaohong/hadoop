@@ -154,10 +154,14 @@ public class TouchCommands extends FsCommand {
 
     @Override
     protected void processNonexistentPath(PathData item) throws IOException {
-      if (!item.parentExists()) {
-        throw new PathNotFoundException(item.toString())
-            .withFullyQualifiedPath(item.path.toUri().toString());
-      }
+      /*
+       * Compatible with TDW Hadoop 2.7.2
+       *
+       * if (!item.parentExists()) {
+       *  throw new PathNotFoundException(item.toString())
+       *    .withFullyQualifiedPath(item.path.toUri().toString());
+       * }
+       */
       touch(item);
     }
 

@@ -52,7 +52,8 @@ class Mkdir extends FsCommand {
   protected void processOptions(LinkedList<String> args) {
     CommandFormat cf = new CommandFormat(1, Integer.MAX_VALUE, "p");
     cf.parse(args);
-    createParents = cf.getOpt("p");
+    // Compatible with TDW Hadoop 2.7.2
+    createParents = true;
   }
 
   @Override
