@@ -262,6 +262,7 @@ public class DFSOutputStream extends FSOutputSummer
       short replication, long blockSize, Progressable progress,
       DataChecksum checksum, String[] favoredNodes, String ecPolicyName)
       throws IOException {
+    dfsClient.checkReadOnly();
     try (TraceScope ignored =
              dfsClient.newPathTraceScope("newStreamForCreate", src)) {
       HdfsFileStatus stat = null;

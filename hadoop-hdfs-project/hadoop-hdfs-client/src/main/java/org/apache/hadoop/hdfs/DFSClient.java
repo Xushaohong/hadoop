@@ -243,6 +243,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   private final int smallBufferSize;
   private final long serverDefaultsValidityPeriod;
 
+  private final boolean readOnlyClient;
+
   public DfsClientConf getConf() {
     return dfsClientConf;
   }
@@ -342,6 +344,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
           nnFallbackToSimpleAuth);
     }
 
+    this.readOnlyClient = isReadOnlyClient();
+
     if (proxyInfo != null) {
       this.dtService = proxyInfo.getDelegationTokenService();
       this.namenode = proxyInfo.getProxy();
@@ -397,6 +401,44 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     this.saslClient = new SaslDataTransferClient(
         conf, DataTransferSaslUtil.getSaslPropertiesResolver(conf),
         TrustedChannelResolver.getInstance(conf), nnFallbackToSimpleAuth);
+  }
+
+  /*
+   *  If a writable HDFS list is configured, then other clusters not in this
+   *  list are ReadOnly and Non-Writable.
+   *
+   *  For a ReadOnly HDFS cluster, all operations that may change/modify the
+   *  FSNameSystem tree construction will be rejected, and will result in an
+   *  UnsupportedOperationException.
+   */
+  private boolean isReadOnlyClient() {
+    /*  Note: Only read dfs.writable.namenode.list from configuration file
+     * (hdfs-site.xml), ignoring the value set via Configuration.set() from
+     *  business code (such as spark).
+     */
+    Configuration localConf = new HdfsConfiguration();
+    String[] writableNNList= localConf.getStrings(
+          HdfsClientConfigKeys.DFS_CLIENT_WRITABLE_NAMENODE_LIST_KEY);
+
+    // not configured or value is empty
+    if (writableNNList == null || writableNNList.length == 0) {
+      return false;
+    }
+
+    for (String nn : writableNNList) {
+      if (nn.equalsIgnoreCase(namenodeUri.getHost())) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  public void checkReadOnly() throws UnsupportedOperationException {
+    if (readOnlyClient) {
+      throw new UnsupportedOperationException(namenodeUri.getAuthority()+
+          " is readOnly to current client.");
+    }
   }
 
   /**
@@ -1216,6 +1258,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       ChecksumOpt checksumOpt, InetSocketAddress[] favoredNodes,
       String ecPolicyName) throws IOException {
     checkOpen();
+    checkReadOnly();
     final FsPermission masked = applyUMask(permission);
     LOG.debug("{}: masked={}", src, masked);
     final DFSOutputStream result = DFSOutputStream.newStreamForCreate(this,
@@ -1289,6 +1332,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public void createSymlink(String target, String link, boolean createParent)
       throws IOException {
     checkOpen();
+    checkReadOnly();
     try (TraceScope ignored = newPathTraceScope("createSymlink", target)) {
       final FsPermission dirPerm = applyUMask(null);
       namenode.createSymlink(target, link, dirPerm, createParent);
@@ -1350,6 +1394,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   private DFSOutputStream callAppend(String src, EnumSet<CreateFlag> flag,
       Progressable progress, String[] favoredNodes) throws IOException {
     CreateFlag.validateForAppend(flag);
+    checkReadOnly();
     try {
       final LastBlockWithStatus blkWithStatus = callAppend(src,
           new EnumSetWritable<>(flag, CreateFlag.class));
@@ -1521,6 +1566,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   @Deprecated
   public boolean rename(String src, String dst) throws IOException {
     checkOpen();
+    checkReadOnly();
     try (TraceScope ignored = newSrcDstTraceScope("rename", src, dst)) {
       return namenode.rename(src, dst);
     } catch (RemoteException re) {
@@ -1539,6 +1585,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    */
   public void concat(String trg, String [] srcs) throws IOException {
     checkOpen();
+    checkReadOnly();
     try (TraceScope ignored = tracer.newScope("concat")) {
       namenode.concat(trg, srcs);
     } catch (RemoteException re) {
@@ -1554,6 +1601,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public void rename(String src, String dst, Options.Rename... options)
       throws IOException {
     checkOpen();
+    checkReadOnly();
     try (TraceScope ignored = newSrcDstTraceScope("rename2", src, dst)) {
       namenode.rename2(src, dst, options);
     } catch (RemoteException re) {
@@ -1576,6 +1624,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    */
   public boolean truncate(String src, long newLength) throws IOException {
     checkOpen();
+    checkReadOnly();
     if (newLength < 0) {
       throw new HadoopIllegalArgumentException(
           "Cannot truncate to a negative file size: " + newLength + ".");
@@ -1607,6 +1656,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    */
   public boolean delete(String src, boolean recursive) throws IOException {
     checkOpen();
+    checkReadOnly();
     try (TraceScope ignored = newPathTraceScope("delete", src)) {
       return namenode.delete(src, recursive);
     } catch (RemoteException re) {
@@ -2421,6 +2471,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public boolean primitiveMkdir(String src, FsPermission absPermission,
       boolean createParent) throws IOException {
     checkOpen();
+    checkReadOnly();
     if (absPermission == null) {
       absPermission = applyUMaskDir(null);
     }

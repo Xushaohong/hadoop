@@ -148,6 +148,7 @@ public interface HdfsClientConfigKeys {
           "dfs.client.key.provider.cache.expiry";
   long    DFS_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT =
               TimeUnit.DAYS.toMillis(10); // 10 days
+  String  DFS_CLIENT_WRITABLE_NAMENODE_LIST_KEY = "dfs.writable.namenode.list";
 
   // refreshing LocatedBlocks period. A value of 0 disables the feature.
   String  DFS_CLIENT_REFRESH_READ_BLOCK_LOCATIONS_MS_KEY =
