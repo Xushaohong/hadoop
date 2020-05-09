@@ -40,7 +40,9 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapred.TIPStatus;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Counters;
@@ -125,8 +127,17 @@ public class CLI extends Configured implements Tool {
     boolean setJobPriority = false;
     boolean logs = false;
     boolean downloadConfig = false;
+    boolean submitJob = false;
 
+    // Compatible with TDW Hadoop 2.7.2
     if ("-submit".equals(cmd)) {
+      if (argv.length != 2) {
+        displayUsage(cmd);
+        return exitCode;
+      }
+      submitJobFile = argv[1];
+      submitJob = true;
+    } else if ("-run".equals(cmd)) {
       if (argv.length != 2) {
         displayUsage(cmd);
         return exitCode;
@@ -139,7 +150,7 @@ public class CLI extends Configured implements Tool {
       }
       jobid = argv[1];
       getStatus = true;
-    } else if("-counter".equals(cmd)) {
+    } else if ("-counter".equals(cmd)) {
       if (argv.length != 4) {
         displayUsage(cmd);
         return exitCode;
@@ -318,9 +329,15 @@ public class CLI extends Configured implements Tool {
     // Submit the request
     try {
       if (submitJobFile != null) {
-        Job job = Job.getInstance(new JobConf(submitJobFile));
-        job.submit();
-        System.out.println("Created job " + job.getJobID());
+        // Compatible with TDW Hadoop 2.7.2
+        if (submitJob) {
+          Job job = Job.getInstance(new JobConf(submitJobFile));
+          job.submit();
+          System.out.println("Created job " + job.getJobID());
+        } else {
+          RunningJob job = JobClient.runJob(new JobConf(submitJobFile));
+          System.out.println("Created job " + job.getID());
+        }
         exitCode = 0;
       } else if (getStatus) {
         Job job = getJob(JobID.forName(jobid));

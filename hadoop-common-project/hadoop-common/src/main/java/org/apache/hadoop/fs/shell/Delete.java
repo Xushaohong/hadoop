@@ -73,7 +73,8 @@ class Delete {
 
     private boolean skipTrash = false;
     private boolean deleteDirs = false;
-    private boolean ignoreFNF = false;
+    // Compatible with TDW Hadoop 2.7.2
+    private boolean ignoreFNF = true;
     private boolean safeDelete = false;
 
     @Override
@@ -81,7 +82,10 @@ class Delete {
       CommandFormat cf = new CommandFormat(
           1, Integer.MAX_VALUE, "f", "r", "R", "skipTrash", "safely");
       cf.parse(args);
-      ignoreFNF = cf.getOpt("f");
+      /*
+       * Compatible with TDW Hadoop 2.7.2
+       * ignoreFNF = cf.getOpt("f");
+       */
       deleteDirs = cf.getOpt("r") || cf.getOpt("R");
       skipTrash = cf.getOpt("skipTrash");
       safeDelete = cf.getOpt("safely");
