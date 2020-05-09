@@ -3709,6 +3709,14 @@
 </property>
 
 <property>
+  <name>dfs.ha.balancer.request.standby</name>
+  <value>false</value>
+  <description>
+    Specifies if Balancer request Standby NameNode to get blocks for HA cluster.
+  </description>
+</property>
+
+<property>
   <name>dfs.block.misreplication.processing.limit</name>
   <value>10000</value>
   <description>
