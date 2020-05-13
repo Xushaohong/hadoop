@@ -20,8 +20,12 @@ package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DF;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.lang.reflect.Constructor;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DU_RESERVED_DEFAULT;
@@ -35,6 +39,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DU_RESERVED_CALC
  * Used for calculating file system space reserved for non-HDFS data.
  */
 public abstract class ReservedSpaceCalculator {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(ReservedSpaceCalculator.class);
 
   /**
    * Used for creating instances of ReservedSpaceCalculator.
@@ -45,6 +51,7 @@ public abstract class ReservedSpaceCalculator {
 
     private DF usage;
     private StorageType storageType;
+    private FsVolumeSpi volume;
 
     public Builder(Configuration conf) {
       this.conf = conf;
@@ -61,6 +68,11 @@ public abstract class ReservedSpaceCalculator {
       return this;
     }
 
+    public Builder setVolume(FsVolumeSpi vol) {
+      this.volume = vol;
+      return this;
+    }
+
     ReservedSpaceCalculator build() {
       try {
         Class<? extends ReservedSpaceCalculator> clazz = conf.getClass(
@@ -69,10 +81,11 @@ public abstract class ReservedSpaceCalculator {
             ReservedSpaceCalculator.class);
 
         Constructor constructor = clazz.getConstructor(
-            Configuration.class, DF.class, StorageType.class);
+            Configuration.class, DF.class, StorageType.class,
+            FsVolumeSpi.class);
 
         return (ReservedSpaceCalculator) constructor.newInstance(
-            conf, usage, storageType);
+            conf, usage, storageType, volume);
       } catch (Exception e) {
         throw new IllegalStateException(
             "Error instantiating ReservedSpaceCalculator", e);
@@ -83,16 +96,22 @@ public abstract class ReservedSpaceCalculator {
   private final DF usage;
   private final Configuration conf;
   private final StorageType storageType;
+  private final FsVolumeSpi volume;
 
   ReservedSpaceCalculator(Configuration conf, DF usage,
-      StorageType storageType) {
+      StorageType storageType, FsVolumeSpi vol) {
     this.usage = usage;
     this.conf = conf;
     this.storageType = storageType;
+    this.volume = vol;
   }
 
   DF getUsage() {
     return usage;
+  }
+
+  FsVolumeSpi getVolume() {
+    return volume;
   }
 
   long getReservedFromConf(String key, long defaultValue) {
@@ -117,10 +136,22 @@ public abstract class ReservedSpaceCalculator {
     private final long reservedBytes;
 
     public ReservedSpaceCalculatorAbsolute(Configuration conf, DF usage,
-        StorageType storageType) {
-      super(conf, usage, storageType);
-      this.reservedBytes = getReservedFromConf(DFS_DATANODE_DU_RESERVED_KEY,
+        StorageType storageType, FsVolumeSpi volume) {
+      super(conf, usage, storageType, volume);
+      // separately configuring reserved space for each volume
+      File baseDir = new File(getVolume().getBaseURI());
+      String tqReservedKey = "tq" + baseDir.getPath().replaceAll("/", ".");
+      LOG.info("Tq reserved space key for " + baseDir + " is " + tqReservedKey);
+      long tqReserved = conf.getLong(tqReservedKey, 0L);
+      if (tqReserved != 0L) {
+        LOG.info("Tq reserved space for " + baseDir + " is "+ tqReserved);
+        this.reservedBytes = tqReserved;
+      } else {
+        LOG.info("Tq reserved space for " + baseDir
+            + " is 0, fallback to default datanode reserved.");
+        this.reservedBytes = getReservedFromConf(DFS_DATANODE_DU_RESERVED_KEY,
           DFS_DATANODE_DU_RESERVED_DEFAULT);
+      }
     }
 
     @Override
@@ -138,8 +169,8 @@ public abstract class ReservedSpaceCalculator {
     private final long reservedPct;
 
     public ReservedSpaceCalculatorPercentage(Configuration conf, DF usage,
-        StorageType storageType) {
-      super(conf, usage, storageType);
+        StorageType storageType, FsVolumeSpi volume) {
+      super(conf, usage, storageType, volume);
       this.reservedPct = getReservedFromConf(
           DFS_DATANODE_DU_RESERVED_PERCENTAGE_KEY,
           DFS_DATANODE_DU_RESERVED_PERCENTAGE_DEFAULT);
@@ -162,8 +193,8 @@ public abstract class ReservedSpaceCalculator {
     private final long reservedPct;
 
     public ReservedSpaceCalculatorConservative(Configuration conf, DF usage,
-        StorageType storageType) {
-      super(conf, usage, storageType);
+        StorageType storageType, FsVolumeSpi volume) {
+      super(conf, usage, storageType, volume);
       this.reservedBytes = getReservedFromConf(DFS_DATANODE_DU_RESERVED_KEY,
           DFS_DATANODE_DU_RESERVED_DEFAULT);
       this.reservedPct = getReservedFromConf(
@@ -197,8 +228,8 @@ public abstract class ReservedSpaceCalculator {
     private final long reservedPct;
 
     public ReservedSpaceCalculatorAggressive(Configuration conf, DF usage,
-        StorageType storageType) {
-      super(conf, usage, storageType);
+        StorageType storageType, FsVolumeSpi volume) {
+      super(conf, usage, storageType, volume);
       this.reservedBytes = getReservedFromConf(DFS_DATANODE_DU_RESERVED_KEY,
           DFS_DATANODE_DU_RESERVED_DEFAULT);
       this.reservedPct = getReservedFromConf(
