@@ -79,6 +79,9 @@ class CosNativeFileSystemStore implements NativeFileSystemStore {
   private COSClient cosClient;
   private String bucketName;
   private int maxRetryTimes;
+  private L5EndpointResolver l5EndpointResolver;
+  private boolean useL5Id = false;
+  private int l5UpdateMaxRetryTimes;
 
   public static final Logger LOG =
       LoggerFactory.getLogger(CosNativeFileSystemStore.class);
@@ -95,11 +98,11 @@ class CosNativeFileSystemStore implements NativeFileSystemStore {
         CosNUtils.createCosCredentialsProviderSet(uri, conf);
     String region = conf.get(CosNConfigKeys.COSN_REGION_KEY);
     String endpointSuffix = conf.get(
-        CosNConfigKeys.COSN_ENDPOINT_SUFFIX_KEY);
+      CosNConfigKeys.COSN_ENDPOINT_SUFFIX_KEY);
     if (null == region && null == endpointSuffix) {
       String exceptionMsg = String.format("config %s and %s at least one",
-          CosNConfigKeys.COSN_REGION_KEY,
-          CosNConfigKeys.COSN_ENDPOINT_SUFFIX_KEY);
+        CosNConfigKeys.COSN_REGION_KEY,
+        CosNConfigKeys.COSN_ENDPOINT_SUFFIX_KEY);
       throw new IOException(exceptionMsg);
     }
 
@@ -117,6 +120,20 @@ class CosNativeFileSystemStore implements NativeFileSystemStore {
       config.setEndpointBuilder(new SuffixEndpointBuilder(endpointSuffix));
     } else {
       config = new ClientConfig(new Region(region));
+    }
+    this.useL5Id = conf.getBoolean(
+      CosNConfigKeys.COSN_USE_L5_ENABLE,
+      CosNConfigKeys.DEFAULT_COSN_USE_L5_ENABLE);
+    this.l5UpdateMaxRetryTimes = conf.getInt(CosNConfigKeys.COSN_L5_UPDATE_MAX_RETRIES_KEY,
+      CosNConfigKeys.DEFAULT_COSN_L5_UPDATE_MAX_RETRIES);
+    if (useL5Id) {
+      String l5Id = conf.get(CosNConfigKeys.COSN_L5_KEY);
+      if (null != l5Id) {
+        int l5modId = Integer.parseInt(l5Id.split(",")[0]);
+        int l5cmdId = Integer.parseInt(l5Id.split(",")[1]);
+        l5EndpointResolver = new L5EndpointResolver(l5modId, l5cmdId);
+        config.setEndpointResolver(l5EndpointResolver);
+      }
     }
     if (useHttps) {
       config.setHttpProtocol(HttpProtocol.https);
@@ -689,6 +706,8 @@ class CosNativeFileSystemStore implements NativeFileSystemStore {
       throws CosServiceException, IOException {
     String sdkMethod = "";
     int retryIndex = 1;
+    int l5ErrorCodeRetryIndex = 1;
+    int l5IOExceptionRetryIndex = 1;
     while (true) {
       try {
         if (request instanceof PutObjectRequest) {
@@ -731,6 +750,17 @@ class CosNativeFileSystemStore implements NativeFileSystemStore {
         // Retry all server errors
         if (statusCode / 100 == 5) {
           if (retryIndex <= this.maxRetryTimes) {
+            if (statusCode == 503) {
+    	      if (useL5Id) {
+                if(l5ErrorCodeRetryIndex >= this.l5UpdateMaxRetryTimes) {
+                  // L5上报，进行重试
+                  l5EndpointResolver.L5RouteResultUpdate(-1);
+                  l5ErrorCodeRetryIndex = 1;
+                } else {
+                  l5ErrorCodeRetryIndex = l5ErrorCodeRetryIndex + 1;
+                }
+              }
+ 	        }
             LOG.info(errMsg);
             long sleepLeast = retryIndex * 300L;
             long sleepBound = retryIndex * 500L;
@@ -755,6 +785,15 @@ class CosNativeFileSystemStore implements NativeFileSystemStore {
           throw cse;
         }
       } catch (Exception e) {
+        if (useL5Id) {
+          if(l5IOExceptionRetryIndex >= this.l5UpdateMaxRetryTimes) {
+            // L5上报，进行重试
+            l5EndpointResolver.L5RouteResultUpdate(-1);
+            l5IOExceptionRetryIndex = 1;
+          } else {
+            l5IOExceptionRetryIndex = l5IOExceptionRetryIndex + 1;
+          }
+        }
         String errMsg = String.format("Call cos sdk failed, "
             + "call method: %s, exception: %s", sdkMethod, e.toString());
         LOG.error(errMsg);
