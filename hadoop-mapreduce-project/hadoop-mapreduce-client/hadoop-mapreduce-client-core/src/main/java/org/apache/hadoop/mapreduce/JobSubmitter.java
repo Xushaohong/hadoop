@@ -212,6 +212,15 @@ class JobSubmitter {
       // to job file.
       String queue = conf.get(MRJobConfig.QUEUE_NAME,
           JobConf.DEFAULT_QUEUE_NAME);
+      //todo remove if client upgrade
+      if (conf.getBoolean("tq.mapreduce.queue.customize.enable", false)) {
+        String queueGroup = conf.get("tdw.ugi.groupname");
+        if (queueGroup != null) {
+          queue = queueGroup.trim() + "-" + conf.get("mapred.job.tdw.servicelevel", "offline");
+          conf.set(MRJobConfig.QUEUE_NAME, queue);
+        }
+      }
+      LOG.info(jobId + " queue: " + queue);
       AccessControlList acl = submitClient.getQueueAdmins(queue);
       conf.set(toFullPropertyName(queue,
           QueueACL.ADMINISTER_JOBS.getAclName()), acl.getAclString());
