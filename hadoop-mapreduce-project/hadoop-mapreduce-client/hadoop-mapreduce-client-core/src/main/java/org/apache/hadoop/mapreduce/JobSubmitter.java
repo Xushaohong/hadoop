@@ -166,6 +166,7 @@ class JobSubmitter {
       conf.set(MRJobConfig.MAPREDUCE_JOB_DIR, submitJobDir.toString());
       LOG.debug("Configuring job " + jobId + " with " + submitJobDir 
           + " as the submit dir");
+      long startTime = System.currentTimeMillis();
       // get delegation token for the dir
       TokenCache.obtainTokensForNamenodes(job.getCredentials(),
           new Path[] { submitJobDir }, conf);
@@ -191,13 +192,18 @@ class JobSubmitter {
                 "data spill is enabled");
       }
 
+      LOG.info(jobId + "handle token cost:" + (System.currentTimeMillis() - startTime) + "ms");
+      startTime = System.currentTimeMillis();
       copyAndConfigureFiles(job, submitJobDir);
+      LOG.info(jobId + " hand resources cost:" + (System.currentTimeMillis() - startTime) + "ms");
 
       Path submitJobFile = JobSubmissionFiles.getJobConfPath(submitJobDir);
       
       // Create the splits for the job
       LOG.debug("Creating splits at " + jtFs.makeQualified(submitJobDir));
+      startTime = System.currentTimeMillis();
       int maps = writeSplits(job, submitJobDir);
+      LOG.info(jobId + " write splits cost:" + (System.currentTimeMillis() - startTime) + "ms");
       conf.setInt(MRJobConfig.NUM_MAPS, maps);
       LOG.info("number of splits:" + maps);
 
@@ -251,14 +257,18 @@ class JobSubmitter {
       }
 
       // Write job file to submit dir
+      startTime = System.currentTimeMillis();
       writeConf(conf, submitJobFile);
+      LOG.info(jobId + " write conf cost:" + (System.currentTimeMillis() - startTime) + "ms");
       
       //
       // Now, actually submit the job (using the submit name)
       //
       printTokens(jobId, job.getCredentials());
+      startTime = System.currentTimeMillis();
       status = submitClient.submitJob(
           jobId, submitJobDir.toString(), job.getCredentials());
+      LOG.info(jobId + " submitJob cost:" + (System.currentTimeMillis() - startTime) + "ms");
       if (status != null) {
         return status;
       } else {
