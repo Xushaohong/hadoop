@@ -524,6 +524,37 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
 
   <profiles>
     <profile>
+      <id>tq-dist-mgmt</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <distMgmtSnapshotsId>tianqiong-snapshots-repo</distMgmtSnapshotsId>
+        <distMgmtSnapshotsName>Tencent TQ Development Snapshot Repository</distMgmtSnapshotsName>
+        <distMgmtSnapshotsUrl>https://mirrors.tencent.com/repository/maven/tianqiong-snapshots</distMgmtSnapshotsUrl>
+        <distMgmtStagingId>tianqiong-releases-repo</distMgmtStagingId>
+        <distMgmtStagingName>Tencent TQ Release Distribution Repository</distMgmtStagingName>
+        <distMgmtStagingUrl>https://mirrors.tencent.com/repository/maven/tianqiong-releases</distMgmtStagingUrl>
+      </properties>
+      <repositories>
+        <repository>
+          <id>${distMgmtStagingId}</id>
+          <name>${distMgmtStagingName}</name>
+          <url>${distMgmtStagingUrl}</url>
+          <snapshots>
+            <enabled>false</enabled>
+          </snapshots>
+        </repository>
+        <repository>
+          <id>tencent_public</id>
+          <url>https://mirrors.tencent.com/repository/maven/tencent_public</url>
+          <snapshots>
+            <enabled>false</enabled>
+          </snapshots>
+        </repository>
+      </repositories>
+    </profile>
+    <profile>
       <id>src</id>
       <activation>
         <activeByDefault>false</activeByDefault>
