@@ -168,6 +168,7 @@ import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
@@ -691,7 +692,9 @@ public class ContainerManagerImpl extends CompositeService implements
           new InetSocketAddress(hostOverride, connectAddress.getPort()));
     }
     return NodeId.newInstance(
-        connectAddress.getAddress().getCanonicalHostName(),
+        NetUtils.PREFER_HOST
+            ? connectAddress.getAddress().getCanonicalHostName()
+            : connectAddress.getAddress().getHostAddress(),
         connectAddress.getPort());
   }
 

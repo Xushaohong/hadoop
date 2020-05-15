@@ -299,7 +299,9 @@ public class WebAppUtils {
         resolved.isLoopbackAddress()) {
       String lh = address.getHostName();
       try {
-        lh = InetAddress.getLocalHost().getCanonicalHostName();
+        sb.append(NetUtils.PREFER_HOST
+            ? InetAddress.getLocalHost().getCanonicalHostName()
+            : InetAddress.getLocalHost().getHostAddress());
       } catch (UnknownHostException e) {
         //Ignore and fallback.
       }

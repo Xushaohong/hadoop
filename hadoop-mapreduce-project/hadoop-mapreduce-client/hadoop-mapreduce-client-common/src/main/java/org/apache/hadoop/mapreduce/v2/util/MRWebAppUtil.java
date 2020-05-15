@@ -33,8 +33,8 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-import java.util.NoSuchElementException;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.http.HttpConfig.Policy;
 
@@ -148,7 +148,9 @@ public class MRWebAppUtil {
     if (address.getAddress() != null &&
         (address.getAddress().isAnyLocalAddress() ||
          address.getAddress().isLoopbackAddress())) {
-      sb.append(InetAddress.getLocalHost().getCanonicalHostName());
+      sb.append(NetUtils.PREFER_HOST
+          ? InetAddress.getLocalHost().getCanonicalHostName()
+          : InetAddress.getLocalHost().getHostAddress());
     } else {
       sb.append(address.getHostName());
     }

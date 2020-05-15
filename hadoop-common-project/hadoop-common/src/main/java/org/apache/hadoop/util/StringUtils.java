@@ -1269,4 +1269,30 @@ public class StringUtils {
       return wrappedLine.toString();
     }
   }
+
+  public static String getPropOrEnvVar(String key) {
+    return getPropOrEnvVar(key, null);
+  }
+
+  public static String getPropOrEnvVar(String key, Map<String, String> props) {
+    return getPropOrEnvVar(key, props, null);
+  }
+
+  public static String getPropOrEnvVar(String key, Map<String, String> props, String defaultValue) {
+    String value = null;
+    if (props != null) {
+      value = props.get(key);
+    }
+    if (value == null) {
+      value = System.getProperty(key);
+    }
+    if (value == null) {
+      String envKey = key.toUpperCase().replaceAll("[.-]", "_");
+      value = System.getenv(envKey);
+    }
+    if(value == null){
+      value = defaultValue;
+    }
+    return value;
+  }
 }

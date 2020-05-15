@@ -1848,12 +1848,14 @@ public abstract class TaskAttemptImpl implements
 
   protected String resolveHost(String src) {
     String result = src; // Fallback in case of failure.
-    try {
-      InetAddress addr = InetAddress.getByName(src);
-      result = addr.getHostName();
-    } catch (UnknownHostException e) {
-      LOG.warn("Failed to resolve address: " + src
-          + ". Continuing to use the same.");
+    if (NetUtils.RESOLVE_HOST) {
+      try {
+        InetAddress addr = InetAddress.getByName(src);
+        result = addr.getHostName();
+      } catch (UnknownHostException e) {
+        LOG.warn("Failed to resolve address: " + src
+            + ". Continuing to use the same.");
+      }
     }
     return result;
   }

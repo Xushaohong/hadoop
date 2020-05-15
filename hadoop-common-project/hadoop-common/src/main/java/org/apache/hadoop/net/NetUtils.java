@@ -57,6 +57,7 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +75,17 @@ public class NetUtils {
   public static final String UNKNOWN_HOST = "(unknown)";
   /** Base URL of the Hadoop Wiki: {@value} */
   public static final String HADOOP_WIKI = "http://wiki.apache.org/hadoop/";
+
+  /**
+   * Use host
+   */
+  public static final boolean PREFER_HOST = StringUtils.getPropOrEnvVar("tq.prefer.host") != null;
+
+  /**
+   * Resolve host
+   */
+  public static final boolean RESOLVE_HOST = StringUtils.getPropOrEnvVar("tq.resolve.host") != null;
+
 
   /**
    * Get the socket factory for the given class according to its
