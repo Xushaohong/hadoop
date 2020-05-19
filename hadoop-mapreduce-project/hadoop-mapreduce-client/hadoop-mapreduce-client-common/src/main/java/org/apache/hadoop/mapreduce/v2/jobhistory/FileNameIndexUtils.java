@@ -39,6 +39,7 @@ public class FileNameIndexUtils {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(FileNameIndexUtils.class);
+  static final int QUEUE_NAME_TRIM_LENGTH = 80;
 
   // Job history file names need to be backwards compatible
   // Only append new elements to the end of this list
@@ -108,8 +109,8 @@ public class FileNameIndexUtils {
     sb.append(DELIMITER);
 
     //QueueName
-    sb.append(escapeDelimiters(encodeJobHistoryFileName(
-        getQueueName(indexInfo))));
+    sb.append(escapeDelimiters(trimQueueName(encodeJobHistoryFileName(
+        getQueueName(indexInfo)))));
     sb.append(DELIMITER);
 
     //JobStartTime
@@ -360,5 +361,15 @@ public class FileNameIndexUtils {
     }
 
     return encodedString.substring(0, index);
+  }
+
+  /**
+   * Trims the queue-name if required
+   */
+  private static String trimQueueName(String queueName) {
+    if (queueName.length() > QUEUE_NAME_TRIM_LENGTH) {
+      queueName = queueName.substring(0, QUEUE_NAME_TRIM_LENGTH);
+    }
+    return queueName;
   }
 }

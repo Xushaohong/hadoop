@@ -20,9 +20,11 @@ package org.apache.hadoop.mapreduce.v2.jobhistory;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -132,6 +134,7 @@ public class JobHistoryUtils {
       return path.getName().endsWith(JOB_HISTORY_FILE_EXTENSION);
     }
   };
+  public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyyMMddHH");
 
   /**
    * Checks whether the provided path string is a valid job history file.
@@ -232,7 +235,18 @@ public class JobHistoryUtils {
     }
     return permission;
   }
-  
+
+  /**
+   * Gets the configured local directory prefix for intermediate done history files.
+   * @param conf
+   * @return A string representation of the prefix.
+   */
+  public static String getConfiguredLocalHistoryIntermediateDoneDirPrefix(
+      Configuration conf) {
+    return conf.get(JHAdminConfig.MR_HISTORY_INTERMEDIATE_LOCAL_DONE_DIR,
+        getConfiguredHistoryIntermediateDoneDirPrefix(conf));
+  }
+
   /**
    * Gets the configured directory prefix for Done history files.
    * @param conf the configuration object
@@ -249,6 +263,13 @@ public class JobHistoryUtils {
     return ensurePathInDefaultFileSystem(doneDirPrefix, conf);
   }
 
+  public static String getDateFormattedDir(String dirPrefix, Date date) {
+    return new Path(dirPrefix, DATE_FORMAT.format(date)).toString();
+  }
+
+  public static String getDateFormattedDir(String dirPrefix) {
+    return new Path(dirPrefix, DATE_FORMAT.format(new Date())).toString();
+  }
   /**
    * Get default file system URI for the cluster (used to ensure consistency
    * of history done/staging locations) over different context
@@ -311,14 +332,36 @@ public class JobHistoryUtils {
     return fc.makeQualified(path).toString();
   }
 
+  // use date formatted done dir friendly for archive management
+  public static boolean isIntermediateDoneDirDateFormattedEnable(Configuration conf){
+    return conf.getBoolean(JHAdminConfig.MR_HISTORY_INTERMEDIATE_DONE_DIR_DATE_FORMAT,
+        JHAdminConfig.DEFAULT_MR_HISTORY_INTERMEDIATE_DONE_DIR_DATE_FORMAT);
+  }
+
   /**
    * Gets the user directory for intermediate done history files.
    * @param conf the configuration object
    * @return the intermediate done directory for jobhistory files.
    */
   public static String getHistoryIntermediateDoneDirForUser(Configuration conf) throws IOException {
-    return new Path(getConfiguredHistoryIntermediateDoneDirPrefix(conf),
-        UserGroupInformation.getCurrentUser().getShortUserName()).toString();
+    String doneDirPrefix = getConfiguredHistoryIntermediateDoneDirPrefix(conf);
+    if (isIntermediateDoneDirDateFormattedEnable(conf)) {
+      doneDirPrefix = getDateFormattedDir(doneDirPrefix);
+    }
+    return new Path(doneDirPrefix, UserGroupInformation.getCurrentUser().getShortUserName()).toString();
+  }
+
+  /**
+   * Gets the local user directory for intermediate done history files.
+   * @param conf the configuration object
+   * @return the intermediate done directory for jobhistory files.
+   */
+  public static String getLocalHistoryIntermediateDoneDirForUser(Configuration conf) throws IOException {
+    String doneDirPrefix = getConfiguredLocalHistoryIntermediateDoneDirPrefix(conf);
+    if (isIntermediateDoneDirDateFormattedEnable(conf)) {
+      doneDirPrefix = getDateFormattedDir(doneDirPrefix);
+    }
+    return new Path(doneDirPrefix, UserGroupInformation.getCurrentUser().getShortUserName()).toString();
   }
 
   public static boolean shouldCreateNonUserDirectory(Configuration conf) {

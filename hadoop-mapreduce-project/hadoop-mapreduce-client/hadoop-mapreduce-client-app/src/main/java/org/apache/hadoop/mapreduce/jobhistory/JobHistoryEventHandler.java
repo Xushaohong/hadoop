@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.mapred.JobConf;
@@ -107,6 +108,7 @@ public class JobHistoryEventHandler extends AbstractService
 
   private Path stagingDirPath = null;
   private Path doneDirPrefixPath = null; // folder for completed jobs
+  private Path localDoneDirPrefixPath = null;
 
   private int maxUnflushedCompletionEvents;
   private int postJobCompletionMultiplier;
@@ -147,6 +149,8 @@ public class JobHistoryEventHandler extends AbstractService
   private static final String MAPREDUCE_TASK_ATTEMPT_ENTITY_TYPE =
       "MAPREDUCE_TASK_ATTEMPT";
 
+  private boolean writeLocalEnable;
+
   public JobHistoryEventHandler(AppContext context, int startCount) {
     super("JobHistoryEventHandler");
     this.context = context;
@@ -163,10 +167,16 @@ public class JobHistoryEventHandler extends AbstractService
   protected void serviceInit(Configuration conf) throws Exception {
     String jobId =
       TypeConverter.fromYarn(context.getApplicationID()).toString();
+
+    boolean writeLocal = conf.getBoolean(JHAdminConfig.MR_HISTORY_LOCAL_ENABLE,
+        JHAdminConfig.DEFAULT_MR_HISTORY_LOCAL_ENABLE);
     
     String stagingDirStr = null;
     String doneDirStr = null;
     String userDoneDirStr = null;
+
+    String localDoneDirStr = null;
+    String localUserDoneDirStr = null;
     try {
       stagingDirStr = JobHistoryUtils.getConfiguredHistoryStagingDirPrefix(conf,
           jobId);
@@ -174,6 +184,8 @@ public class JobHistoryEventHandler extends AbstractService
           JobHistoryUtils.getConfiguredHistoryIntermediateDoneDirPrefix(conf);
       userDoneDirStr =
           JobHistoryUtils.getHistoryIntermediateDoneDirForUser(conf);
+      localDoneDirStr = JobHistoryUtils.getConfiguredLocalHistoryIntermediateDoneDirPrefix(conf);
+      localUserDoneDirStr = JobHistoryUtils.getLocalHistoryIntermediateDoneDirForUser(conf);
     } catch (IOException e) {
       LOG.error("Failed while getting the configured log directories", e);
       throw new YarnRuntimeException(e);
@@ -234,14 +246,87 @@ public class JobHistoryEventHandler extends AbstractService
 
     //Check/create user directory under intermediate done dir.
     try {
+      // create date formatted done dir
+      if (JobHistoryUtils.isIntermediateDoneDirDateFormattedEnable(conf)) {
+        Path formattedDoneDirPath = FileContext.getFileContext(conf).makeQualified(
+            new Path(JobHistoryUtils.getDateFormattedDir(doneDirStr)));
+        mkdir(
+            doneDirFS,
+            formattedDoneDirPath,
+            new FsPermission(
+                JobHistoryUtils.HISTORY_INTERMEDIATE_DONE_DIR_PERMISSIONS
+                    .toShort()));
+        LOG.info("Created done dir path : " + formattedDoneDirPath);
+      }
       doneDirPrefixPath =
           FileContext.getFileContext(conf).makeQualified(new Path(userDoneDirStr));
       mkdir(doneDirFS, doneDirPrefixPath, JobHistoryUtils.
           getConfiguredHistoryIntermediateUserDoneDirPermissions(conf));
+      LOG.info("Created done dir prefix path : " + doneDirPrefixPath);
     } catch (IOException e) {
       LOG.error("Error creating user intermediate history done directory: [ "
           + doneDirPrefixPath + "]", e);
       throw new YarnRuntimeException(e);
+    }
+    FileSystem localFS = FileSystem.getLocal(conf);
+    this.writeLocalEnable = writeLocal && !doneDirFS.getScheme().equals(localFS.getScheme());
+    LOG.info("Write history local : " + writeLocalEnable);
+
+    if (writeLocalEnable) {
+      localDoneDirPrefixPath = localFS.makeQualified(new Path(localUserDoneDirStr));
+      Path localDoneDirPath = localFS.makeQualified(new Path(localDoneDirStr));
+
+      try {
+        // This directory will be in a common location, or this may be a cluster
+        // meant for a single user. Creating based on the conf. Should ideally be
+        // created by the JobHistoryServer or as part of deployment.
+        if (!localFS.exists(localDoneDirPath)) {
+          if (JobHistoryUtils.shouldCreateNonUserDirectory(conf)) {
+            LOG.info("Creating local intermediate history logDir: ["
+                + localDoneDirPath
+                + "] + based on conf. Should ideally be created by admin");
+            mkdir(
+                localFS,
+                localDoneDirPath,
+                new FsPermission(
+                    JobHistoryUtils.HISTORY_INTERMEDIATE_DONE_DIR_PERMISSIONS
+                        .toShort()));
+          } else {
+            String message = "Not creating local intermediate history logDir: ["
+                + localDoneDirPath
+                + "] need to pre-create this directory with" +
+                " appropriate permissions by admin";
+            LOG.error(message);
+            throw new YarnRuntimeException(message);
+          }
+        }
+      } catch (IOException e) {
+        LOG.error("Failed checking for the existance of history intermediate " +
+            "done directory: [" + localDoneDirPath + "]");
+        throw new YarnRuntimeException(e);
+      }
+
+      try {
+        // create date formatted done dir
+        if (JobHistoryUtils.isIntermediateDoneDirDateFormattedEnable(conf)) {
+          Path formattedDoneDirPath = localFS.makeQualified(
+              new Path(JobHistoryUtils.getDateFormattedDir(localDoneDirStr)));
+          mkdir(
+              localFS,
+              formattedDoneDirPath,
+              new FsPermission(
+                  JobHistoryUtils.HISTORY_INTERMEDIATE_DONE_DIR_PERMISSIONS
+                      .toShort()));
+          LOG.info("Created local done dir path : " + formattedDoneDirPath);
+        }
+        mkdir(localFS, localDoneDirPrefixPath, new FsPermission(
+            JobHistoryUtils.getConfiguredHistoryIntermediateUserDoneDirPermissions(conf)));
+        LOG.info("Created local done dir prefix path : " + localDoneDirPrefixPath);
+      } catch (IOException e) {
+        LOG.error("Error creating local user intermediate history done directory: [ "
+            + localDoneDirPrefixPath + "]", e);
+        throw new YarnRuntimeException(e);
+      }
     }
 
     // Maximum number of unflushed completion-events that can stay in the queue
@@ -1525,14 +1610,29 @@ public class JobHistoryEventHandler extends AbstractService
                 doneConfFileName));
         moveToDoneNow(qualifiedConfFile, qualifiedConfDoneFile);
       }
-      
-      moveTmpToDone(qualifiedSummaryDoneFile);
-      moveTmpToDone(qualifiedConfDoneFile);
-      moveTmpToDone(qualifiedDoneFile);
 
+      qualifiedSummaryDoneFile = moveTmpToDone(qualifiedSummaryDoneFile);
+      qualifiedConfDoneFile = moveTmpToDone(qualifiedConfDoneFile);
+      qualifiedDoneFile = moveTmpToDone(qualifiedDoneFile);
+
+      if (writeLocalEnable) {
+        copyDoneToLocal(qualifiedSummaryDoneFile);
+        copyDoneToLocal(qualifiedConfDoneFile);
+        copyDoneToLocal(qualifiedDoneFile);
+      }
     } catch (IOException e) {
       LOG.error("Error closing writer for JobID: " + jobId);
       throw e;
+    }
+  }
+
+  private void copyDoneToLocal(Path src) throws IOException {
+    if (src != null) {
+      Configuration config = getConfig();
+      Path dest = new Path(localDoneDirPrefixPath, src.getName());
+      LocalFileSystem localFS = FileSystem.getLocal(config);
+      FileUtil.copy(doneDirFS, src, localFS, dest, false, true, config);
+      LOG.info("Copied " + src + " to " + dest);
     }
   }
 
@@ -1715,14 +1815,16 @@ public class JobHistoryEventHandler extends AbstractService
     }
   }
 
-  protected void moveTmpToDone(Path tmpPath) throws IOException {
+  protected Path moveTmpToDone(Path tmpPath) throws IOException {
     if (tmpPath != null) {
       String tmpFileName = tmpPath.getName();
       String fileName = getFileNameFromTmpFN(tmpFileName);
       Path path = new Path(tmpPath.getParent(), fileName);
       doneDirFS.rename(tmpPath, path);
       LOG.info("Moved tmp to done: " + tmpPath + " to " + path);
+      return path;
     }
+    return null;
   }
   
   // TODO If the FS objects are the same, this should be a rename instead of a

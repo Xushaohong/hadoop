@@ -102,7 +102,24 @@ public class JHAdminConfig {
       MR_HISTORY_PREFIX + "intermediate-user-done-dir.permissions";
   public static final short
       DEFAULT_MR_HISTORY_INTERMEDIATE_USER_DONE_DIR_PERMISSIONS = 0770;
-  
+
+  /**
+   * Whether to enable date format for intermediate done dir
+   **/
+  public static final String MR_HISTORY_INTERMEDIATE_DONE_DIR_DATE_FORMAT =
+      MR_HISTORY_PREFIX + "intermediate-done-dir.date-format";
+
+  /**
+   * Default is true to enable data format for intermediate done dir
+   */
+  public static final boolean DEFAULT_MR_HISTORY_INTERMEDIATE_DONE_DIR_DATE_FORMAT = true;
+
+  /**
+   *  Path where history files should be stored local after a job finished
+   **/
+  public static final String MR_HISTORY_INTERMEDIATE_LOCAL_DONE_DIR =
+      MR_HISTORY_PREFIX + "intermediate-done-local-dir";
+
   /** Size of the job list cache.*/
   public static final String MR_HISTORY_JOBLIST_CACHE_SIZE =
     MR_HISTORY_PREFIX + "joblist.cache.size";
@@ -150,6 +167,9 @@ public class JHAdminConfig {
   /** To enable https in MR history server */
   public static final String MR_HS_HTTP_POLICY = MR_HISTORY_PREFIX
       + "http.policy";
+  public static final String MR_HISTORY_LOCAL_ENABLE = MR_HISTORY_PREFIX
+      + "local.enable";
+  public static final boolean DEFAULT_MR_HISTORY_LOCAL_ENABLE = true;
   public static String DEFAULT_MR_HS_HTTP_POLICY =
           HttpConfig.Policy.HTTP_ONLY.name();
   
