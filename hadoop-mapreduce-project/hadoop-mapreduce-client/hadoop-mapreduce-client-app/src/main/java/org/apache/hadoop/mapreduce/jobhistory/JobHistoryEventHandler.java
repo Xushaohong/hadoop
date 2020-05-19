@@ -20,6 +20,7 @@ package org.apache.hadoop.mapreduce.jobhistory;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -177,15 +178,19 @@ public class JobHistoryEventHandler extends AbstractService
 
     String localDoneDirStr = null;
     String localUserDoneDirStr = null;
+    // use job init time as date formatted
+    Date initTime  = new Date();
     try {
       stagingDirStr = JobHistoryUtils.getConfiguredHistoryStagingDirPrefix(conf,
           jobId);
       doneDirStr =
           JobHistoryUtils.getConfiguredHistoryIntermediateDoneDirPrefix(conf);
       userDoneDirStr =
-          JobHistoryUtils.getHistoryIntermediateDoneDirForUser(conf);
+          JobHistoryUtils.isIntermediateDoneDirDateFormattedEnable(conf)
+              ? JobHistoryUtils.getHistoryIntermediateDoneDirForUser(conf, initTime)
+              : JobHistoryUtils.getHistoryIntermediateDoneDirForUser(conf);
       localDoneDirStr = JobHistoryUtils.getConfiguredLocalHistoryIntermediateDoneDirPrefix(conf);
-      localUserDoneDirStr = JobHistoryUtils.getLocalHistoryIntermediateDoneDirForUser(conf);
+      localUserDoneDirStr = JobHistoryUtils.getLocalHistoryIntermediateDoneDirForUser(conf, initTime);
     } catch (IOException e) {
       LOG.error("Failed while getting the configured log directories", e);
       throw new YarnRuntimeException(e);
@@ -246,10 +251,10 @@ public class JobHistoryEventHandler extends AbstractService
 
     //Check/create user directory under intermediate done dir.
     try {
-      // create date formatted done dir
+      //try create date formatted done dir
       if (JobHistoryUtils.isIntermediateDoneDirDateFormattedEnable(conf)) {
-        Path formattedDoneDirPath = FileContext.getFileContext(conf).makeQualified(
-            new Path(JobHistoryUtils.getDateFormattedDir(doneDirStr)));
+        Path formattedDoneDirPath = doneDirFS.makeQualified(
+            new Path(JobHistoryUtils.getHSDateFormattedDir(doneDirStr)));
         mkdir(
             doneDirFS,
             formattedDoneDirPath,
@@ -268,6 +273,7 @@ public class JobHistoryEventHandler extends AbstractService
           + doneDirPrefixPath + "]", e);
       throw new YarnRuntimeException(e);
     }
+
     FileSystem localFS = FileSystem.getLocal(conf);
     this.writeLocalEnable = writeLocal && !doneDirFS.getScheme().equals(localFS.getScheme());
     LOG.info("Write history local : " + writeLocalEnable);
@@ -307,18 +313,16 @@ public class JobHistoryEventHandler extends AbstractService
       }
 
       try {
-        // create date formatted done dir
-        if (JobHistoryUtils.isIntermediateDoneDirDateFormattedEnable(conf)) {
-          Path formattedDoneDirPath = localFS.makeQualified(
-              new Path(JobHistoryUtils.getDateFormattedDir(localDoneDirStr)));
-          mkdir(
-              localFS,
-              formattedDoneDirPath,
-              new FsPermission(
-                  JobHistoryUtils.HISTORY_INTERMEDIATE_DONE_DIR_PERMISSIONS
-                      .toShort()));
-          LOG.info("Created local done dir path : " + formattedDoneDirPath);
-        }
+        // create date formatted local done dir
+        Path formattedDoneDirPath = localFS.makeQualified(
+            new Path(JobHistoryUtils.getLocalHSDateFormattedDir(localDoneDirStr)));
+        mkdir(
+            localFS,
+            formattedDoneDirPath,
+            new FsPermission(
+                JobHistoryUtils.HISTORY_INTERMEDIATE_DONE_DIR_PERMISSIONS
+                    .toShort()));
+        LOG.info("Created local done dir path : " + formattedDoneDirPath);
         mkdir(localFS, localDoneDirPrefixPath, new FsPermission(
             JobHistoryUtils.getConfiguredHistoryIntermediateUserDoneDirPermissions(conf)));
         LOG.info("Created local done dir prefix path : " + localDoneDirPrefixPath);
@@ -1538,6 +1542,55 @@ public class JobHistoryEventHandler extends AbstractService
   }
 
   protected void processDoneFiles(JobId jobId) throws IOException {
+    FileSystem localFS = FileSystem.getLocal(getConfig());
+    Date doneTime = new Date();
+    if (writeLocalEnable) {
+      String userLocalDoneDateDirStr = JobHistoryUtils.getLocalHistoryIntermediateDoneDirForUser(getConfig(), doneTime);
+      Path tmpLocalDoneDirPrefixPath = localFS.makeQualified(new Path(userLocalDoneDateDirStr));
+      // the job done time is beyond init time,  try use done time
+      try {
+        if (!tmpLocalDoneDirPrefixPath.equals(this.localDoneDirPrefixPath)) {
+          String localDoneDirStr = JobHistoryUtils.getConfiguredLocalHistoryIntermediateDoneDirPrefix(getConfig());
+          mkdir(localFS, localFS.makeQualified(new Path(JobHistoryUtils.getLocalHSDateFormattedDir(localDoneDirStr, doneTime))),
+              new FsPermission(
+                  JobHistoryUtils.HISTORY_INTERMEDIATE_DONE_DIR_PERMISSIONS
+                      .toShort()));
+          mkdir(localFS,
+              tmpLocalDoneDirPrefixPath,
+              new FsPermission(
+                  JobHistoryUtils.getConfiguredHistoryIntermediateUserDoneDirPermissions(getConfig())
+                      .toShort()));
+          this.localDoneDirPrefixPath = tmpLocalDoneDirPrefixPath;
+          LOG.info("Created date local done dir path :" + tmpLocalDoneDirPrefixPath);
+        }
+      } catch (Exception e) {
+        LOG.warn("Error creating local done dir path:" + tmpLocalDoneDirPrefixPath, e);
+      }
+    }
+    if (JobHistoryUtils.isIntermediateDoneDirDateFormattedEnable(getConfig())) {
+      String userDoneDateDirStr = JobHistoryUtils.getHistoryIntermediateDoneDirForUser(getConfig(), doneTime);
+      Path tmpDoneDirPrefixPath = doneDirFS.makeQualified(new Path(userDoneDateDirStr));
+      // the job done time is beyond init time,  try use done time
+      try {
+        if (tmpDoneDirPrefixPath.equals(this.doneDirPrefixPath)) {
+          String doneDirStr =
+              JobHistoryUtils.getConfiguredHistoryIntermediateDoneDirPrefix(getConfig());
+          mkdir(doneDirFS, doneDirFS.makeQualified(new Path(JobHistoryUtils.getHSDateFormattedDir(doneDirStr, doneTime))),
+              new FsPermission(
+                  JobHistoryUtils.HISTORY_INTERMEDIATE_DONE_DIR_PERMISSIONS
+                      .toShort()));
+          mkdir(doneDirFS,
+              tmpDoneDirPrefixPath,
+              new FsPermission(
+                  JobHistoryUtils.getConfiguredHistoryIntermediateUserDoneDirPermissions(getConfig())
+                      .toShort()));
+          LOG.info("Created date done dir path :" + tmpDoneDirPrefixPath);
+          this.doneDirPrefixPath = tmpDoneDirPrefixPath;
+        }
+      } catch (Exception e) {
+        LOG.warn("Error creating  done dir path:" + tmpDoneDirPrefixPath, e);
+      }
+    }
 
     final MetaInfo mi = fileMap.get(jobId);
     if (mi == null) {
@@ -1577,6 +1630,7 @@ public class JobHistoryEventHandler extends AbstractService
 
       // Move historyFile to Done Folder.
       Path qualifiedDoneFile = null;
+      Path qualifiedIndexFile = null;
       if (mi.getHistoryFile() != null) {
         Path historyFile = mi.getHistoryFile();
         Path qualifiedLogFile = stagingDirFS.makeQualified(historyFile);
@@ -1614,6 +1668,23 @@ public class JobHistoryEventHandler extends AbstractService
       qualifiedSummaryDoneFile = moveTmpToDone(qualifiedSummaryDoneFile);
       qualifiedConfDoneFile = moveTmpToDone(qualifiedConfDoneFile);
       qualifiedDoneFile = moveTmpToDone(qualifiedDoneFile);
+
+      // index for history file avoid global scan
+      if (getConfig().getBoolean("tq.mapreduce.write.history.index", true)) {
+        String indexFileName = JobHistoryUtils.getIntermediateJobHistoryIndexFileName(jobId);
+        qualifiedIndexFile = doneDirFS.makeQualified(new Path(doneDirPrefixPath,
+            indexFileName));
+        FSDataOutputStream jobIndexFileOutput = null;
+        try {
+          jobIndexFileOutput = doneDirFS.create(qualifiedIndexFile, true);
+          jobIndexFileOutput.writeUTF(qualifiedDoneFile.getName());
+        } catch (Exception e) {
+          LOG.warn("Error writing job index file for JobID: " + jobId, e);
+        }
+        if (jobIndexFileOutput != null) {
+          jobIndexFileOutput.close();
+        }
+      }
 
       if (writeLocalEnable) {
         copyDoneToLocal(qualifiedSummaryDoneFile);

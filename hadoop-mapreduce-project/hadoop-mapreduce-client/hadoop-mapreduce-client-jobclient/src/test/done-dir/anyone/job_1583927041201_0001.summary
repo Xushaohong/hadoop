@@ -1,0 +1,1 @@
+djobId=job_1583927041201_0001,submitTime=1583927194751,launchTime=1583927200538,firstMapTaskLaunchTime=1583927202764,firstReduceTaskLaunchTime=1583927218736,finishTime=1583927249063,resourcesPerMap=1024,resourcesPerReduce=1024,numMaps=68,numReduces=1,user=gaiaadmin,queue=default,status=SUCCEEDED,mapSlotSeconds=8995,reduceSlotSeconds=241,jobName=word count

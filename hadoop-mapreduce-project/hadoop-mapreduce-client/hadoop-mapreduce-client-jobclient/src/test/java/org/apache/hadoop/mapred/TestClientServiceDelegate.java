@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -48,6 +49,7 @@ import org.apache.hadoop.mapreduce.v2.api.records.Counters;
 import org.apache.hadoop.mapreduce.v2.api.records.JobReport;
 import org.apache.hadoop.mapreduce.v2.api.records.JobState;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -264,6 +266,32 @@ public class TestClientServiceDelegate {
     Assert.assertEquals("http://TestTrackingUrl", jobStatus.getTrackingUrl());                    
     Assert.assertEquals(1.0f, jobStatus.getMapProgress(), 0.0f);
     Assert.assertEquals(1.0f, jobStatus.getReduceProgress(), 0.0f);
+  }
+
+  @Test
+  public void testJobReportFromDirectHSProxy() throws Exception {
+    MRClientProtocol historyServerProxy = null;
+    ResourceMgrDelegate rm = mock(ResourceMgrDelegate.class);
+    when(rm.getApplicationReport(TypeConverter.toYarn(oldJobId).getAppId()))
+        .thenReturn(null);
+    Configuration conf = new YarnConfiguration();
+    conf.set("mapreduce.jobhistory.intermediate-done-dir", "src/test/done-dir/");
+    conf.set("mapreduce.jobhistory.intermediate-done-dir.date-format","false");
+    final ClientServiceDelegate clientServiceDelegate = getClientServiceDelegate(
+        historyServerProxy, rm, conf);
+
+    JobStatus jobStatus =
+        UserGroupInformation.createRemoteUser("anyone").doAs(new PrivilegedExceptionAction<JobStatus>() {
+          @Override
+          public JobStatus run() throws Exception {
+           return clientServiceDelegate.getJobStatus(JobID.forName(
+                "job_1583927041201_0001"));
+          }
+        });
+    clientServiceDelegate.close();
+    Assert.assertNotNull(jobStatus);
+    Assert.assertEquals(1.0f, jobStatus.getMapProgress(), 1.0f);
+    Assert.assertEquals(1.0f, jobStatus.getReduceProgress(), 1.0f);
   }
   
   @Test
@@ -544,6 +572,15 @@ public class TestClientServiceDelegate {
   private ClientServiceDelegate getClientServiceDelegate(
       MRClientProtocol historyServerProxy, ResourceMgrDelegate rm) {
     Configuration conf = new YarnConfiguration();
+    conf.set(MRConfig.FRAMEWORK_NAME, MRConfig.YARN_FRAMEWORK_NAME);
+    conf.setBoolean(MRJobConfig.JOB_AM_ACCESS_DISABLED, !isAMReachableFromClient);
+    ClientServiceDelegate clientServiceDelegate = new ClientServiceDelegate(
+        conf, rm, oldJobId, historyServerProxy);
+    return clientServiceDelegate;
+  }
+
+  private ClientServiceDelegate getClientServiceDelegate(
+      MRClientProtocol historyServerProxy, ResourceMgrDelegate rm, Configuration conf) {
     conf.set(MRConfig.FRAMEWORK_NAME, MRConfig.YARN_FRAMEWORK_NAME);
     conf.setBoolean(MRJobConfig.JOB_AM_ACCESS_DISABLED, !isAMReachableFromClient);
     ClientServiceDelegate clientServiceDelegate = new ClientServiceDelegate(

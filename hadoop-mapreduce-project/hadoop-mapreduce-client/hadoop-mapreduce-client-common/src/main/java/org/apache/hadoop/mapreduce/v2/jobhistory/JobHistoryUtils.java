@@ -110,6 +110,8 @@ public class JobHistoryUtils {
    * Job History File extension.
    */
   public static final String JOB_HISTORY_FILE_EXTENSION = ".jhist";
+
+  public static final String JOB_HISTORY_INDEX_FILE_SUFFIX = ".JOB_HIST_INDEX";
   
   public static final int VERSION = 4;
 
@@ -134,7 +136,10 @@ public class JobHistoryUtils {
       return path.getName().endsWith(JOB_HISTORY_FILE_EXTENSION);
     }
   };
-  public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyyMMddHH");
+
+  public static final SimpleDateFormat LOCAL_HS_DATE_FORMAT = new SimpleDateFormat("yyyyMMddHH");
+
+  public static final SimpleDateFormat HS_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd");
 
   /**
    * Checks whether the provided path string is a valid job history file.
@@ -172,6 +177,16 @@ public class JobHistoryUtils {
    */
   public static PathFilter getHistoryFileFilter() {
     return JOB_HISTORY_FILE_FILTER;
+  }
+
+  public static PathFilter getHistoryFileFilter(final JobId jobID) {
+    return new PathFilter() {
+      @Override
+      public boolean accept(Path path) {
+        String pathName = path.getName();
+        return pathName.startsWith(jobID.toString()) && JOB_HISTORY_FILE_FILTER.accept(path);
+      }
+    };
   }
 
   /**
@@ -263,13 +278,30 @@ public class JobHistoryUtils {
     return ensurePathInDefaultFileSystem(doneDirPrefix, conf);
   }
 
-  public static String getDateFormattedDir(String dirPrefix, Date date) {
-    return new Path(dirPrefix, DATE_FORMAT.format(date)).toString();
+  public static String getLocalHSDateFormattedDir(String dirPrefix, Date date) {
+    return new Path(dirPrefix, getLocalHSDateStr(date)).toString();
   }
 
-  public static String getDateFormattedDir(String dirPrefix) {
-    return new Path(dirPrefix, DATE_FORMAT.format(new Date())).toString();
+  public static String getLocalHSDateFormattedDir(String dirPrefix) {
+    return new Path(dirPrefix, getLocalHSDateStr(new Date())).toString();
   }
+
+  public static String getLocalHSDateStr(Date date){
+    return  LOCAL_HS_DATE_FORMAT.format(date);
+  }
+
+  public static String getHSDateFormattedDir(String dirPrefix, Date date) {
+    return new Path(dirPrefix, getHSDateStr(date)).toString();
+  }
+
+  public static String getHSDateFormattedDir(String dirPrefix) {
+    return new Path(dirPrefix, getHSDateStr(new Date())).toString();
+  }
+
+  public static String getHSDateStr(Date date){
+    return  HS_DATE_FORMAT.format(date);
+  }
+
   /**
    * Get default file system URI for the cluster (used to ensure consistency
    * of history done/staging locations) over different context
@@ -348,11 +380,30 @@ public class JobHistoryUtils {
    * @return the intermediate done directory for jobhistory files.
    */
   public static String getHistoryIntermediateDoneDirForUser(Configuration conf) throws IOException {
+    return getHistoryIntermediateDoneDirForUser(conf, UserGroupInformation.getCurrentUser().getShortUserName());
+  }
+
+  /**
+   * Gets the user directory for intermediate done history files.
+   * @param conf the configuration object
+   * @return the intermediate done directory for jobhistory files.
+   */
+  public static String getHistoryIntermediateDoneDirForUser(Configuration conf, String userName) throws IOException {
     String doneDirPrefix = getConfiguredHistoryIntermediateDoneDirPrefix(conf);
-    if (isIntermediateDoneDirDateFormattedEnable(conf)) {
-      doneDirPrefix = getDateFormattedDir(doneDirPrefix);
-    }
-    return new Path(doneDirPrefix, UserGroupInformation.getCurrentUser().getShortUserName()).toString();
+    return new Path(doneDirPrefix, userName).toString();
+  }
+
+  public static String getHistoryIntermediateDoneDirForUser(Configuration conf, Date date) throws IOException {
+    return getHistoryIntermediateDoneDirForUser(conf, date, UserGroupInformation.getCurrentUser().getShortUserName());
+  }
+
+  public static String getHistoryIntermediateDoneDirForUser(Configuration conf, String date, String userName) throws IOException {
+    String doneDirPrefix = getConfiguredHistoryIntermediateDoneDirPrefix(conf);
+    return new Path(new Path(doneDirPrefix, date), userName).toString();
+  }
+
+  public static String getHistoryIntermediateDoneDirForUser(Configuration conf, Date date, String userName) throws IOException {
+    return getHistoryIntermediateDoneDirForUser(conf, getHSDateStr(date), userName);
   }
 
   /**
@@ -360,12 +411,10 @@ public class JobHistoryUtils {
    * @param conf the configuration object
    * @return the intermediate done directory for jobhistory files.
    */
-  public static String getLocalHistoryIntermediateDoneDirForUser(Configuration conf) throws IOException {
+  public static String getLocalHistoryIntermediateDoneDirForUser(Configuration conf, Date date) throws IOException {
     String doneDirPrefix = getConfiguredLocalHistoryIntermediateDoneDirPrefix(conf);
-    if (isIntermediateDoneDirDateFormattedEnable(conf)) {
-      doneDirPrefix = getDateFormattedDir(doneDirPrefix);
-    }
-    return new Path(doneDirPrefix, UserGroupInformation.getCurrentUser().getShortUserName()).toString();
+    return new Path(getLocalHSDateFormattedDir(doneDirPrefix, date),
+        UserGroupInformation.getCurrentUser().getShortUserName()).toString();
   }
 
   public static boolean shouldCreateNonUserDirectory(Configuration conf) {
@@ -405,6 +454,10 @@ public class JobHistoryUtils {
    */
   public static String getIntermediateSummaryFileName(JobId jobId) {
     return TypeConverter.fromYarn(jobId).toString() + SUMMARY_FILE_NAME_SUFFIX;
+  }
+
+  public static String getIntermediateJobHistoryIndexFileName(JobId jobId) {
+    return TypeConverter.fromYarn(jobId).toString() + JOB_HISTORY_INDEX_FILE_SUFFIX;
   }
   
   /**

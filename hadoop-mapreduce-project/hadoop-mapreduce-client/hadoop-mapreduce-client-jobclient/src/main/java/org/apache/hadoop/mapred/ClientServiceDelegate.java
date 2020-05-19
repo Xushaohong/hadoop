@@ -32,6 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.mapred.history.DirectHistoryProxy;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.MRJobConfig;
@@ -65,6 +66,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -95,6 +97,7 @@ public class ClientServiceDelegate {
   private final ApplicationId appId;
   private final ResourceMgrDelegate rm;
   private final MRClientProtocol historyServerProxy;
+  private DirectHistoryProxy directHistoryProxy = null;
   private MRClientProtocol realProxy = null;
   private RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
   private static String UNKNOWN_USER = "Unknown User";
@@ -285,7 +288,14 @@ public class ClientServiceDelegate {
   }
 
   private MRClientProtocol checkAndGetHSProxy(
-      ApplicationReport applicationReport, JobState state) {
+      ApplicationReport applicationReport, JobState state) throws IOException {
+    if (conf.getBoolean("tq.mapreduce.job.history.direct.mode", true)) {
+      if (directHistoryProxy == null) {
+        directHistoryProxy = ReflectionUtils.newInstance(DirectHistoryProxy.class, conf);
+        directHistoryProxy.init();
+      }
+      return directHistoryProxy;
+    }
     if (null == historyServerProxy) {
       LOG.warn("Job History Server is not configured.");
       return getNotRunningJob(applicationReport, state);
