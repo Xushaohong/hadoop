@@ -546,6 +546,21 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
           </snapshots>
         </repository>
         <repository>
+          <id>${distMgmtSnapshotsId}</id>
+          <name>${distMgmtSnapshotsName}</name>
+          <url>${distMgmtSnapshotsUrl}</url>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </repository>
+        <repository>
+          <id>tencent</id>
+          <url>https://mirrors.tencent.com/nexus/repository/maven-public/</url>
+          <snapshots>
+            <enabled>false</enabled>
+          </snapshots>
+        </repository>
+        <repository>
           <id>tencent_public</id>
           <url>https://mirrors.tencent.com/repository/maven/tencent_public</url>
           <snapshots>
