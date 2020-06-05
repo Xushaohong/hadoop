@@ -124,7 +124,7 @@ public class NameNodeProxies {
 
     if (failoverProxyProvider == null) {
       return createNonHAProxy(conf, DFSUtilClient.getNNAddress(nameNodeUri),
-          xface, UserGroupInformation.getCurrentUser(), true,
+          xface, UserGroupInformation.getCurrentUser(conf), true,
           fallbackToSimpleAuth, null);
     } else {
       return NameNodeProxiesClient.createHAProxy(conf, nameNodeUri, xface,

@@ -24,6 +24,7 @@ import static org.apache.hadoop.ipc.RpcConstants.CONNECTION_CONTEXT_CALL_ID;
 import static org.apache.hadoop.ipc.RpcConstants.CURRENT_VERSION;
 import static org.apache.hadoop.ipc.RpcConstants.HEADER_LEN_AFTER_HRPC_PART;
 import static org.apache.hadoop.ipc.RpcConstants.PING_CALL_ID;
+import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_PROTOCOL_NAME_KEY;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -99,16 +100,21 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslAuth;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslState;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.AuthConfigureHolder;
 import org.apache.hadoop.security.SaslPropertiesResolver;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
+import org.apache.hadoop.security.Utils;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
+import org.apache.hadoop.security.sasl.TqNegotiationToken;
+import org.apache.hadoop.security.sasl.TqSaslMessage;
+import org.apache.hadoop.security.sasl.TqSaslState;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -2019,7 +2025,8 @@ public abstract class Server {
           IOException tce = (IOException) getTrueCause(e);
           AUDITLOG.warn(AUTH_FAILED_FOR + this.toString() + ":"
               + attemptingUser + " (" + e.getLocalizedMessage()
-              + ") with true cause: (" + tce.getLocalizedMessage() + ")");
+              + ") with true cause: (" + tce.getLocalizedMessage() + ")"
+              + " from " + getHostAddress());
           throw tce;
         }
         
@@ -2033,7 +2040,7 @@ public abstract class Server {
             LOG.debug("SASL server successfully authenticated client: " + user);
           }
           rpcMetrics.incrAuthenticationSuccesses();
-          AUDITLOG.info(AUTH_SUCCESSFUL_FOR + user);
+          AUDITLOG.info(AUTH_SUCCESSFUL_FOR + user + " from " + getHostAddress());
           saslContextEstablished = true;
         }
       } catch (RpcServerException rse) { // don't re-wrap
@@ -2096,7 +2103,7 @@ public abstract class Server {
           }
           // verify the client requested an advertised authType
           SaslAuth clientSaslAuth = saslMessage.getAuths(0);
-          if (!negotiateResponse.getAuthsList().contains(clientSaslAuth)) {
+          if (!enabledAuthMethods.contains(AuthMethod.valueOf(clientSaslAuth.getMethod()))) {
             if (sentNegotiate) {
               throw new AccessControlException(
                   clientSaslAuth.getMethod() + " authentication is not enabled."
@@ -2115,7 +2122,7 @@ public abstract class Server {
           }
           // sasl server for tokens may already be instantiated
           if (saslServer == null || authMethod != AuthMethod.TOKEN) {
-            saslServer = createSaslServer(authMethod);
+            saslServer = createSaslServer(authMethod, clientSaslAuth.getClientVersion());
           }
           saslResponse = processSaslToken(saslMessage);
           break;
@@ -2362,15 +2369,41 @@ public abstract class Server {
             .setChallenge(ByteString.copyFrom(challenge));
         negotiateMessage = negotiateBuilder.build();
       }
+      // send name directly
+      if (enabledAuthMethods.contains(AuthMethod.TAUTH)
+          && conf.getBoolean("tq.tauth.send.negotiate", false)) {
+        RpcSaslProto.Builder negotiateBuilder =
+            RpcSaslProto.newBuilder(negotiateMessage);
+        for (SaslAuth.Builder authBuilder : negotiateBuilder.getAuthsBuilderList()) {
+          if (AuthMethod.valueOf(authBuilder.getMethod()) == AuthMethod.TAUTH
+              && authBuilder.getServerVersion() == 1) {
+            authBuilder.setChallenge(ByteString.copyFrom(
+                new TqSaslMessage(TqSaslState.NEGOTIATE, new TqNegotiationToken(AuthConfigureHolder.isAuthEnable()
+                    && AuthConfigureHolder.getProtocolPolicyManagement().isNeedAuth(protocolName),
+                    Utils.getSystemPropertyOrEnvVar("tq.service.name")))
+                    .toBytes()));
+          }
+        }
+        negotiateMessage = negotiateBuilder.build();
+      }
       sentNegotiate = true;
       return negotiateMessage;
     }
     
     private SaslServer createSaslServer(AuthMethod authMethod)
         throws IOException, InterruptedException {
-      final Map<String,?> saslProps =
-                  saslPropsResolver.getServerProperties(addr, ingressPort);
-      return new SaslRpcServer(authMethod).create(this, saslProps, secretManager);
+      return createSaslServer(authMethod, 0);
+    }
+
+    private SaslServer createSaslServer(AuthMethod authMethod, int authVersion)
+        throws IOException, InterruptedException {
+      final Map<String,String> saslProps =
+          saslPropsResolver.getServerProperties(addr);
+      if(protocolName != null) {
+        saslProps.put(TAUTH_PROTOCOL_NAME_KEY, protocolName);
+        saslProps.put("tq.service.name", getConf().get("tq.service.name"));
+      }
+      return new SaslRpcServer(authMethod, authVersion).create(this, saslProps, secretManager);
     }
     
     /**
@@ -2438,6 +2471,7 @@ public abstract class Server {
       UserGroupInformation protocolUser = ProtoUtil.getUgi(connectionContext);
       if (authProtocol == AuthProtocol.NONE) {
         user = protocolUser;
+        AUDITLOG.info("Record for " + user + " from " + getHostAddress());
       } else {
         // user is authenticated
         user.setAuthenticationMethod(authMethod);
@@ -2461,6 +2495,15 @@ public abstract class Server {
             user = UserGroupInformation.createProxyUser(protocolUser
                 .getUserName(), realUser);
           }
+        }
+      }
+      if (AuthConfigureHolder.isRegularUsernameEnable()) {
+        String userName = AuthConfigureHolder.regularUserName(user.getUserName());
+        UserGroupInformation realUser = user.getRealUser();
+        if (realUser != null) {
+          user = UserGroupInformation.createProxyUser(userName, realUser);
+        } else {
+          user = UserGroupInformation.createRemoteUser(userName, authMethod);
         }
       }
       authorizeConnection();
@@ -3086,7 +3129,8 @@ public abstract class Server {
                       false);
 
     // configure supported authentications
-    this.enabledAuthMethods = getAuthMethods(secretManager, conf);
+    boolean authCompatible = conf.getBoolean("tq.auth.compatible", false);
+    this.enabledAuthMethods = getAuthMethods(secretManager, conf, authCompatible);
     this.negotiateResponse = buildNegotiateResponse(enabledAuthMethods);
     
     // Start the listener here and let it bind to the port
@@ -3142,9 +3186,15 @@ public abstract class Server {
     } else {
       negotiateBuilder.setState(SaslState.NEGOTIATE);
       for (AuthMethod authMethod : authMethods) {
-        SaslRpcServer saslRpcServer = new SaslRpcServer(authMethod);      
+        SaslRpcServer saslRpcServer;
+        if (authMethod == AuthMethod.TAUTH) {
+          saslRpcServer = new SaslRpcServer(authMethod, AuthConfigureHolder.getTAuthSaslVersion() > 0 ? 1 : 0);
+        } else {
+          saslRpcServer = new SaslRpcServer(authMethod);
+        }
         SaslAuth.Builder builder = negotiateBuilder.addAuthsBuilder()
             .setMethod(authMethod.toString())
+            .setServerVersion(saslRpcServer.authVersion)
             .setMechanism(saslRpcServer.mechanism);
         if (saslRpcServer.protocol != null) {
           builder.setProtocol(saslRpcServer.protocol);
@@ -3161,7 +3211,7 @@ public abstract class Server {
   // if a secret manager is provided, or fail if token is the conf value but
   // there is no secret manager
   private List<AuthMethod> getAuthMethods(SecretManager<?> secretManager,
-                                             Configuration conf) {
+                                             Configuration conf, boolean authCompatible) {
     AuthenticationMethod confAuthenticationMethod =
         SecurityUtil.getAuthenticationMethod(conf);        
     List<AuthMethod> authMethods = new ArrayList<AuthMethod>();
@@ -3178,6 +3228,12 @@ public abstract class Server {
     }
     authMethods.add(confAuthenticationMethod.getAuthMethod());        
     
+    // compatible support
+    // TODO need to remove while version is unified
+    if (confAuthenticationMethod == AuthenticationMethod.TAUTH && authCompatible) {
+      authMethods.add(AuthenticationMethod.SIMPLE.getAuthMethod());
+      LOG.debug(AuthenticationMethod.SIMPLE + " enabled for compatible");
+    }
     LOG.debug("Server accepts auth methods:" + authMethods);
     return authMethods;
   }

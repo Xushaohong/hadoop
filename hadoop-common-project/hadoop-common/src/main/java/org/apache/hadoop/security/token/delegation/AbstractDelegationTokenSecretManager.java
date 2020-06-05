@@ -31,6 +31,7 @@ import java.util.Set;
 
 import javax.crypto.SecretKey;
 
+import com.tencent.tdw.security.beans.TokenInformation;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
@@ -44,6 +45,8 @@ import org.apache.hadoop.util.Time;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.security.token.delegation.UnionDelegationTokenManager.TOKEN_INFO_PLACEHOLDER;
 
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -104,6 +107,8 @@ extends AbstractDelegationTokenIdentifier>
    */
   protected Object noInterruptsLock = new Object();
 
+  protected UnionDelegationTokenManager<TokenIdent> unionDelegationTokenManager;
+
   /**
    * Create a secret manager
    * @param delegationKeyUpdateInterval the number of milliseconds for rolling
@@ -118,11 +123,30 @@ extends AbstractDelegationTokenIdentifier>
   public AbstractDelegationTokenSecretManager(long delegationKeyUpdateInterval,
       long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
       long delegationTokenRemoverScanInterval) {
+   this(delegationKeyUpdateInterval, delegationTokenMaxLifetime,
+       delegationTokenRenewInterval,delegationTokenRemoverScanInterval, null);
+  }
+
+  /**
+   * Create a secret manager
+   * @param delegationKeyUpdateInterval the number of milliseconds for rolling
+   *        new secret keys.
+   * @param delegationTokenMaxLifetime the maximum lifetime of the delegation
+   *        tokens in milliseconds
+   * @param delegationTokenRenewInterval how often the tokens must be renewed
+   *        in milliseconds
+   * @param delegationTokenRemoverScanInterval how often the tokens are scanned
+   *        for expired tokens in milliseconds
+   */
+  public AbstractDelegationTokenSecretManager(long delegationKeyUpdateInterval,
+      long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
+      long delegationTokenRemoverScanInterval, UnionDelegationTokenManager<TokenIdent> unionDelegationTokenManager) {
     this.keyUpdateInterval = delegationKeyUpdateInterval;
     this.tokenMaxLifetime = delegationTokenMaxLifetime;
     this.tokenRenewInterval = delegationTokenRenewInterval;
     this.tokenRemoverScanInterval = delegationTokenRemoverScanInterval;
     this.storeTokenTrackingId = false;
+    this.unionDelegationTokenManager = unionDelegationTokenManager;
   }
 
   /** should be called before this object is used */
@@ -133,6 +157,9 @@ extends AbstractDelegationTokenIdentifier>
       running = true;
       tokenRemoverThread = new Daemon(new ExpiredTokenRemover());
       tokenRemoverThread.start();
+      if (isUnionTokenEnable()) {
+        unionDelegationTokenManager.startThreads();
+      }
     }
   }
   
@@ -190,7 +217,9 @@ extends AbstractDelegationTokenIdentifier>
 
   // RM
   protected void removeStoredToken(TokenIdent ident) throws IOException {
-
+    if (isUnionTokenEnable() && ident.isUnion()) {
+      unionDelegationTokenManager.cancelToken(ident.getId());
+    }
   }
   // RM
   protected void updateStoredToken(TokenIdent ident, long renewDate) throws IOException {
@@ -275,7 +304,15 @@ extends AbstractDelegationTokenIdentifier>
    * based implementations
    */
   protected DelegationTokenInformation getTokenInfo(TokenIdent ident) {
-    return currentTokens.get(ident);
+    DelegationTokenInformation tokenInformation = currentTokens.get(ident);
+    if (tokenInformation == null && isUnionTokenEnable() && ident.isUnion()) {
+      TokenInformation globalTokenInfo = unionDelegationTokenManager.getToken(ident.getId(),
+          unionDelegationTokenManager.getConverter().toId(ident));
+      if (globalTokenInfo != null) {
+        tokenInformation = unionDelegationTokenManager.getConverter().toInfo(globalTokenInfo);
+      }
+    }
+    return tokenInformation;
   }
 
   /**
@@ -296,6 +333,10 @@ extends AbstractDelegationTokenIdentifier>
       DelegationTokenInformation tokenInfo) throws IOException {
     currentTokens.put(ident, tokenInfo);
     updateStoredToken(ident, tokenInfo.getRenewDate());
+    if (isUnionTokenEnable() && ident.isUnion()) {
+      unionDelegationTokenManager.updateToken(
+          ident.getId(), unionDelegationTokenManager.getConverter().toInfo(tokenInfo));
+    }
   }
 
   /**
@@ -404,11 +445,22 @@ extends AbstractDelegationTokenIdentifier>
     identifier.setMaxDate(now + tokenMaxLifetime);
     identifier.setMasterKeyId(currentKey.getKeyId());
     identifier.setSequenceNumber(sequenceNum);
+    if (isUnionTokenEnable()) {
+      long id = unionDelegationTokenManager.pushToken(
+          unionDelegationTokenManager.getConverter().toId(identifier), TOKEN_INFO_PLACEHOLDER);
+      if (id > 0) {
+        identifier.setId(id);
+      }
+    }
     LOG.info("Creating password for identifier: " + formatTokenId(identifier)
         + ", currentKey: " + currentKey.getKeyId());
     byte[] password = createPassword(identifier.getBytes(), currentKey.getKey());
     DelegationTokenInformation tokenInfo = new DelegationTokenInformation(now
         + tokenRenewInterval, password, getTrackingIdIfEnabled(identifier));
+    if (isUnionTokenEnable()) {
+      unionDelegationTokenManager.updateToken(identifier.getId(),
+          unionDelegationTokenManager.getConverter().toInfo(tokenInfo));
+    }
     try {
       storeToken(identifier, tokenInfo);
     } catch (IOException ioe) {
@@ -660,6 +712,10 @@ extends AbstractDelegationTokenIdentifier>
             "Unable to join on token removal thread", e);
       }
     }
+
+    if (isUnionTokenEnable()) {
+      unionDelegationTokenManager.stopThreads();
+    }
   }
   
   /**
@@ -717,6 +773,18 @@ extends AbstractDelegationTokenIdentifier>
    */
   public TokenIdent decodeTokenIdentifier(Token<TokenIdent> token) throws IOException {
     return token.decodeIdentifier();
+  }
+
+  public void register(UnionDelegationTokenManager<TokenIdent> unionDelegationTokenManager) {
+    Preconditions.checkState(!running);
+    Preconditions.checkArgument(unionDelegationTokenManager != null);
+    synchronized (this) {
+      this.unionDelegationTokenManager = unionDelegationTokenManager;
+    }
+  }
+
+  public boolean isUnionTokenEnable(){
+    return unionDelegationTokenManager != null;
   }
 
 }

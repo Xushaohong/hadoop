@@ -1617,7 +1617,8 @@ public class SequenceFile {
     /** Append a key/value pair. */
     @Override
     @SuppressWarnings("unchecked")
-    public synchronized void append(Object key, Object val)
+    public synchronized void
+    append(Object key, Object val)
       throws IOException {
       if (key.getClass() != keyClass)
         throw new IOException("wrong key class: "+key+" is not "+keyClass);

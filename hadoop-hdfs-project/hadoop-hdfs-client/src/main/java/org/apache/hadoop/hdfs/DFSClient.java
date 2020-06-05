@@ -244,6 +244,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   private final long serverDefaultsValidityPeriod;
 
   private final boolean readOnlyClient;
+  private final boolean avoidGetTokenInsecurity;
 
   public DfsClientConf getConf() {
     return dfsClientConf;
@@ -322,7 +323,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
               MIN_REPLICATION + " to "
               + dtpReplaceDatanodeOnFailureReplication);
     }
-    this.ugi = UserGroupInformation.getCurrentUser();
+    // compatible with some ugi case
+    this.ugi = UserGroupInformation.getCurrentUser(conf);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Using user[" + ugi.getShortUserName() + "] for " + nameNodeUri);
+    }
 
     this.namenodeUri = nameNodeUri;
     this.clientName = "DFSClient_" + dfsClientConf.getTaskId() + "_" +
@@ -401,6 +406,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     this.saslClient = new SaslDataTransferClient(
         conf, DataTransferSaslUtil.getSaslPropertiesResolver(conf),
         TrustedChannelResolver.getInstance(conf), nnFallbackToSimpleAuth);
+    this.avoidGetTokenInsecurity = conf.getBoolean("tq.client.avoid.get.token.insecurity", true);
   }
 
   /*
@@ -738,6 +744,12 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    */
   public Token<DelegationTokenIdentifier> getDelegationToken(Text renewer)
       throws IOException {
+    UserGroupInformation.AuthenticationMethod authenticationMethod =  ugi.getRealAuthenticationMethod();
+    if (authenticationMethod != UserGroupInformation.AuthenticationMethod.TAUTH
+        && authenticationMethod != UserGroupInformation.AuthenticationMethod.KERBEROS
+        && avoidGetTokenInsecurity) {
+      return null;
+    }
     assert dtService != null;
     try (TraceScope ignored = tracer.newScope("getDelegationToken")) {
       Token<DelegationTokenIdentifier> token =

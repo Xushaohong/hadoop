@@ -130,6 +130,19 @@ public abstract class ProtoUtil {
     String effectiveUser = userInfo.hasEffectiveUser() ? userInfo
         .getEffectiveUser() : null;
     String realUser = userInfo.hasRealUser() ? userInfo.getRealUser() : null;
+    // compatible support
+    if (effectiveUser != null) {
+      int ugiIdx = effectiveUser.indexOf(":");
+      if (ugiIdx > 0) {
+        effectiveUser = effectiveUser.substring(0, ugiIdx);
+      }
+    }
+    if (realUser != null) {
+      int ugiIdx = realUser.indexOf(":");
+      if (ugiIdx > 0) {
+        realUser = realUser.substring(0, ugiIdx);
+      }
+    }
     if (effectiveUser != null) {
       if (realUser != null) {
         UserGroupInformation realUserUgi = UserGroupInformation

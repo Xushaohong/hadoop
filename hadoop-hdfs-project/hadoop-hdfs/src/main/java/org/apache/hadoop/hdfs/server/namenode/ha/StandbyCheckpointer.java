@@ -438,7 +438,7 @@ public class StandbyCheckpointer {
         }
         try {
           // We may have lost our ticket since last checkpoint, log in again, just in case
-          if (UserGroupInformation.isSecurityEnabled()) {
+          if (UserGroupInformation.isKerberosEnabled()) {
             UserGroupInformation.getCurrentUser().checkTGTAndReloginFromKeytab();
           }
           

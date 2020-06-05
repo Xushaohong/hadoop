@@ -204,8 +204,8 @@ public class ImageServlet extends HttpServlet {
   private void validateRequest(ServletContext context, Configuration conf,
       HttpServletRequest request, HttpServletResponse response,
       FSImage nnImage, String theirStorageInfoString) throws IOException {
-
-    if (UserGroupInformation.isSecurityEnabled()
+    // http auth only support kerberos temporarily
+    if (UserGroupInformation.isKerberosEnabled()
         && !isValidRequestor(context, request.getUserPrincipal().getName(),
             conf)) {
       String errorMsg = "Only Namenode, Secondary Namenode, and administrators may access "

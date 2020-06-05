@@ -17,39 +17,32 @@
  */
 package org.apache.hadoop.security;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_USER_GROUP_METRICS_PERCENTILES_INTERVALS;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_KERBEROS_MIN_SECONDS_BEFORE_RELOGIN;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_KERBEROS_MIN_SECONDS_BEFORE_RELOGIN_DEFAULT;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_TOKEN_FILES;
-import static org.apache.hadoop.security.UGIExceptionMessages.*;
-import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
-
 import com.google.common.annotations.VisibleForTesting;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.lang.reflect.UndeclaredThrowableException;
-import java.security.AccessControlContext;
-import java.security.AccessController;
-import java.security.Principal;
-import java.security.PrivilegedAction;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.metrics2.annotation.Metric;
+import org.apache.hadoop.metrics2.annotation.Metrics;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
+import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
+import org.apache.hadoop.security.authentication.util.KerberosUtil;
+import org.apache.hadoop.security.tauth.TAuthLoginModule;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.security.token.TqTokenIdentifier;
+import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.Subject;
@@ -62,31 +55,48 @@ import javax.security.auth.login.Configuration.Parameters;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 import javax.security.auth.spi.LoginModule;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.security.Principal;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.metrics2.annotation.Metric;
-import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.MutableRate;
-import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
-import org.apache.hadoop.security.authentication.util.KerberosUtil;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.util.Shell;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_USER_GROUP_METRICS_PERCENTILES_INTERVALS;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_KERBEROS_MIN_SECONDS_BEFORE_RELOGIN;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_KERBEROS_MIN_SECONDS_BEFORE_RELOGIN_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_TOKEN_FILES;
+import static org.apache.hadoop.security.UGIExceptionMessages.FAILURE_TO_LOGIN;
+import static org.apache.hadoop.security.UGIExceptionMessages.LOGIN_FAILURE;
+import static org.apache.hadoop.security.UGIExceptionMessages.LOGOUT_FAILURE;
+import static org.apache.hadoop.security.UGIExceptionMessages.MUST_FIRST_LOGIN;
+import static org.apache.hadoop.security.UGIExceptionMessages.MUST_FIRST_LOGIN_FROM_KEYTAB;
+import static org.apache.hadoop.security.UGIExceptionMessages.SUBJECT_MUST_CONTAIN_PRINCIPAL;
+import static org.apache.hadoop.security.UGIExceptionMessages.SUBJECT_MUST_NOT_BE_NULL;
+import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
 
 /**
  * User and group information for Hadoop.
@@ -108,6 +118,8 @@ public class UserGroupInformation {
   private static boolean shouldRenewImmediatelyForTests = false;
   static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   static final String HADOOP_PROXY_USER = "HADOOP_PROXY_USER";
+  private static final Map<String,UserGroupInformation> CACHED_SIMPLE_UGIS = new HashMap<String, UserGroupInformation>();
+  private static final Map<String,UserGroupInformation> CACHED_AUTH_UGIS = new HashMap<String, UserGroupInformation>();
 
   /**
    * For the purposes of unit tests, we want to test login
@@ -199,6 +211,14 @@ public class UserGroupInformation {
           LOG.debug("using kerberos user:"+user);
         }
       }
+
+      // if we are using tauth, try it out
+      if (isAuthenticationMethodEnabled(AuthenticationMethod.TAUTH)) {
+        user = getCanonicalUser(TAuthLoginModule.TAuthPrincipal.class);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("using tauth user:" + user);
+        }
+      }
       //If we don't have a kerberos user and security is disabled, check
       //if user is specified in the environment or properties
       if (!isSecurityEnabled() && (user == null)) {
@@ -288,6 +308,23 @@ public class UserGroupInformation {
   /**Environment variable pointing to the token cache file*/
   public static final String HADOOP_TOKEN_FILE_LOCATION = 
     "HADOOP_TOKEN_FILE_LOCATION";
+
+  /**
+   * Environment variable pointing to the token cache file
+   */
+  public static final String TQ_TOKEN_FILE_LOCATION =
+      "TQ_TOKEN_FILE_LOCATION";
+
+  /**
+   * Variable pointing to the token
+   */
+  public static final String TQ_TOKEN = "tq.token";
+
+  /**
+   * Environment variable pointing to the token props cache file
+   */
+  public static final String TQ_PROPS_TOKEN_FILE_LOCATION =
+      "TQ_TOKEN_PROPS_FILE_LOCATION";
   
   public static boolean isInitialized() {
     return conf != null;
@@ -351,6 +388,9 @@ public class UserGroupInformation {
         metrics.getGroupsQuantiles = getGroupsQuantiles;
       }
     }
+    if (conf.getBoolean("hadoop.show.authentication", true)) {
+      LOG.info("Hadoop UGI authentication : " + authenticationMethod);
+    }
   }
 
   /**
@@ -384,6 +424,15 @@ public class UserGroupInformation {
    */
   public static boolean isSecurityEnabled() {
     return !isAuthenticationMethodEnabled(AuthenticationMethod.SIMPLE);
+  }
+
+  public static boolean isTAuthEnabled() {
+    return isAuthenticationMethodEnabled(AuthenticationMethod.TAUTH);
+  }
+
+  public static boolean isKerberosEnabled() {
+    return isAuthenticationMethodEnabled(AuthenticationMethod.KERBEROS)
+        || isAuthenticationMethodEnabled(AuthenticationMethod.KERBEROS_SSL);
   }
   
   @InterfaceAudience.Private
@@ -565,6 +614,10 @@ public class UserGroupInformation {
     return user.getAuthenticationMethod() == AuthenticationMethod.KERBEROS;
   }
 
+  public boolean hasTAuthCredentials() {
+    return user.getAuthenticationMethod() == AuthenticationMethod.TAUTH;
+  }
+
   /**
    * Return the current user, including any doAs in the current stack.
    * @return the current user
@@ -580,6 +633,48 @@ public class UserGroupInformation {
     } else {
       return new UserGroupInformation(subject);
     }
+  }
+
+  // compatible with some ugi case
+  // need to abandon while permission is managed by ranger
+  public synchronized
+  static UserGroupInformation getCurrentUser(Configuration conf) throws IOException {
+    if (conf.getBoolean("tq.use.ugi", false)) {
+      String[] ugi = conf.getStrings("hadoop.job.ugi");
+      if (ugi != null && ugi.length > 0) {
+        try {
+          String specUserName = ugi[0].split(":")[0];
+          if (conf.getTrimmedStringCollection("tq.ugi.list").contains(specUserName)) {
+            UserGroupInformation result = null;
+            String base64Key = conf.get(String.format("tq.%s.key", specUserName));
+            if (base64Key != null) {
+              result = CACHED_AUTH_UGIS.get(specUserName);
+              if (result == null) {
+                result = createUserByTAuthKey(specUserName, new String(Base64.getDecoder().decode(base64Key)));
+                    CACHED_AUTH_UGIS.put(specUserName, result);
+              }
+            }
+            if (result == null) {
+              result = CACHED_SIMPLE_UGIS.get(specUserName);
+              if (result == null) {
+                Subject subject = new Subject();
+                subject.getPrincipals().add(new User(specUserName));
+                result = new UserGroupInformation(subject);
+                result.setAuthenticationMethod(AuthenticationMethod.SIMPLE);
+                CACHED_SIMPLE_UGIS.put(specUserName, result);
+              }
+            }
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Using " + specUserName + " as user by ugi");
+            }
+            return result;
+          }
+        } catch (Exception e) {
+          LOG.warn("Failed to create user by ugi ", e);
+        }
+      }
+    }
+    return getCurrentUser();
   }
 
   /**
@@ -766,6 +861,9 @@ public class UserGroupInformation {
         LOG.debug("Loaded {} tokens", cred.numberOfTokens());
         loginUser.addCredentials(cred);
       }
+
+      // load tq token
+      loadTqTokensForLogin(loginUser);
     } catch (IOException ioe) {
       LOG.debug("failure to load login credentials", ioe);
       throw ioe;
@@ -774,6 +872,68 @@ public class UserGroupInformation {
       LOG.debug("UGI loginUser:"+loginUser);
     }
     return loginUser;
+  }
+
+  private static void loadTqTokensForLogin(UserGroupInformation loginUser) throws IOException {
+    String fileLocation;
+    fileLocation = System.getenv(TQ_TOKEN_FILE_LOCATION);
+    String tqTokenStr = StringUtils.getPropOrEnvVar(TQ_TOKEN);
+    if (fileLocation != null || tqTokenStr != null) {
+      String tqTokenPropsLocation = System.getenv(TQ_PROPS_TOKEN_FILE_LOCATION);
+      Set<String> tqTokenIdents = new HashSet<>();
+      if (fileLocation != null) {
+        File source = new File(fileLocation);
+        LOG.debug("Reading credentials from location set in {}: {}",
+            TQ_TOKEN_FILE_LOCATION,
+            source.getCanonicalPath());
+        if (!source.isFile()) {
+          throw new FileNotFoundException("Source file "
+              + source.getCanonicalPath() + " from "
+              + TQ_TOKEN_FILE_LOCATION
+              + " not found");
+        }
+        try (BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(source)))) {
+          String tmpTokenIdent;
+          while ((tmpTokenIdent = input.readLine()) != null) {
+            tqTokenIdents.add(tmpTokenIdent);
+          }
+        } catch (Exception e) {
+          throw new IOException("Exception reading " + source, e);
+        }
+      } else {
+        tqTokenIdents.addAll(StringUtils.getStringCollection(tqTokenStr, "[ ,\t\r\n]*"));
+        LOG.debug("Reading tq token from variable {}: {}",
+            TQ_TOKEN, tqTokenStr);
+      }
+      Map<String, String> tqTokenPropsMap = new HashMap<>();
+      if (tqTokenPropsLocation != null) {
+        Properties tqTokenProps = new Properties();
+        try (FileInputStream input = new FileInputStream(new File(tqTokenPropsLocation))) {
+          tqTokenProps.load(input);
+        } catch (Exception e) {
+          throw new IOException("Exception reading " + tqTokenPropsLocation, e);
+        }
+        for (final String name : tqTokenProps.stringPropertyNames())
+          tqTokenPropsMap.put(name, tqTokenProps.getProperty(name));
+      }
+      LOG.debug("Loaded tq token identifiers: " + tqTokenIdents + ", properties:" + tqTokenPropsMap);
+      if (!tqTokenIdents.isEmpty()) {
+        Credentials credentials = new Credentials();
+        for (String tokenIdent : tqTokenIdents) {
+          tokenIdent = tokenIdent.trim();
+          if (tokenIdent.isEmpty()) {
+            continue;
+          }
+          TqTokenIdentifier identifier = new TqTokenIdentifier(tokenIdent, tqTokenPropsMap);
+          Token<TqTokenIdentifier> tqToken =
+              new Token<>(identifier.getBytes(), identifier.getPassword(),
+                  identifier.getKind(), TqTokenIdentifier.TQ_TOKEN);
+          LOG.debug("Loaded tq token : " + tqToken);
+          credentials.addToken(TqTokenIdentifier.TQ_TOKEN, tqToken);
+        }
+        loginUser.addCredentials(credentials);
+      }
+    }
   }
 
   @InterfaceAudience.Private
@@ -1013,9 +1173,32 @@ public class UserGroupInformation {
     if (!isSecurityEnabled())
       return;
 
-    setLoginUser(loginUserFromKeytabAndReturnUGI(user, path));
+    if (isKerberosEnabled()) {
+      setLoginUser(loginUserFromKeytabAndReturnUGI(user, path));
+      LOG.info("Login successful for user " + user
+          + " using keytab file " + path);
+      return;
+    }
+
+    // Maintain compatibility with Kerberos
+    if (isTAuthEnabled()) {
+      loginFromTAuthKeyFile(user, path);
+      LOG.info("Login successful for user " + user
+          + " using tauth file " + path);
+    }
+  }
+
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
+  public
+  static void loginFromTAuthKeyFile(String user,
+                                  String path) throws IOException {
+    if (!isTAuthEnabled())
+      return;
+
+    setLoginUser(loginUserFromTAuthFileAndReturnUGI(user, path));
     LOG.info("Login successful for user " + user
-        + " using keytab file " + path);
+        + " using tauth file " + path);
   }
 
   /**
@@ -1030,6 +1213,11 @@ public class UserGroupInformation {
   @InterfaceAudience.Public
   @InterfaceStability.Evolving
   public void logoutUserFromKeytab() throws IOException {
+    // Maintain compatibility with Kerberos
+    if (hasTAuthCredentials()) {
+      logoutUserFromTAuth();
+      return;
+    }
     if (!hasKerberosCredentials()) {
       return;
     }
@@ -1054,6 +1242,26 @@ public class UserGroupInformation {
 
     LOG.info("Logout successful for user " + getUserName()
         + " using keytab file " + keytabFile);
+  }
+
+  public void logoutUserFromTAuth() throws IOException {
+    if (!hasTAuthCredentials()) {
+      return;
+    }
+    HadoopLoginContext login = getLogin();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Initiating logout for " + getUserName());
+    }
+    if (login == null) {
+      throw new IOException("login from tauth must be done first");
+    }
+    try {
+      // hadoop login context internally locks credentials.
+      login.logout();
+    } catch (LoginException le) {
+      throw new IOException("Logout failure", le);
+    }
+    LOG.info("Logout successful for user " + getUserName());
   }
   
   /**
@@ -1132,6 +1340,10 @@ public class UserGroupInformation {
       }
     }
     relogin(login);
+  }
+
+  private void reloginFromTAuth(){
+
   }
 
   /**
@@ -1214,7 +1426,7 @@ public class UserGroupInformation {
   static UserGroupInformation loginUserFromKeytabAndReturnUGI(String user,
                                   String path
                                   ) throws IOException {
-    if (!isSecurityEnabled())
+    if (!isKerberosEnabled())
       return UserGroupInformation.getCurrentUser();
 
     LoginParams params = new LoginParams();
@@ -1223,6 +1435,31 @@ public class UserGroupInformation {
     return doSubjectLogin(null, params);
   }
 
+  public
+  static UserGroupInformation loginUserFromTAuthFileAndReturnUGI(String user,
+                                    String path
+                                    ) throws IOException {
+    if (!isTAuthEnabled())
+      return UserGroupInformation.getCurrentUser();
+
+    LoginParams params = new LoginParams();
+    params.put(LoginParam.PRINCIPAL, user);
+    params.put(LoginParam.TAUTH_PATH, path);
+    return doSubjectLogin(null, params);
+  }
+
+  public
+  static UserGroupInformation loginUserFromTAuthKeyAndReturnUGI(String user,
+                                                                 String key
+  ) throws IOException {
+    if (!isTAuthEnabled())
+      return UserGroupInformation.getCurrentUser();
+
+    LoginParams params = new LoginParams();
+    params.put(LoginParam.PRINCIPAL, user);
+    params.put(LoginParam.TAUTH_KEY, key);
+    return doSubjectLogin(null, params);
+  }
   private boolean hasSufficientTimeElapsed(long now) {
     if (!shouldRenewImmediatelyForTests &&
         now - user.getLastLogin() < kerberosMinSecondsBeforeRelogin ) {
@@ -1298,7 +1535,8 @@ public class UserGroupInformation {
     TOKEN(AuthMethod.TOKEN),
     CERTIFICATE(null),
     KERBEROS_SSL(null),
-    PROXY(null);
+    PROXY(null),
+    TAUTH(AuthMethod.TAUTH, HadoopConfiguration.TAUTH_CONFIG_NAME);;
     
     private final AuthMethod authMethod;
     private final String loginAppName;
@@ -1422,6 +1660,19 @@ public class UserGroupInformation {
     // add the user groups
     ((TestingGroups) groups).setUserGroups(ugi.getShortUserName(), userGroups);
     return ugi;
+  }
+
+  public static UserGroupInformation createUserByTAuthKey(String userName, String masterKey) {
+    Subject subject = new Subject();
+    TAuthLoginModule.TAuthPrincipal principal = new TAuthLoginModule.TAuthPrincipal(userName);
+    TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.buildWithMasterKey(masterKey);
+    User user = new User(userName, AuthenticationMethod.TAUTH, null);
+    subject.getPrincipals().add(principal);
+    subject.getPrincipals().add(user);
+    subject.getPrivateCredentials().add(credential);
+    UserGroupInformation realUser = new UserGroupInformation(subject);
+    realUser.setAuthenticationMethod(AuthenticationMethod.TAUTH);
+    return realUser;
   }
 
 
@@ -1870,6 +2121,8 @@ public class UserGroupInformation {
     PRINCIPAL,
     KEYTAB,
     CCACHE,
+    TAUTH_PATH,
+    TAUTH_KEY,
   }
 
   // explicitly private to prevent external tampering.
@@ -1888,9 +2141,15 @@ public class UserGroupInformation {
 
     static LoginParams getDefaults() {
       LoginParams params = new LoginParams();
-      params.put(LoginParam.PRINCIPAL, System.getenv("KRB5PRINCIPAL"));
+      String principal = System.getenv("KRB5PRINCIPAL");
+      if (principal == null || principal.length()  == 0) {
+        principal = System.getenv("TAUTHRINCIPAL");
+      }
+      params.put(LoginParam.PRINCIPAL, principal);
       params.put(LoginParam.KEYTAB, System.getenv("KRB5KEYTAB"));
       params.put(LoginParam.CCACHE, System.getenv("KRB5CCNAME"));
+      params.put(LoginParam.TAUTH_PATH, System.getenv("TAUTHPATH"));
+      params.put(LoginParam.TAUTH_KEY, System.getenv("TAUTHKEY"));
       return params;
     }
   }
@@ -1963,6 +2222,7 @@ public class UserGroupInformation {
         KerberosUtil.getKrb5LoginModuleName();
     static final String SIMPLE_CONFIG_NAME = "hadoop-simple";
     static final String KERBEROS_CONFIG_NAME = "hadoop-kerberos";
+    private static final String TAUTH_CONFIG_NAME = "hadoop-tauth";
 
     private static final Map<String, String> BASIC_JAAS_OPTIONS =
         new HashMap<String,String>();
@@ -2011,9 +2271,36 @@ public class UserGroupInformation {
           entries.add(OS_SPECIFIC_LOGIN);
         }
         entries.add(getKerberosEntry());
+      } else  if(appName.equals(TAUTH_CONFIG_NAME)) {
+        if (!params.containsKey(LoginParam.PRINCIPAL)) {
+          entries.add(OS_SPECIFIC_LOGIN);
+        }
+        entries.add(getTAuthEntry());
       }
       entries.add(HADOOP_LOGIN);
       return entries.toArray(new AppConfigurationEntry[0]);
+    }
+
+    private AppConfigurationEntry getTAuthEntry() {
+      final Map<String, Object> options = new HashMap<>(BASIC_JAAS_OPTIONS);
+      options.put(TAuthLoginModule.OS_PRINCIPAL_CLASS, OS_PRINCIPAL_CLASS);
+      LoginModuleControlFlag controlFlag = LoginModuleControlFlag.OPTIONAL;
+      final String principal = params.get(LoginParam.PRINCIPAL);
+      if (principal != null) {
+        options.put(TAuthLoginModule.TAUTH_PRINCIPAL, principal);
+        controlFlag = LoginModuleControlFlag.REQUIRED;
+      }
+
+      final String key = params.get(LoginParam.TAUTH_KEY);
+      if (key != null) {
+        options.put(TAuthLoginModule.TAUTH_KEY, key);
+      }
+      final String path = params.get(LoginParam.TAUTH_PATH);
+      if (path != null) {
+        options.put(TAuthLoginModule.TAUTH_KEY_PATH, path);
+      }
+      return new AppConfigurationEntry(
+          TAuthLoginModule.class.getName(), controlFlag, options);
     }
 
     private AppConfigurationEntry getKerberosEntry() {

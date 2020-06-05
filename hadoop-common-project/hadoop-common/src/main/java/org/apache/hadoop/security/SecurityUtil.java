@@ -304,15 +304,24 @@ public final class SecurityUtil {
       return;
     
     String keytabFilename = conf.get(keytabFileKey);
-    if (keytabFilename == null || keytabFilename.length() == 0) {
-      throw new IOException("Running in secure mode, but config doesn't have a keytab");
+    if (UserGroupInformation.isKerberosEnabled()) {
+      if (keytabFilename == null || keytabFilename.length() == 0) {
+        throw new IOException("Running in secure mode, but config doesn't have a keytab");
+      }
     }
 
     String principalConfig = conf.get(userNameKey, System
         .getProperty("user.name"));
     String principalName = SecurityUtil.getServerPrincipal(principalConfig,
         hostname);
-    UserGroupInformation.loginUserFromKeytab(principalName, keytabFilename);
+    if (UserGroupInformation.isKerberosEnabled()) {
+      UserGroupInformation.loginUserFromKeytab(principalName, keytabFilename);
+      return;
+    }
+    String tauthKeyFilename = conf.get(keytabFileKey.replaceAll("keytab","keyfile"));
+    if (tauthKeyFilename != null) {
+      UserGroupInformation.loginFromTAuthKeyFile(principalConfig, tauthKeyFilename);
+    }
   }
 
   /**

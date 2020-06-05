@@ -339,7 +339,7 @@ public class WebApps {
         if (hasSpnegoConf) {
           builder.setUsernameConfKey(spnegoPrincipalKey)
               .setKeytabConfKey(spnegoKeytabKey)
-              .setSecurityEnabled(UserGroupInformation.isSecurityEnabled());
+              .setSecurityEnabled(UserGroupInformation.isKerberosEnabled());
         }
 
         if (httpScheme.equals(WebAppUtils.HTTPS_PREFIX)) {

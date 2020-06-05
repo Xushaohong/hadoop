@@ -134,7 +134,7 @@ public class DFSck extends Configured implements Tool {
     this.out = out;
     this.connectionFactory = URLConnectionFactory
         .newDefaultURLConnectionFactory(conf);
-    this.isSpnegoEnabled = UserGroupInformation.isSecurityEnabled();
+    this.isSpnegoEnabled = UserGroupInformation.isKerberosEnabled();
   }
 
   /**

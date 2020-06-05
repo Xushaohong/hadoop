@@ -1624,7 +1624,7 @@ public class DFSUtil {
 
     HttpServer2.Builder builder = new HttpServer2.Builder().setName(name)
         .setConf(conf).setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")))
-        .setSecurityEnabled(UserGroupInformation.isSecurityEnabled())
+        .setSecurityEnabled(UserGroupInformation.isKerberosEnabled()) // http auth only support kerberos temporarily
         .setUsernameConfKey(spnegoUserNameKey)
         .setKeytabConfKey(getSpnegoKeytabKey(conf, spnegoKeytabFileKey));
 

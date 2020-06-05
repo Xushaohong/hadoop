@@ -53,6 +53,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.AbstractAuthTokenDelegationManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenManager;
 import org.apache.zookeeper.CreateMode;
@@ -668,6 +669,13 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
         LOG.error("Error retrieving tokenInfo [" + ident.getSequenceNumber()
             + "] from ZK", e);
       }
+
+      if (tokenInfo == null && isUnionTokenEnable() && ident.isUnion()) {
+        AbstractAuthTokenDelegationManager.Converter<TokenIdent, DelegationTokenInformation> converter =
+            unionDelegationTokenManager.getConverter();
+        tokenInfo = converter.toInfo(unionDelegationTokenManager.getToken(ident.getId(),
+            converter.toId(ident)));
+      }
     }
     return tokenInfo;
   }
@@ -827,6 +835,10 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
         addOrUpdateToken(ident, tokenInfo, false);
         LOG.debug("Attempted to update a non-existing znode " + nodeRemovePath);
       }
+      if (isUnionTokenEnable() && ident.isUnion()) {
+        unionDelegationTokenManager.updateToken(
+            ident.getId(), unionDelegationTokenManager.getConverter().toInfo(tokenInfo));
+      }
     } catch (Exception e) {
       throw new RuntimeException("Could not update Stored Token ZKDTSMDelegationToken_"
           + ident.getSequenceNumber(), e);
@@ -858,6 +870,9 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
         }
       } else {
         LOG.debug("Attempted to remove a non-existing znode " + nodeRemovePath);
+      }
+      if (isUnionTokenEnable() && ident.isUnion()) {
+        unionDelegationTokenManager.cancelToken(ident.getId());
       }
     } catch (Exception e) {
       throw new RuntimeException(

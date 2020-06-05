@@ -62,6 +62,7 @@ import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
+import org.apache.hadoop.security.AuthConfigureHolder;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -779,6 +780,7 @@ public final class HttpServer2 implements FilterContainer {
     addServlet("logLevel", "/logLevel", LogLevel.Servlet.class);
     addServlet("jmx", "/jmx", JMXJsonServlet.class);
     addServlet("conf", "/conf", ConfServlet.class);
+    addServlet("auth", "/auth", AuthConfigureHolder.RefreshAuthServlet.class);
   }
 
   public void addContext(ServletContextHandler ctxt, boolean isFiltered) {
@@ -895,7 +897,7 @@ public final class HttpServer2 implements FilterContainer {
     }
     webAppContext.addServlet(holder, pathSpec);
 
-    if(requireAuth && UserGroupInformation.isSecurityEnabled()) {
+    if(requireAuth && UserGroupInformation.isKerberosEnabled()) {
       LOG.info("Adding Kerberos (SPNEGO) filter to " + name);
       ServletHandler handler = webAppContext.getServletHandler();
       FilterMapping fmap = new FilterMapping();

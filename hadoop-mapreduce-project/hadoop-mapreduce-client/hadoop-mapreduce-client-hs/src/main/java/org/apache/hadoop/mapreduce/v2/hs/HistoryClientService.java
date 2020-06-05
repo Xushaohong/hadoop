@@ -366,7 +366,7 @@ public class HistoryClientService extends AbstractService {
       // Verify that the connection is kerberos authenticated
         if (!isAllowedDelegationTokenOp()) {
           throw new IOException(
-              "Delegation Token can be issued only with kerberos authentication");
+              "Delegation Token can be issued only with tauth or kerberos authentication");
         }
 
       GetDelegationTokenResponse response = recordFactory.newRecordInstance(
@@ -397,7 +397,7 @@ public class HistoryClientService extends AbstractService {
         RenewDelegationTokenRequest request) throws IOException {
         if (!isAllowedDelegationTokenOp()) {
           throw new IOException(
-              "Delegation Token can be renewed only with kerberos authentication");
+              "Delegation Token can be renewed only with tauth or kerberos authentication");
         }
 
         org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
@@ -420,7 +420,7 @@ public class HistoryClientService extends AbstractService {
         CancelDelegationTokenRequest request) throws IOException {
         if (!isAllowedDelegationTokenOp()) {
           throw new IOException(
-              "Delegation Token can be cancelled only with kerberos authentication");
+              "Delegation Token can be cancelled only with tauth or kerberos authentication");
         }
 
         org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
@@ -452,7 +452,8 @@ public class HistoryClientService extends AbstractService {
       if (UserGroupInformation.isSecurityEnabled()) {
         return EnumSet.of(AuthenticationMethod.KERBEROS,
                           AuthenticationMethod.KERBEROS_SSL,
-                          AuthenticationMethod.CERTIFICATE)
+                          AuthenticationMethod.CERTIFICATE,
+                          AuthenticationMethod.TAUTH)
             .contains(UserGroupInformation.getCurrentUser()
                     .getRealAuthenticationMethod());
       } else {

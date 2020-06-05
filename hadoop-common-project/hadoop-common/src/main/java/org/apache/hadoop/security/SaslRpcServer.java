@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.security;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
@@ -27,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.security.Security;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +46,13 @@ import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 import javax.security.sasl.SaslServerFactory;
 
+import com.tencent.tdw.security.Tuple;
+import com.tencent.tdw.security.authentication.Authentication;
+import com.tencent.tdw.security.authentication.service.SecureService;
+import com.tencent.tdw.security.authentication.service.SecureServiceFactory;
+import com.tencent.tdw.security.authentication.tauth.AuthServer;
+import com.tencent.tdw.security.authentication.tauth.ServerAuthResult;
+import com.tencent.tdw.security.netbeans.AuthTicket;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -52,9 +61,16 @@ import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.Server.Connection;
 import org.apache.hadoop.ipc.StandbyException;
+import org.apache.hadoop.security.sasl.TqAuthConst;
+import org.apache.hadoop.security.sasl.TqServerCallbackHandler;
+import org.apache.hadoop.security.sasl.TqServerSecurityProvider;
+import org.apache.hadoop.security.sasl.TqTicketResponseToken;
+import org.apache.hadoop.security.tauth.TAuthConst;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.security.token.TqTokenIdentifier;
+import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,19 +103,25 @@ public class SaslRpcServer {
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
   public AuthMethod authMethod;
+  public int authVersion;
   public String mechanism;
   public String protocol;
   public String serverId;
-  
+
+  public SaslRpcServer(AuthMethod authMethod) throws IOException {
+    this(authMethod, 0);
+  }
+
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
-  public SaslRpcServer(AuthMethod authMethod) throws IOException {
-    this.authMethod = authMethod;
-    mechanism = authMethod.getMechanismName();    
+  public SaslRpcServer(AuthMethod authMethod, int authVersion) throws IOException {
+    this.authVersion = authVersion;
+    mechanism = authMethod.getMechanismName();
     switch (authMethod) {
       case SIMPLE: {
         return; // no sasl for simple
       }
+      case TAUTH:
       case TOKEN: {
         protocol = "";
         serverId = SaslRpcServer.SASL_DEFAULT_REALM;
@@ -147,6 +169,21 @@ public class SaslRpcServer {
         callback = new SaslGssCallbackHandler();
         break;
       }
+      case TAUTH:{
+        ugi = UserGroupInformation.getCurrentUser();
+        if (authVersion == 0) {
+          //no need callback
+          callback = null;
+        } else if (authVersion == 1) {
+          callback = new TqAuthServerCallbackHandler(saslProperties);
+        } else {
+          throw new IOException("Unknown version of TAUTH " + authVersion);
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("TAUTH mechanism:" + mechanism +", version:" + authVersion);
+        }
+        break;
+      }
       default:
         // we should never be able to get here
         throw new AccessControlException(
@@ -178,10 +215,13 @@ public class SaslRpcServer {
   }
 
   public static void init(Configuration conf) {
-    Security.addProvider(new SaslPlainServer.SecurityProvider());
-    // passing null so factory is populated with all possibilities.  the
-    // properties passed when instantiating a server are what really matter
-    saslFactory = new FastSaslServerFactory(null);
+    if (saslFactory == null) {
+      Security.addProvider(new SaslPlainServer.SecurityProvider());
+      Security.addProvider(new TqServerSecurityProvider());
+      // passing null so factory is populated with all possibilities.  the
+      // properties passed when instantiating a server are what really matter
+      saslFactory = new FastSaslServerFactory(null);
+    }
   }
   
   static String encodeIdentifier(byte[] identifier) {
@@ -195,11 +235,24 @@ public class SaslRpcServer {
   public static <T extends TokenIdentifier> T getIdentifier(String id,
       SecretManager<T> secretManager) throws InvalidToken {
     byte[] tokenId = decodeIdentifier(id);
-    T tokenIdentifier = secretManager.createIdentifier();
+    T tokenIdentifier;
     try {
+      byte[] header = new byte[TqTokenIdentifier.TQ_TOKEN.getLength()];
+      System.arraycopy(tokenId, 0, header, 0, Math.min(tokenId.length, header.length));
+      // Tq token
+      if (Arrays.equals(header, TqTokenIdentifier.TQ_TOKEN.copyBytes())) {
+        TqTokenIdentifier tqTokenIdentifier = new TqTokenIdentifier();
+        DataInput in = new DataInputStream(new BufferedInputStream(
+            new ByteArrayInputStream(tokenId)));
+        tqTokenIdentifier.readFields(in);
+        return (T) tqTokenIdentifier;
+      }
+
+      tokenIdentifier = secretManager.createIdentifier();
+
       tokenIdentifier.readFields(new DataInputStream(new ByteArrayInputStream(
           tokenId)));
-    } catch (IOException e) {
+    } catch (Exception e) {
       throw (InvalidToken) new InvalidToken(
           "Can't de-serialize tokenIdentifier").initCause(e);
     }
@@ -224,7 +277,8 @@ public class SaslRpcServer {
     @Deprecated
     DIGEST((byte) 82, "DIGEST-MD5"),
     TOKEN((byte) 82, "DIGEST-MD5"),
-    PLAIN((byte) 83, "PLAIN");
+    PLAIN((byte) 83, "PLAIN"),
+    TAUTH((byte) 84, TqAuthConst.TAUTH);
 
     /** The code for this method. */
     public final byte code;
@@ -274,6 +328,18 @@ public class SaslRpcServer {
 
     private char[] getPassword(TokenIdentifier tokenid) throws InvalidToken,
         StandbyException, RetriableException, IOException {
+      if (TqTokenIdentifier.TQ_TOKEN.equals(tokenid.getKind())) {
+        TqTokenIdentifier tqTokenIdentifier = (TqTokenIdentifier) tokenid;
+        if (AuthConfigureHolder.isTqTokenEnable()) {
+          try {
+            SecureService secureService = SecureServiceFactory.getDefault();
+            secureService.authenticate(Authentication.valueOf(tqTokenIdentifier.getAuthentication()));
+          } catch (Exception e) {
+            throw new InvalidToken("TQ token is invalid : " + e.getMessage());
+          }
+        }
+        return encodePassword(tqTokenIdentifier.getPassword());
+      }
       return encodePassword(secretManager.retriableRetrievePassword(tokenid));
     }
 
@@ -299,8 +365,22 @@ public class SaslRpcServer {
         }
       }
       if (pc != null) {
-        TokenIdentifier tokenIdentifier = getIdentifier(nc.getDefaultName(),
+        // compatible support
+        // TODO need to removed if version upgrade
+        String[] names = nc.getDefaultName().split(TAuthConst.TAUTH_SPLITTER);
+        String identifier = names[0];
+        long id = -1;
+        if (names.length > 1) {
+          id = Long.valueOf(names[1]);
+        }
+        TokenIdentifier tokenIdentifier = getIdentifier(identifier,
             secretManager);
+        if( tokenIdentifier instanceof AbstractDelegationTokenIdentifier) {
+          AbstractDelegationTokenIdentifier delegationTokenIdent = (AbstractDelegationTokenIdentifier) tokenIdentifier;
+          if(!delegationTokenIdent.isUnion()){
+            delegationTokenIdent.setId(id);
+          }
+        }
         char[] password = getPassword(tokenIdentifier);
         UserGroupInformation user = null;
         user = tokenIdentifier.getUser(); // may throw exception
@@ -408,6 +488,44 @@ public class SaslRpcServer {
     @Override
     public String[] getMechanismNames(Map<String, ?> props) {
       return factoryCache.keySet().toArray(new String[0]);
+    }
+  }
+
+  private static class TqAuthServerCallbackHandler extends TqServerCallbackHandler {
+    private final Map<String, ?> saslProperties;
+
+    public TqAuthServerCallbackHandler(Map<String, ?> saslProperties) {
+      this.saslProperties = saslProperties;
+    }
+
+    @Override
+    protected boolean isNeedAuth(byte[] extraId) {
+      return AuthConfigureHolder.isAuthEnable()
+          && (extraId == null
+          || AuthConfigureHolder.getProtocolPolicyManagement().isNeedAuth(new String(extraId)));
+    }
+
+    @Override
+    protected boolean isForbidden(String userName) {
+      return AuthConfigureHolder.isNotAllow(userName);
+    }
+
+    @Override
+    protected Tuple<byte[], String> processResponse(byte[] response) throws Exception {
+      TqTicketResponseToken token = TqTicketResponseToken.valueOf(response);
+      AuthServer authServer = AuthServer.getDefault();
+      ServerAuthResult ret = authServer.auth(new AuthTicket(token.getSmkId(),
+          token.getServiceTicket(), token.getAuthenticator()));
+      return Tuple.of(ret.getTicket().getSessionKey(), ret.getAuthenticator().getPrinciple());
+    }
+
+    @Override
+    protected String getServiceName() {
+      Object serviceNameObj = saslProperties.get("tq.service.name");
+      if (serviceNameObj != null) {
+        return serviceNameObj.toString();
+      }
+      return Utils.getSystemPropertyOrEnvVar("tq.service.name");
     }
   }
 }

@@ -115,8 +115,11 @@ import org.apache.hadoop.hdfs.protocol.ZoneReencryptionStatus;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 import org.apache.hadoop.util.ChunkedArrayList;
 import org.apache.hadoop.util.Progressable;
 
@@ -3195,6 +3198,33 @@ public class DistributedFileSystem extends FileSystem
    */
   public String getProtection() throws IOException {
     return dfs.getProtection();
+  }
+
+  @Override
+  public Token<?>[] addDelegationTokens(String renewer, Credentials credentials) throws IOException {
+    //try hdfs union delegation token
+    try {
+      if (credentials != null && credentials.numberOfTokens() > 0
+          && getConf().getBoolean("dfs.client.use.union.token", true)) {
+        Collection<Token<? extends TokenIdentifier>> tokens = credentials.getAllTokens();
+        for (Token<? extends TokenIdentifier> token : tokens) {
+          if (DelegationTokenIdentifier.HDFS_DELEGATION_KIND.equals(token.getKind())
+              && AbstractDelegationTokenIdentifier.getVersion(token.getIdentifier())
+              == AbstractDelegationTokenIdentifier.UNION_DELEGATION_TOKEN_IDENTIFIER_VERSION) {
+            DelegationTokenIdentifier delegationTokenIdent = (DelegationTokenIdentifier) token.decodeIdentifier();
+            if (delegationTokenIdent.isUnion()) {
+              if (DFSClient.LOG.isDebugEnabled()) {
+                DFSClient.LOG.debug("Found union token(" + token + ") for : " + getUri());
+              }
+              return new Token<?>[]{token};
+            }
+          }
+        }
+      }
+    } catch (Exception e) {
+      DFSClient.LOG.warn("Failed to try union token for " + renewer, e);
+    }
+    return super.addDelegationTokens(renewer, credentials);
   }
 
   @Override

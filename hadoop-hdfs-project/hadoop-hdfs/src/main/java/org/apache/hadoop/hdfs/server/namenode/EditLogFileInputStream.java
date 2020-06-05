@@ -464,7 +464,7 @@ public class EditLogFileInputStream extends EditLogInputStream {
 
     public URLLog(URLConnectionFactory connectionFactory, URL url) {
       this.connectionFactory = connectionFactory;
-      this.isSpnegoEnabled = UserGroupInformation.isSecurityEnabled();
+      this.isSpnegoEnabled = UserGroupInformation.isKerberosEnabled();
       this.url = url;
     }
 

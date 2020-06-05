@@ -59,7 +59,7 @@ public abstract class AbstractNNFailoverProxyProvider<T> implements
     this.xface = xface;
     this.factory = factory;
     try {
-      this.ugi = UserGroupInformation.getCurrentUser();
+      ugi = UserGroupInformation.getCurrentUser(conf);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

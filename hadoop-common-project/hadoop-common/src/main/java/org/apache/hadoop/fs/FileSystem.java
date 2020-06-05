@@ -612,6 +612,31 @@ public abstract class FileSystem extends Configured
     return null;
   }
 
+  @Override
+  public Token<?>[] addDelegationTokens(String renewer, Credentials credentials) throws IOException {
+    URI uri = getUri();
+    Configuration conf = getConf();
+    if (conf.getTrimmedStringCollection("tq.gray.list").contains(uri.getHost())) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("The filesystem(" + uri.getHost() + ") is gray, will not collect delegation token");
+      }
+      return new Token<?>[]{};
+    }
+    if (conf.getBoolean("tq.fs.skip.collecting.tokens", false)) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("The filesystem(" + uri.getHost() + ") skipped collecting tokens");
+      }
+      return new Token<?>[]{};
+    }
+    return DelegationTokenIssuer.super.addDelegationTokens(renewer,credentials);
+  }
+
+  @Override
+  public boolean useTqTokenAvoidCollectRemote() {
+    return getConf().getBoolean("fs.client.use.tq.token",
+        DelegationTokenIssuer.super.useTqTokenAvoidCollectRemote());
+  }
+
   /**
    * Get all the immediate child FileSystems embedded in this FileSystem.
    * It does not recurse and get grand children.  If a FileSystem
@@ -3488,8 +3513,8 @@ public abstract class FileSystem extends Configured
         authority = uri.getAuthority()==null ?
             "" : StringUtils.toLowerCase(uri.getAuthority());
         this.unique = unique;
-
-        this.ugi = UserGroupInformation.getCurrentUser();
+        // compatible with some ugi case
+        this.ugi = UserGroupInformation.getCurrentUser(conf);
       }
 
       @Override

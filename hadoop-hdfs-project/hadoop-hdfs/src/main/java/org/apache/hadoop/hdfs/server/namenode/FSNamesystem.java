@@ -5722,7 +5722,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       checkNameNodeSafeMode("Cannot issue delegation token");
       if (!isAllowedDelegationTokenOp()) {
         throw new IOException(
-          "Delegation Token can be issued only with kerberos or web authentication");
+          "Delegation Token can be issued only with tauth or kerberos or web authentication");
       }
       if (dtSecretManager == null || !dtSecretManager.isRunning()) {
         LOG.warn("trying to get DT with no secret manager running");
@@ -5773,7 +5773,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       checkNameNodeSafeMode("Cannot renew delegation token");
       if (!isAllowedDelegationTokenOp()) {
         throw new IOException(
-            "Delegation Token can be renewed only with kerberos or web authentication");
+            "Delegation Token can be renewed only with tauth or kerberos or web authentication");
       }
       String renewer = getRemoteUser().getShortUserName();
       expiryTime = dtSecretManager.renewToken(token, renewer);
@@ -5902,7 +5902,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     if (UserGroupInformation.isSecurityEnabled()
         && (authMethod != AuthenticationMethod.KERBEROS)
         && (authMethod != AuthenticationMethod.KERBEROS_SSL)
-        && (authMethod != AuthenticationMethod.CERTIFICATE)) {
+        && (authMethod != AuthenticationMethod.CERTIFICATE)
+        && (authMethod != AuthenticationMethod.TAUTH)) {
       return false;
     }
     return true;

@@ -138,7 +138,7 @@ public class NameNodeProxiesClient {
       InetSocketAddress nnAddr = DFSUtilClient.getNNAddress(nameNodeUri);
       Text dtService = SecurityUtil.buildTokenService(nnAddr);
       ClientProtocol proxy = createNonHAProxyWithClientProtocol(nnAddr, conf,
-          UserGroupInformation.getCurrentUser(), true, fallbackToSimpleAuth);
+          UserGroupInformation.getCurrentUser(conf), true, fallbackToSimpleAuth);
       return new ProxyAndInfo<>(proxy, dtService, nnAddr);
     } else {
       return createHAProxy(conf, nameNodeUri, ClientProtocol.class,

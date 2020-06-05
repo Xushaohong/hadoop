@@ -308,6 +308,7 @@ public class GenericOptionsParser {
         String[] keyval = prop.split("=", 2);
         if (keyval.length == 2) {
           conf.set(keyval[0], keyval[1], "from command line");
+          System.setProperty(keyval[0], keyval[1]);
         }
       }
     }

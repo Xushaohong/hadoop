@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Stack;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.security.AuthConfigureHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FSExceptionMessages;
@@ -94,7 +95,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     this.callerUgi = callerUgi;
     this.groups = callerUgi.getGroups();
     user = callerUgi.getShortUserName();
-    isSuper = user.equals(fsOwner) || groups.contains(supergroup);
+    isSuper = isSameUser(user, fsOwner) || groups.contains(supergroup);
     this.attributeProvider = attributeProvider;
   }
 
@@ -294,7 +295,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
   /** Guarded by {@link FSNamesystem#readLock()} */
   private void checkOwner(INodeAttributes[] inodes, byte[][] components, int i)
       throws AccessControlException {
-    if (getUser().equals(inodes[i].getUserName())) {
+    if (isSameUser(getUser(), inodes[i].getUserName())) {
       return;
     }
     throw new AccessControlException(
@@ -417,7 +418,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
       }
     }
     final FsAction checkAction;
-    if (getUser().equals(inode.getUserName())) { //user class
+    if (isSameUser(getUser(), inode.getUserName())) { //user class
       checkAction = mode.getUserAction();
     } else if (isMemberOfGroup(inode.getGroupName())) { //group class
       checkAction = mode.getGroupAction();
@@ -455,7 +456,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     boolean foundMatch = false;
 
     // Use owner entry from permission bits if user is owner.
-    if (getUser().equals(inode.getUserName())) {
+    if (isSameUser(getUser(), inode.getUserName())) {
       if (mode.getUserAction().implies(access)) {
         return true;
       }
@@ -474,7 +475,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
         if (type == AclEntryType.USER) {
           // Use named user entry with mask from permission bits applied if user
           // matches name.
-          if (getUser().equals(name)) {
+          if (isSameUser(getUser(), name)) {
             FsAction masked = AclEntryStatusFormat.getPermission(entry).and(
                 mode.getGroupAction());
             if (masked.implies(access)) {
@@ -526,7 +527,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
   private boolean isStickyBitViolated(INodeAttributes parent,
                                       INodeAttributes inode) {
     // If this user is the directory owner, return
-    if (parent.getUserName().equals(getUser())) {
+    if (isSameUser(parent.getUserName(), getUser())) {
       return false;
     }
 
@@ -565,7 +566,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     if (isSuperUser()) {
       return;
     }
-    if (getUser().equals(pool.getOwnerName())
+    if (isSameUser(getUser(), pool.getOwnerName())
         && mode.getUserAction().implies(access)) {
       return;
     }
@@ -677,5 +678,17 @@ public class FSPermissionChecker implements AccessControlEnforcer {
       }
       throw this;
     }
+  }
+
+  public static boolean isSameUser(String userA, String userB) {
+    if (userA.equals(userB)) {
+      return true;
+    }
+    if (AuthConfigureHolder.isRegularUserUnifyPermissionEnable()) {
+      userA = AuthConfigureHolder.regularUserName(userA);
+      userB = AuthConfigureHolder.regularUserName(userB);
+      return userA.equals(userB);
+    }
+    return false;
   }
 }

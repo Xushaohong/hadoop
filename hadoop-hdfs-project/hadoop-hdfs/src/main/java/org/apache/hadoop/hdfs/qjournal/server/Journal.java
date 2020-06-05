@@ -999,7 +999,7 @@ public class Journal implements Closeable {
           @Override
           public Void run() throws IOException {
             // We may have lost our ticket since last checkpoint, log in again, just in case
-            if (UserGroupInformation.isSecurityEnabled()) {
+            if (UserGroupInformation.isKerberosEnabled()) {
               UserGroupInformation.getCurrentUser().checkTGTAndReloginFromKeytab();
             }
 

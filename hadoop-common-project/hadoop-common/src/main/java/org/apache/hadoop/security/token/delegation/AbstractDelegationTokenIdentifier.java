@@ -18,13 +18,10 @@
 
 package org.apache.hadoop.security.token.delegation;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.security.HadoopKerberosName;
@@ -32,14 +29,23 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.Arrays;
+
+import static org.apache.hadoop.security.token.delegation.DelegationTokenVersionHolder.TOKEN_IDENTIFIER_SERIALIZATION_VERSION;
+import static org.apache.hadoop.security.token.delegation.DelegationTokenVersionHolder.TOKEN_IDENTIFIER_TRANSMISSION_VERSION;
 
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public abstract class AbstractDelegationTokenIdentifier 
 extends TokenIdentifier {
   private static final byte VERSION = 0;
+  public static final byte DEFAULT_DELEGATION_TOKEN_IDENTIFIER_VERSION = VERSION;
+  public static final byte UNION_DELEGATION_TOKEN_IDENTIFIER_VERSION = 1;
 
+  private long id;
   private Text owner;
   private Text renewer;
   private Text realUser;
@@ -84,6 +90,18 @@ extends TokenIdentifier {
     }
     realUgi.setAuthenticationMethod(AuthenticationMethod.TOKEN);
     return ugi;
+  }
+
+  public boolean isUnion(){
+    return id > 0;
+  }
+
+  public long getId() {
+    return id;
+  }
+
+  public void setId(long id) {
+    this.id = id;
   }
 
   public Text getOwner() {
@@ -189,9 +207,13 @@ extends TokenIdentifier {
   @Override
   public void readFields(DataInput in) throws IOException {
     byte version = in.readByte();
-    if (version != VERSION) {
-	throw new IOException("Unknown version of delegation token " + 
-                              version);
+    if (version != DEFAULT_DELEGATION_TOKEN_IDENTIFIER_VERSION
+        && version != UNION_DELEGATION_TOKEN_IDENTIFIER_VERSION) {
+      throw new IOException("Unknown version of delegation token " +
+          version);
+    }
+    if(version == UNION_DELEGATION_TOKEN_IDENTIFIER_VERSION){
+      id = WritableUtils.readVLong(in);
     }
     owner.readFields(in, Text.DEFAULT_MAX_LEN);
     renewer.readFields(in, Text.DEFAULT_MAX_LEN);
@@ -204,7 +226,14 @@ extends TokenIdentifier {
 
   @VisibleForTesting
   void writeImpl(DataOutput out) throws IOException {
-    out.writeByte(VERSION);
+    writeImpl(out, TOKEN_IDENTIFIER_SERIALIZATION_VERSION);
+  }
+
+  private void writeImpl(DataOutput out, int serialVersion) throws IOException {
+    out.writeByte(serialVersion);
+    if (serialVersion == UNION_DELEGATION_TOKEN_IDENTIFIER_VERSION) {
+      WritableUtils.writeVLong(out, id);
+    }
     owner.write(out);
     renewer.write(out);
     realUser.write(out);
@@ -213,9 +242,24 @@ extends TokenIdentifier {
     WritableUtils.writeVInt(out, sequenceNumber);
     WritableUtils.writeVInt(out, masterKeyId);
   }
-  
+
+  @Override
+  public byte[] getBytes() {
+    DataOutputBuffer buf = new DataOutputBuffer(4096);
+    try {
+      this.write(buf, TOKEN_IDENTIFIER_TRANSMISSION_VERSION);
+    } catch (IOException ie) {
+      throw new RuntimeException("i/o error in getBytes", ie);
+    }
+    return Arrays.copyOf(buf.getData(), buf.getLength());
+  }
+
   @Override
   public void write(DataOutput out) throws IOException {
+    write(out, TOKEN_IDENTIFIER_SERIALIZATION_VERSION);
+  }
+
+  private void write(DataOutput out, int serialVersion) throws IOException {
     if (owner.getLength() > Text.DEFAULT_MAX_LEN) {
       throw new IOException("owner is too long to be serialized!");
     }
@@ -225,9 +269,9 @@ extends TokenIdentifier {
     if (realUser.getLength() > Text.DEFAULT_MAX_LEN) {
       throw new IOException("realuser is too long to be serialized!");
     }
-    writeImpl(out);
+    writeImpl(out, serialVersion);
   }
-  
+
   @Override
   public String toString() {
     StringBuilder buffer = new StringBuilder();
@@ -240,7 +284,14 @@ extends TokenIdentifier {
         .append(", maxDate=").append(maxDate)
         .append(", sequenceNumber=").append(sequenceNumber)
         .append(", masterKeyId=").append(masterKeyId);
+    if (isUnion()) {
+      buffer.append(", id=").append(id);
+    }
     return buffer.toString();
+  }
+
+  public static int getVersion(byte[] identifier) {
+    return (identifier != null && identifier.length > 0) ? identifier[0] : -1;
   }
   /*
    * A frozen version of toString() to be used to be backward compatible.

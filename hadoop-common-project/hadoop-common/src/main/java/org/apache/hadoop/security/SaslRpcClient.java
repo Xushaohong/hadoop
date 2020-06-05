@@ -28,11 +28,15 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.security.Security;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
@@ -45,11 +49,21 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslClient;
 
+import com.google.common.base.Preconditions;
+import com.tencent.tdw.security.Tuple;
+import com.tencent.tdw.security.authentication.LocalKeyManager;
+import com.tencent.tdw.security.authentication.ServiceTarget;
+import com.tencent.tdw.security.authentication.tauth.AuthClient;
+import com.tencent.tdw.security.authentication.tauth.AuthClient2;
+import com.tencent.tdw.security.netbeans.AppServerInfo;
+import com.tencent.tdw.security.netbeans.AuthTicket;
+import com.tencent.tdw.security.netbeans.Ticket;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.GlobPattern;
 import org.apache.hadoop.ipc.Client.IpcStreams;
+import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.ipc.RPC.RpcKind;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.ResponseBuffer;
@@ -64,6 +78,14 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslAuth;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslState;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.apache.hadoop.security.sasl.TqClientCallbackHandler;
+import org.apache.hadoop.security.sasl.TqClientSecurityProvider;
+import org.apache.hadoop.security.sasl.TqTicketResponseToken;
+import org.apache.hadoop.security.sasl.TqAuthConst;
+import org.apache.hadoop.security.sasl.TqSaslServer;
+import org.apache.hadoop.security.tauth.TAuthConst;
+import org.apache.hadoop.security.tauth.TAuthLoginModule;
+import org.apache.hadoop.security.tauth.TAuthSaslClient;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.TokenInfo;
@@ -75,6 +97,13 @@ import com.google.protobuf.ByteString;
 import com.google.re2j.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_ALLOW_WITHOUT_LOGIN_DEFAULT;
+import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_ALLOW_WITHOUT_LOGIN_KEY;
+import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_NOKEY_FALLBACK_ALLOWED;
+import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_NOKEY_FALLBACK_ALLOWED_DEFAULT;
+import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_REBUILD_WITHOUT_LOGIN_KEY;
+import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_REBUILD__WITHOUT_LOGIN_DEFAULT;
 
 /**
  * A utility class that encapsulates SASL logic for RPC client
@@ -100,6 +129,15 @@ public class SaslRpcClient {
           RpcConstants.INVALID_RETRY_COUNT, RpcConstants.DUMMY_CLIENT_ID);
   private static final RpcSaslProto negotiateRequest =
       RpcSaslProto.newBuilder().setState(SaslState.NEGOTIATE).build();
+  private static boolean PROVIDER_INITIALIZED = false;
+
+
+  public static void init(Configuration conf) {
+    if (!PROVIDER_INITIALIZED) {
+      Security.addProvider(new TqClientSecurityProvider());
+      PROVIDER_INITIALIZED = true;
+    }
+  }
 
   /**
    * Create a SaslRpcClient that can be used by a RPC client to negotiate
@@ -239,6 +277,66 @@ public class SaslRpcClient {
         if (LOG.isDebugEnabled()) {
           LOG.debug("RPC Server's Kerberos principal name for protocol="
               + protocol.getCanonicalName() + " is " + serverPrincipal);
+        }
+        break;
+      }
+      case TAUTH: {
+        AccessControlContext context = AccessController.getContext();
+        Subject subject = Subject.getSubject(context);
+        TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(subject);
+        TAuthLoginModule.TAuthPrincipal principal = TAuthLoginModule.TAuthPrincipal.getFromSubject(subject);
+        if (ugi.getRealAuthenticationMethod().getAuthMethod() != AuthMethod.TAUTH) {
+          if (!conf.getBoolean(TAUTH_ALLOW_WITHOUT_LOGIN_KEY, TAUTH_ALLOW_WITHOUT_LOGIN_DEFAULT)) {
+            return null;
+          }
+
+          // (re)build for tauth
+          if (conf.getBoolean(TAUTH_REBUILD_WITHOUT_LOGIN_KEY, TAUTH_REBUILD__WITHOUT_LOGIN_DEFAULT) ||
+              principal == null || credential == null) {
+            String userName = ugi.getUserName();
+            if (ugi.getRealUser() != null) {
+              userName = ugi.getRealUser().getUserName();
+            }
+            // by custom
+            Tuple<TAuthLoginModule.TAuthPrincipal, TAuthLoginModule.TAuthCredential> tuple =
+                TAuthLoginModule.buildCustomPrincipalAndCredentialTupleIfEnabled(userName);
+            if (tuple == null) {
+              tuple = TAuthLoginModule.buildAuthPrincipalAndCredential(userName);
+            }
+            principal = tuple._1();
+            credential = tuple._2();
+            TAuthLoginModule.TAuthPrincipal.removeIfPresent(subject);
+            TAuthLoginModule.TAuthCredential.removeIfPresent(subject);
+            subject.getPrincipals().add(principal);
+            subject.getPrivateCredentials().add(credential);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Using TAUTH (" + principal + ") without login");
+            }
+          }
+        }
+
+        if ((credential == null || !credential.getLocalKeyManager().hasAnyKey())
+            && conf.getBoolean(TAUTH_NOKEY_FALLBACK_ALLOWED, TAUTH_NOKEY_FALLBACK_ALLOWED_DEFAULT)) {
+          LOG.warn("Not found any key : " + ugi + " for service " + serverAddr);
+          return null;
+        }
+        int version = authType.getServerVersion();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("RPC Server ask TAUTH version:" + version);
+        }
+        String protocolName;
+        ProtocolInfo protocolInfo = protocol.getAnnotation(ProtocolInfo.class);
+        if (protocolInfo != null) {
+          protocolName = protocolInfo.protocolName();
+        } else {
+          protocolName = protocol.getName();
+        }
+        protocolName = protocolName.replaceAll("PB", "");
+        Preconditions.checkNotNull(principal, TAuthLoginModule.TAuthPrincipal.class.getName());
+        if (version == TAuthConst.VERSION) {
+          saslCallback = new TAuthSaslClient.DefaultTAuthSaslCallbackHandler(principal.getName(), serverAddr, protocolName);
+        } else if (version == TqAuthConst.VERSION) {
+          saslCallback = new TqAuthClientCallbackHandler(principal.getName(), credential.getLocalKeyManager(), protocolName);
         }
         break;
       }
@@ -409,6 +507,13 @@ public class SaslRpcClient {
                     : new byte[0];
           }
           response = createSaslReply(SaslState.INITIATE, responseToken);
+          // ack version
+          if(authMethod == AuthMethod.TAUTH &&
+              saslAuthType.hasServerVersion() && saslAuthType.getServerVersion() > 0){
+            SaslAuth.Builder builder = SaslAuth.newBuilder(saslAuthType);
+            builder.setClientVersion(saslAuthType.getServerVersion());
+            saslAuthType = builder.build();
+          }
           response.addAuths(saslAuthType);
           break;
         }
@@ -689,6 +794,54 @@ public class SaslRpcClient {
               + rc.getDefaultText());
         rc.setText(rc.getDefaultText());
       }
+    }
+  }
+
+  private class TqAuthClientCallbackHandler extends TqClientCallbackHandler {
+    private final String userName;
+    private final LocalKeyManager localKeyManager;
+    private final String protocolName;
+
+    public TqAuthClientCallbackHandler(String userName, LocalKeyManager localKeyManager, String protocolName) {
+      this.userName = userName;
+      this.localKeyManager = localKeyManager;
+      this.protocolName = protocolName;
+    }
+
+    @Override
+    protected Tuple<byte[], byte[]> processChallenge(String target) throws Exception {
+      Ticket ticket = null;
+      try {
+        if (target != null && !TqSaslServer.DEFAULT_SERVER_NAME.equals(target)) {
+          AuthClient2 authClient = new AuthClient2(userName, localKeyManager);
+          ticket = authClient.ask(ServiceTarget.valueOf(target));
+        }
+      } catch (Exception e) {
+        LOG.error("Failed ask ticket for " + target + ", will try address and protocol index service", e);
+      }
+      if (ticket == null) {
+        AuthClient authClient = new AuthClient(userName, localKeyManager);
+        ticket = authClient.ask(new AppServerInfo(serverAddr.getAddress().getHostAddress(),
+            serverAddr.getPort(), protocolName));
+      }
+      AuthTicket authTicket = ticket.getAuthTicket();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Got ticket for " + userName);
+      }
+      return Tuple.of(ticket.getSessionTicket().getSessionKey(),
+          new TqTicketResponseToken(authTicket.getEncryptedAuthenticator()
+              , authTicket.getServiceTicket(), authTicket.getSmkId())
+              .toBytes());
+    }
+
+    @Override
+    protected String getUserName() {
+      return userName;
+    }
+
+    @Override
+    protected byte[] getExtraId() {
+      return protocolName.getBytes();
     }
   }
 }

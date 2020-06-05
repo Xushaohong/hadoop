@@ -77,6 +77,10 @@ public interface DelegationTokenIssuer {
     return tokens.toArray(new Token<?>[tokens.size()]);
   }
 
+  default boolean useTqTokenAvoidCollectRemote(){
+    return true;
+  }
+
   /**
    * NEVER call this method directly.
    */
@@ -91,6 +95,9 @@ public interface DelegationTokenIssuer {
     if (serviceName != null) {
       final Text service = new Text(serviceName);
       Token<?> token = credentials.getToken(service);
+      if (token == null && issuer.useTqTokenAvoidCollectRemote()) {
+        token = credentials.getToken(TqTokenIdentifier.TQ_TOKEN);
+      }
       if (token == null) {
         token = issuer.getDelegationToken(renewer);
         if (token != null) {

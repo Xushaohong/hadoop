@@ -81,7 +81,7 @@ public class FSDirAttrOp {
       iip = fsd.resolvePath(pc, src, DirOp.WRITE);
       fsd.checkOwner(pc, iip);
       if (!pc.isSuperUser()) {
-        if (username != null && !pc.getUser().equals(username)) {
+        if (username != null && !FSPermissionChecker.isSameUser(pc.getUser(), username)) {
           throw new AccessControlException("User " + pc.getUser()
               + " is not a super user (non-super user cannot change owner).");
         }

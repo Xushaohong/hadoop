@@ -2089,7 +2089,7 @@ public class RMWebServices extends WebServices implements RMWebServiceProtocol {
       throw new AuthorizationException(
           "Unable to obtain user name, " + "user not authenticated");
     }
-    if (UserGroupInformation.isSecurityEnabled() && isStaticUser(callerUGI)) {
+    if (UserGroupInformation.isKerberosEnabled() && isStaticUser(callerUGI)) {
       String msg = "The default static user cannot carry out this operation.";
       return Response.status(Status.FORBIDDEN).entity(msg).build();
     }
@@ -2143,7 +2143,7 @@ public class RMWebServices extends WebServices implements RMWebServiceProtocol {
       userName = callerUGI.getUserName();
     }
 
-    if (UserGroupInformation.isSecurityEnabled() && isStaticUser(callerUGI)) {
+    if (UserGroupInformation.isKerberosEnabled() && isStaticUser(callerUGI)) {
       String msg = "The default static user cannot carry out this operation.";
       RMAuditLogger.logFailure(userName, AuditConstants.GET_APP_TIMEOUTS,
           "UNKNOWN", "RMWebService", msg);

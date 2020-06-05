@@ -175,6 +175,8 @@ message RpcSaslProto {
     optional string protocol  = 3;
     optional string serverId  = 4;
     optional bytes  challenge = 5;
+    optional int32 serverVersion = 6;
+    optional int32 clientVersion = 7;
   }
 
   optional uint32 version  = 1;  

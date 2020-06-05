@@ -1146,7 +1146,7 @@ public class ClientRMService extends AbstractService implements
       // Verify that the connection is kerberos authenticated
       if (!isAllowedDelegationTokenOp()) {
         throw new IOException(
-          "Delegation Token can be issued only with kerberos authentication");
+          "Delegation Token can be issued only with tauth or kerberos authentication");
       }
 
       GetDelegationTokenResponse response =
@@ -1182,7 +1182,7 @@ public class ClientRMService extends AbstractService implements
     try {
       if (!isAllowedDelegationTokenOp()) {
         throw new IOException(
-            "Delegation Token can be renewed only with kerberos authentication");
+            "Delegation Token can be renewed only with tauth or kerberos authentication");
       }
       
       org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
@@ -1207,7 +1207,7 @@ public class ClientRMService extends AbstractService implements
     try {
       if (!isAllowedDelegationTokenOp()) {
         throw new IOException(
-            "Delegation Token can be cancelled only with kerberos authentication");
+            "Delegation Token can be cancelled only with tauth or kerberos authentication");
       }
       org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
       Token<RMDelegationTokenIdentifier> token = new Token<RMDelegationTokenIdentifier>(
@@ -1314,7 +1314,8 @@ public class ClientRMService extends AbstractService implements
     if (UserGroupInformation.isSecurityEnabled()) {
       return EnumSet.of(AuthenticationMethod.KERBEROS,
                         AuthenticationMethod.KERBEROS_SSL,
-                        AuthenticationMethod.CERTIFICATE)
+                        AuthenticationMethod.CERTIFICATE,
+                        AuthenticationMethod.TAUTH)
           .contains(UserGroupInformation.getCurrentUser()
                   .getRealAuthenticationMethod());
     } else {
