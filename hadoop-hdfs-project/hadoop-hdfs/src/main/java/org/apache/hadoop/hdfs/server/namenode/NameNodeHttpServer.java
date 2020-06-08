@@ -213,7 +213,7 @@ public class NameNodeHttpServer {
           .put(
               DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY,
               SecurityUtil.getServerPrincipal(principalInConf, hostname));
-    } else if (UserGroupInformation.isSecurityEnabled()) {
+    } else if (UserGroupInformation.isKerberosEnabled()) {
       HttpServer2.LOG.error(
           "WebHDFS and security are enabled, but configuration property '" +
           DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY +
@@ -225,7 +225,7 @@ public class NameNodeHttpServer {
       params.put(
           DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY,
           httpKeytab);
-    } else if (UserGroupInformation.isSecurityEnabled()) {
+    } else if (UserGroupInformation.isKerberosEnabled()) {
       HttpServer2.LOG.error(
           "WebHDFS and security are enabled, but configuration property '" +
           DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY +

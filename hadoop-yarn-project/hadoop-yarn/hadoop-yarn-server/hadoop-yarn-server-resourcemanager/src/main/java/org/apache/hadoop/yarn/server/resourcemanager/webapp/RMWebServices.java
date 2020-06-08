@@ -310,7 +310,7 @@ public class RMWebServices extends WebServices implements RMWebServiceProtocol {
       throw new AuthorizationException(msg);
     }
 
-    if (UserGroupInformation.isSecurityEnabled() && isStaticUser(callerUGI)) {
+    if (UserGroupInformation.isKerberosEnabled() && isStaticUser(callerUGI)) {
       String msg = "The default static user cannot carry out this operation.";
       throw new ForbiddenException(msg);
     }
