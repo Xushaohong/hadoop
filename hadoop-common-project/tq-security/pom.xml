@@ -18,7 +18,7 @@
     <dependency>
       <groupId>com.tencent.tdw</groupId>
       <artifactId>security-common</artifactId>
-      <version>1.0.0</version>
+      <version>1.0.1</version>
       <classifier>shaded</classifier>
       <exclusions>
         <exclusion>
