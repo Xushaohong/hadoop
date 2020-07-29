@@ -40,6 +40,7 @@ public class TestReadOnly {
           "getStoragePolicy",
           "getListing",
           "getSnapshottableDirListing",
+          "getSnapshotListing",
           "getPreferredBlockSize",
           "listCorruptFileBlocks",
           "getFileInfo",
