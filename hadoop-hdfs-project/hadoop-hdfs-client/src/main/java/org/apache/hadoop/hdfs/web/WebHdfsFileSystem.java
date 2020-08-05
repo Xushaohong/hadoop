@@ -347,6 +347,14 @@ public class WebHdfsFileSystem extends FileSystem
     return super.getCanonicalUri();
   }
 
+  /** Is WebHDFS enabled in conf? */
+  public static boolean isEnabled(final Configuration conf) {
+    final boolean b = conf.getBoolean(
+        HdfsClientConfigKeys.DFS_WEBHDFS_ENABLED_KEY,
+        HdfsClientConfigKeys.DFS_WEBHDFS_ENABLED_DEFAULT);
+    return b;
+  }
+
   TokenSelector<DelegationTokenIdentifier> tokenSelector =
       new AbstractDelegationTokenSelector<DelegationTokenIdentifier>(getTokenKind()){};
 

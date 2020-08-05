@@ -82,44 +82,46 @@ public class NameNodeHttpServer {
   public static void initWebHdfs(Configuration conf, String hostname,
       HttpServer2 httpServer2, String jerseyResourcePackage)
       throws IOException {
-    // set user pattern based on configuration file
-    UserParam.setUserPattern(conf.get(
-        HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
-        HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
-    AclPermissionParam.setAclPermissionPattern(conf.get(
-        HdfsClientConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_KEY,
-        HdfsClientConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT));
+    if (WebHdfsFileSystem.isEnabled(conf)) {
+      // set user pattern based on configuration file
+      UserParam.setUserPattern(conf.get(
+          HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
+          HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
+      AclPermissionParam.setAclPermissionPattern(conf.get(
+          HdfsClientConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_KEY,
+          HdfsClientConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT));
 
-    // add authentication filter for webhdfs
-    final String className = conf.get(
-        DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_KEY,
-        DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_DEFAULT);
-    final String name = className;
+      // add authentication filter for webhdfs
+      final String className = conf.get(
+          DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_KEY,
+          DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_DEFAULT);
+      final String name = className;
 
-    final String pathSpec = WebHdfsFileSystem.PATH_PREFIX + "/*";
-    Map<String, String> params = getAuthFilterParams(conf, hostname);
-    HttpServer2.defineFilter(httpServer2.getWebAppContext(), name, className,
-        params, new String[] { pathSpec });
-    HttpServer2.LOG.info("Added filter '" + name + "' (class=" + className
-        + ")");
+      final String pathSpec = WebHdfsFileSystem.PATH_PREFIX + "/*";
+      Map<String, String> params = getAuthFilterParams(conf, hostname);
+      HttpServer2.defineFilter(httpServer2.getWebAppContext(), name, className,
+          params, new String[] { pathSpec });
+      HttpServer2.LOG.info("Added filter '" + name + "' (class=" + className
+          + ")");
 
-    // add REST CSRF prevention filter
-    if (conf.getBoolean(DFS_WEBHDFS_REST_CSRF_ENABLED_KEY,
-        DFS_WEBHDFS_REST_CSRF_ENABLED_DEFAULT)) {
-      Map<String, String> restCsrfParams = RestCsrfPreventionFilter
-          .getFilterParams(conf, "dfs.webhdfs.rest-csrf.");
-      String restCsrfClassName = RestCsrfPreventionFilter.class.getName();
-      HttpServer2.defineFilter(httpServer2.getWebAppContext(),
-          restCsrfClassName, restCsrfClassName, restCsrfParams,
-          new String[] {pathSpec});
+      // add REST CSRF prevention filter
+      if (conf.getBoolean(DFS_WEBHDFS_REST_CSRF_ENABLED_KEY,
+          DFS_WEBHDFS_REST_CSRF_ENABLED_DEFAULT)) {
+        Map<String, String> restCsrfParams = RestCsrfPreventionFilter
+            .getFilterParams(conf, "dfs.webhdfs.rest-csrf.");
+        String restCsrfClassName = RestCsrfPreventionFilter.class.getName();
+        HttpServer2.defineFilter(httpServer2.getWebAppContext(),
+            restCsrfClassName, restCsrfClassName, restCsrfParams,
+            new String[] {pathSpec});
+      }
+
+      // add webhdfs packages
+      final Map<String, String> resourceParams = new HashMap<>();
+      resourceParams.put(ResourceConfig.FEATURE_MATCH_MATRIX_PARAMS, "true");
+      httpServer2.addJerseyResourcePackage(
+          jerseyResourcePackage + ";" + Param.class.getPackage().getName(),
+          pathSpec, resourceParams);
     }
-
-    // add webhdfs packages
-    final Map<String, String> resourceParams = new HashMap<>();
-    resourceParams.put(ResourceConfig.FEATURE_MATCH_MATRIX_PARAMS, "true");
-    httpServer2.addJerseyResourcePackage(
-        jerseyResourcePackage + ";" + Param.class.getPackage().getName(),
-        pathSpec, resourceParams);
   }
 
   /**
