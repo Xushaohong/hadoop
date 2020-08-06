@@ -62,8 +62,6 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.SchedulerResourceTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.net.NetUtils.PREFER_HOST;
-
 /**
  * Registers/unregisters to RM and sends heartbeats to RM.
  */
@@ -154,7 +152,7 @@ public abstract class RMCommunicator extends AbstractService
       RegisterApplicationMasterRequest request =
         recordFactory.newRecordInstance(RegisterApplicationMasterRequest.class);
       if (serviceAddr != null) {
-        String hostOrIp = PREFER_HOST ? serviceAddr.getHostName() : serviceAddr.getAddress().getHostAddress();
+        String hostOrIp = serviceAddr.getAddress().getHostAddress();
         request.setHost(hostOrIp);
         request.setRpcPort(serviceAddr.getPort());
         request.setTrackingUrl(MRWebAppUtil

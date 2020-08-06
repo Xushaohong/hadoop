@@ -99,7 +99,7 @@ public class DFSZKFailoverController extends ZKFailoverController {
     InetSocketAddress addr = target.getAddress();
 
     return ActiveNodeInfo.newBuilder()
-      .setHostname(addr.getHostName())
+      .setHostname(addr.getAddress().getHostAddress())
       .setPort(addr.getPort())
       .setZkfcPort(target.getZKFCAddress().getPort())
       .setNameserviceId(localNNTarget.getNameServiceId())

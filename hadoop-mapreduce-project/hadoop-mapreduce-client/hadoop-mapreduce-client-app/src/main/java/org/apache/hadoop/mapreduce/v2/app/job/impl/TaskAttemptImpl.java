@@ -1993,7 +1993,7 @@ public abstract class TaskAttemptImpl implements
       //TODO Resolve to host / IP in case of a local address.
       InetSocketAddress nodeHttpInetAddr = // TODO: Costly to create sock-addr?
           NetUtils.createSocketAddr(taskAttempt.container.getNodeHttpAddress());
-      taskAttempt.trackerName = nodeHttpInetAddr.getHostName();
+      taskAttempt.trackerName = nodeHttpInetAddr.getAddress().getHostAddress();
       taskAttempt.httpPort = nodeHttpInetAddr.getPort();
       taskAttempt.sendLaunchedEvents();
       taskAttempt.eventHandler.handle
