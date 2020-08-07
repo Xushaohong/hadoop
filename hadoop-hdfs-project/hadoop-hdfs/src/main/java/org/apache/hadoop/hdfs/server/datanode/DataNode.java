@@ -1499,7 +1499,7 @@ public class DataNode extends ReconfigurableBase
           "(via " + DFSConfigKeys.DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY + ") " +
           "aren't enabled. This may cause issues " +
           "when clients attempt to connect to a DataNode. Aborting DataNode";
-      throw new RuntimeException(errMessage);
+      LOG.warn(errMessage);
     }
 
     if (dnConf.getIgnoreSecurePortsForTesting()) {

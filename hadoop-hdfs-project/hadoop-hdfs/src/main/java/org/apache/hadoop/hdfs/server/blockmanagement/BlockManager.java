@@ -642,7 +642,7 @@ public class BlockManager implements BlockStatsMXBean {
             "(via " + DFSConfigKeys.DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY + ") " +
             "aren't enabled. This may cause issues " +
             "when clients attempt to connect to a DataNode. Aborting NameNode";
-        throw new IOException(errMessage);
+        LOG.warn(errMessage);
       }
       return null;
     }
