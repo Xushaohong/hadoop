@@ -46,6 +46,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_DEF
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_METRICS_LOGGER_PERIOD_SECONDS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_METRICS_LOGGER_PERIOD_SECONDS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SECURITY_CHECK_SKIP_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SECURITY_CHECK_SKIP_DEFAULT;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -1502,7 +1504,9 @@ public class DataNode extends ReconfigurableBase
       LOG.warn(errMessage);
     }
 
-    if (dnConf.getIgnoreSecurePortsForTesting()) {
+    if (dnConf.getIgnoreSecurePortsForTesting()
+      || dnConf.getConf().getBoolean(DFS_SECURITY_CHECK_SKIP_KEY, DFS_SECURITY_CHECK_SKIP_DEFAULT)) {
+      LOG.info("Skip rpc/http security check.");
       return;
     }
 
