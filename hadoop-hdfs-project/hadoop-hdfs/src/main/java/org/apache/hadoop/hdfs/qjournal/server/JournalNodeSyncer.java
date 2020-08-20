@@ -441,7 +441,7 @@ public class JournalNodeSyncer {
         log.getStartTxId(), log.getEndTxId());
 
     if (!SecurityUtil.doAsLoginUser(() -> {
-      if (UserGroupInformation.isSecurityEnabled()) {
+      if (UserGroupInformation.isKerberosEnabled()) {
         UserGroupInformation.getCurrentUser().checkTGTAndReloginFromKeytab();
       }
       try {

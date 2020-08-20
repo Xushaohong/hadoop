@@ -64,7 +64,7 @@ public class AuthFilter extends AuthenticationFilter {
     final Properties p = super.getConfiguration(CONF_PREFIX, config);
     // if not set, configure based on security enabled
     if (p.getProperty(AUTH_TYPE) == null) {
-      p.setProperty(AUTH_TYPE, UserGroupInformation.isSecurityEnabled()?
+      p.setProperty(AUTH_TYPE, UserGroupInformation.isKerberosEnabled()?
           KerberosAuthenticationHandler.TYPE: PseudoAuthenticationHandler.TYPE);
     }
     // if not set, enable anonymous for pseudo authentication

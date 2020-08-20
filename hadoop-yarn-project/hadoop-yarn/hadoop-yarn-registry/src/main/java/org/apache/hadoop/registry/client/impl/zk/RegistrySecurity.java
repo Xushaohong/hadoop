@@ -258,7 +258,7 @@ public class RegistrySecurity extends AbstractService {
 
       // add self if the current user can be determined
       ACL self;
-      if (UserGroupInformation.isSecurityEnabled()) {
+      if (UserGroupInformation.isKerberosEnabled()) {
         self = createSaslACLFromCurrentUser(ZooDefs.Perms.ALL);
         if (self != null) {
           userACLs.add(self);
@@ -270,7 +270,7 @@ public class RegistrySecurity extends AbstractService {
       switch (access) {
         case sasl:
           // secure + SASL => has to be authenticated
-          if (!UserGroupInformation.isSecurityEnabled()) {
+          if (!UserGroupInformation.isKerberosEnabled()) {
             throw new IOException("Kerberos required for secure registry access");
           }
           UserGroupInformation currentUser =
@@ -1110,7 +1110,7 @@ public class RegistrySecurity extends AbstractService {
       builder.append(" hasKerberosCredentials=").append(
           ugi.hasKerberosCredentials());
       builder.append(" isFromKeytab=").append(ugi.isFromKeytab());
-      builder.append(" kerberos is enabled in Hadoop =").append(UserGroupInformation.isSecurityEnabled());
+      builder.append(" kerberos is enabled in Hadoop =").append(UserGroupInformation.isKerberosEnabled());
       return builder.toString();
     }
 
