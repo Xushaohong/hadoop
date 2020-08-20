@@ -115,6 +115,7 @@ public class SaslRpcServer {
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
   public SaslRpcServer(AuthMethod authMethod, int authVersion) throws IOException {
+    this.authMethod = authMethod;
     this.authVersion = authVersion;
     mechanism = authMethod.getMechanismName();
     switch (authMethod) {
