@@ -245,8 +245,12 @@ public class UserGroupInformation {
         try {
           // LoginContext will be attached later unless it's an external
           // subject.
-          AuthenticationMethod authMethod = (user instanceof KerberosPrincipal)
-            ? AuthenticationMethod.KERBEROS : AuthenticationMethod.SIMPLE;
+          AuthenticationMethod authMethod =  AuthenticationMethod.SIMPLE;
+          if(user instanceof KerberosPrincipal) {
+            authMethod = AuthenticationMethod.KERBEROS;
+          }else if(user instanceof TAuthLoginModule.TAuthPrincipal) {
+            authMethod = AuthenticationMethod.TAUTH;
+          }
           userEntry = new User(user.getName(), authMethod, null);
         } catch (Exception e) {
           throw (LoginException)(new LoginException(e.toString()).initCause(e));

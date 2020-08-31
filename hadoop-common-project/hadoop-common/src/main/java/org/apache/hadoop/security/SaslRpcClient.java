@@ -28,15 +28,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.security.AccessControlContext;
-import java.security.AccessController;
 import java.security.Security;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
@@ -98,13 +95,8 @@ import com.google.re2j.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_ALLOW_WITHOUT_LOGIN_DEFAULT;
-import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_ALLOW_WITHOUT_LOGIN_KEY;
 import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_NOKEY_FALLBACK_ALLOWED;
 import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_NOKEY_FALLBACK_ALLOWED_DEFAULT;
-import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_REBUILD_WITHOUT_LOGIN_KEY;
-import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_REBUILD__WITHOUT_LOGIN_DEFAULT;
-
 /**
  * A utility class that encapsulates SASL logic for RPC client
  */
@@ -281,43 +273,16 @@ public class SaslRpcClient {
         break;
       }
       case TAUTH: {
-        AccessControlContext context = AccessController.getContext();
-        Subject subject = Subject.getSubject(context);
-        TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(subject);
-        TAuthLoginModule.TAuthPrincipal principal = TAuthLoginModule.TAuthPrincipal.getFromSubject(subject);
-        if (ugi.getRealAuthenticationMethod().getAuthMethod() != AuthMethod.TAUTH) {
-          if (!conf.getBoolean(TAUTH_ALLOW_WITHOUT_LOGIN_KEY, TAUTH_ALLOW_WITHOUT_LOGIN_DEFAULT)) {
-            return null;
-          }
-
-          // (re)build for tauth
-          if (conf.getBoolean(TAUTH_REBUILD_WITHOUT_LOGIN_KEY, TAUTH_REBUILD__WITHOUT_LOGIN_DEFAULT) ||
-              principal == null || credential == null) {
-            String userName = ugi.getUserName();
-            if (ugi.getRealUser() != null) {
-              userName = ugi.getRealUser().getUserName();
-            }
-            // by custom
-            Tuple<TAuthLoginModule.TAuthPrincipal, TAuthLoginModule.TAuthCredential> tuple =
-                TAuthLoginModule.buildCustomPrincipalAndCredentialTupleIfEnabled(userName);
-            if (tuple == null) {
-              tuple = TAuthLoginModule.buildAuthPrincipalAndCredential(userName);
-            }
-            principal = tuple._1();
-            credential = tuple._2();
-            TAuthLoginModule.TAuthPrincipal.removeIfPresent(subject);
-            TAuthLoginModule.TAuthCredential.removeIfPresent(subject);
-            subject.getPrincipals().add(principal);
-            subject.getPrivateCredentials().add(credential);
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Using TAUTH (" + principal + ") without login");
-            }
-          }
+        if(LOG.isDebugEnabled()) {
+          LOG.debug("current ugi: " + ugi.toString());
         }
+
+        TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(ugi.getSubject());
+        TAuthLoginModule.TAuthPrincipal principal = TAuthLoginModule.TAuthPrincipal.getFromSubject(ugi.getSubject());
 
         if ((credential == null || !credential.getLocalKeyManager().hasAnyKey())
             && conf.getBoolean(TAUTH_NOKEY_FALLBACK_ALLOWED, TAUTH_NOKEY_FALLBACK_ALLOWED_DEFAULT)) {
-          LOG.warn("Not found any key : " + ugi + " for service " + serverAddr);
+          LOG.warn("Not found any key : " + ugi + " for service " + serverAddr + ", fall back to simple auth method.");
           return null;
         }
         int version = authType.getServerVersion();
