@@ -543,7 +543,7 @@ public class VolumeScanner extends Thread {
         }
       }
       if (curBlockIter != null) {
-        long saveDelta = monotonicMs - curBlockIter.getLastSavedMs();
+        long saveDelta = Time.now() - curBlockIter.getLastSavedMs();
         if (saveDelta >= conf.cursorSaveMs) {
           LOG.debug("{}: saving block iterator {} after {} ms.",
               this, curBlockIter, saveDelta);
