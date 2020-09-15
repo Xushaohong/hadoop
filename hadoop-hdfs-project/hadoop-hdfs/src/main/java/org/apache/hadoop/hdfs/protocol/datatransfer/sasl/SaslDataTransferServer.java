@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.protocol.datatransfer.sasl;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SECURITY_CHECK_SKIP_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SECURITY_CHECK_SKIP_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_DATA_TRANSFER_PROTECTION_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_CIPHER_SUITES_KEY;
 import static org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil.*;
@@ -120,6 +122,11 @@ public class SaslDataTransferServer {
       LOG.debug(
         "SASL server skipping handshake in unsecured configuration for "
         + "peer = {}, datanodeId = {}", peer, datanodeId);
+      return new IOStreamPair(underlyingIn, underlyingOut);
+    } else if (dnConf.getConf().getBoolean(DFS_SECURITY_CHECK_SKIP_KEY, DFS_SECURITY_CHECK_SKIP_DEFAULT)) {
+      LOG.debug(
+          "Skip security check in security configuration for "
+              + "peer = {}, datanodeId = {}", peer, datanodeId);
       return new IOStreamPair(underlyingIn, underlyingOut);
     } else if (SecurityUtil.isPrivilegedPort(xferPort)) {
       LOG.debug(
