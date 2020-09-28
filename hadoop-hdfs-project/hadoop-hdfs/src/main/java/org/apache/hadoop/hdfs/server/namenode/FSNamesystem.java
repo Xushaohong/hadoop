@@ -1934,7 +1934,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot set permission for " + src);
@@ -1960,7 +1959,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot set owner for " + src);
@@ -1985,7 +1983,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.READ);
     GetBlockLocationsResult res = null;
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(operationName);
     final INode inode;
     readLock();
     try {
@@ -2093,7 +2090,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     FileStatus stat = null;
     boolean success = false;
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(operationName);
     checkOperation(OperationCategory.WRITE);
     writeLock();
     try {
@@ -2125,7 +2121,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot set times " + src);
@@ -2165,7 +2160,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       }
       checkOperation(OperationCategory.WRITE);
       final FSPermissionChecker pc = getPermissionChecker();
-      FSPermissionChecker.setOperationType(operationName);
       writeLock();
       BlocksMapUpdateInfo toRemoveBlocks = new BlocksMapUpdateInfo();
       try {
@@ -2202,7 +2196,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     FileStatus auditStat = null;
     checkOperation(OperationCategory.WRITE);
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot create symlink " + link);
@@ -2238,7 +2231,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot set replication for " + src);
@@ -2269,7 +2261,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot set storage policy for " + src);
@@ -2346,7 +2337,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot unset storage policy for " + src);
@@ -2370,7 +2360,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   BlockStoragePolicy getStoragePolicy(String src) throws IOException {
     checkOperation(OperationCategory.READ);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(null);
     readLock();
     try {
       checkOperation(OperationCategory.READ);
@@ -2397,7 +2386,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   long getPreferredBlockSize(String src) throws IOException {
     checkOperation(OperationCategory.READ);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(null);
     readLock();
     try {
       checkOperation(OperationCategory.READ);
@@ -2513,7 +2501,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(null);
     writeLock();
     try {
       checkOperation(OperationCategory.WRITE);
@@ -2609,7 +2596,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean skipSync = false;
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(null);
     writeLock();
     try {
       checkOperation(OperationCategory.WRITE);
@@ -2750,7 +2736,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       LastBlockWithStatus lbs = null;
       checkOperation(OperationCategory.WRITE);
       final FSPermissionChecker pc = getPermissionChecker();
-      FSPermissionChecker.setOperationType(operationName);
       writeLock();
       try {
         checkOperation(OperationCategory.WRITE);
@@ -2807,7 +2792,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     FSDirWriteFileOp.ValidateAddBlockResult r;
     checkOperation(OperationCategory.READ);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(operationName);
     readLock();
     try {
       checkOperation(OperationCategory.READ);
@@ -2858,7 +2842,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final BlockType blockType;
     checkOperation(OperationCategory.READ);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(null);
     readLock();
     try {
       checkOperation(OperationCategory.READ);
@@ -2907,7 +2890,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         "BLOCK* NameSystem.abandonBlock: {} of file {}", b, src);
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(null);
     writeLock();
     try {
       checkOperation(OperationCategory.WRITE);
@@ -2973,7 +2955,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean success = false;
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(null);
     writeLock();
     try {
       checkOperation(OperationCategory.WRITE);
@@ -3054,7 +3035,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot rename " + src);
@@ -3081,7 +3061,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot rename " + src);
@@ -3120,7 +3099,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     boolean ret = false;
     try {
       checkOperation(OperationCategory.WRITE);
@@ -3227,7 +3205,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     HdfsFileStatus stat = null;
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.READ);
       stat = FSDirStatAndListingOp.getFileInfo(
@@ -3250,8 +3227,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.READ);
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
-    boolean success = false;
     try {
       checkOperation(OperationCategory.READ);
       return FSDirStatAndListingOp.isFileClosed(dir, pc, src);
@@ -3273,7 +3248,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot create directory " + src);
@@ -3311,7 +3285,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     ContentSummary cs;
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.READ);
       cs = FSDirStatAndListingOp.getContentSummary(dir, pc, src);
@@ -3347,7 +3320,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
     boolean success = true;
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.READ);
       quotaUsage = FSDirStatAndListingOp.getQuotaUsage(dir, pc, src);
@@ -3379,7 +3351,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
     boolean success = false;
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot set quota on " + src);
@@ -3411,7 +3382,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     NameNode.stateChangeLog.info("BLOCK* fsync: " + src + " for " + clientName);
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(null);
     writeLock();
     try {
       checkOperation(OperationCategory.WRITE);
@@ -3929,7 +3899,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     DirectoryListing dl = null;
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(NameNode.OperationCategory.READ);
       dl = getListingInt(dir, pc, src, startAfter, needLocation);
@@ -6608,7 +6577,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean success = false;
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot create snapshot for " + snapshotRoot);
@@ -6646,7 +6614,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     String newSnapshotRoot = Snapshot.getSnapshotPath(path, snapshotNewName);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot rename snapshot for " + path);
@@ -6680,7 +6647,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean success = false;
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.READ);
       status = FSDirSnapshotOp.getSnapshottableDirListing(dir, pc,
@@ -6709,7 +6675,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.READ);
     boolean success = false;
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       readLock();
       try {
@@ -6754,8 +6719,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         path : Snapshot.getSnapshotPath(path, toSnapshot);
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
-    long actualTime = Time.monotonicNow();
     try {
       checkOperation(OperationCategory.READ);
       diffs = FSDirSnapshotOp.getSnapshotDiffReport(dir, pc, snapshotManager,
@@ -6812,7 +6775,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             Snapshot.getSnapshotPath(path, toSnapshot);
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.READ);
       diffs = FSDirSnapshotOp
@@ -6846,7 +6808,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     String rootPath = null;
     BlocksMapUpdateInfo blocksToBeDeleted = null;
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(operationName);
     checkOperation(OperationCategory.WRITE);
     writeLock();
     try {
@@ -7143,7 +7104,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
     checkOperation(OperationCategory.WRITE);
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot add cache directive");
@@ -7174,7 +7134,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     if (!flags.contains(CacheFlag.FORCE)) {
       cacheManager.waitForRescanIfNeeded();
     }
-    FSPermissionChecker.setOperationType(operationName);
     checkOperation(OperationCategory.WRITE);
     writeLock();
     try {
@@ -7203,7 +7162,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     String idStr = "{id: " + Long.toString(id) + "}";
     checkOperation(OperationCategory.WRITE);
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot remove cache directives");
@@ -7223,7 +7181,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       long startId, CacheDirectiveInfo filter) throws IOException {
     final String operationName = "listCacheDirectives";
     checkOperation(OperationCategory.READ);
-    FSPermissionChecker.setOperationType(operationName);
     BatchedListEntries<CacheDirectiveEntry> results;
     cacheManager.waitForRescanIfNeeded();
     readLock();
@@ -7326,7 +7283,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     BatchedListEntries<CachePoolEntry> results;
     checkOperation(OperationCategory.READ);
     boolean success = false;
-    FSPermissionChecker.setOperationType(operationName);
     cacheManager.waitForRescanIfNeeded();
     readLock();
     try {
@@ -7350,7 +7306,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot modify ACL entries on " + src);
@@ -7372,7 +7327,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     FileStatus auditStat = null;
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot remove ACL entries on " + src);
@@ -7393,7 +7347,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot remove default ACL entries on " + src);
@@ -7414,7 +7367,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot remove ACL on " + src);
@@ -7435,7 +7387,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot set ACL on " + src);
@@ -7456,7 +7407,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final AclStatus ret;
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.READ);
       ret = FSDirAclOp.getAclStatus(dir, pc, src);
@@ -7489,7 +7439,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       Metadata metadata = FSDirEncryptionZoneOp.ensureKeyIsInitialized(dir,
           keyName, src);
       final FSPermissionChecker pc = getPermissionChecker();
-      FSPermissionChecker.setOperationType(operationName);
       checkSuperuserPrivilege(pc);
       checkOperation(OperationCategory.WRITE);
       final FileStatus resultingStat;
@@ -7526,7 +7475,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean success = false;
     EncryptionZone encryptionZone;
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(operationName);
     checkOperation(OperationCategory.READ);
     readLock();
     try {
@@ -7552,7 +7500,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean success = false;
     checkOperation(OperationCategory.READ);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(operationName);
     checkSuperuserPrivilege(pc);
     readLock();
     try {
@@ -7590,7 +7537,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean success = false;
     checkOperation(OperationCategory.READ);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(operationName);
     checkSuperuserPrivilege(pc);
     readLock();
     try {
@@ -7678,7 +7624,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     FileStatus resultingStat = null;
     final FSPermissionChecker pc = getPermissionChecker();
     boolean success = false;
-    FSPermissionChecker.setOperationType(operationName);
     writeLock();
     try {
       checkOperation(OperationCategory.WRITE);
@@ -7851,7 +7796,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     FileStatus resultingStat = null;
     final FSPermissionChecker pc = getPermissionChecker();
     boolean success = false;
-    FSPermissionChecker.setOperationType(operationName);
     writeLock();
     try {
       checkOperation(OperationCategory.WRITE);
@@ -7878,7 +7822,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.READ);
     checkErasureCodingSupported(operationName);
     final FSPermissionChecker pc = getPermissionChecker();
-    FSPermissionChecker.setOperationType(operationName);
     readLock();
     try {
       checkOperation(OperationCategory.READ);
@@ -7942,7 +7885,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot set XAttr on " + src);
@@ -7965,7 +7907,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     List<XAttr> fsXattrs;
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.READ);
       fsXattrs = FSDirXAttrOp.getXAttrs(dir, pc, src, xAttrs);
@@ -7985,7 +7926,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     List<XAttr> fsXattrs;
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.READ);
       fsXattrs = FSDirXAttrOp.listXAttrs(dir, pc, src);
@@ -8006,7 +7946,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.WRITE);
     final FSPermissionChecker pc = getPermissionChecker();
     writeLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot remove XAttr entry on " + src);
@@ -8049,7 +7988,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.READ);
     final FSPermissionChecker pc = getPermissionChecker();
     readLock();
-    FSPermissionChecker.setOperationType(operationName);
     try {
       checkOperation(OperationCategory.READ);
       final INodesInPath iip = dir.resolvePath(pc, src, DirOp.READ);
