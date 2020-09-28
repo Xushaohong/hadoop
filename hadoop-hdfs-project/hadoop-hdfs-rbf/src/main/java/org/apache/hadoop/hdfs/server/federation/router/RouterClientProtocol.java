@@ -1973,7 +1973,8 @@ public class RouterClientProtocol implements ClientProtocol {
    * @param date Map with the dates.
    * @return New HDFS file status representing a mount point.
    */
-  private HdfsFileStatus getMountPointStatus(
+  @VisibleForTesting
+  HdfsFileStatus getMountPointStatus(
       String name, int childrenNum, long date) {
     long modTime = date;
     long accessTime = date;
@@ -2024,6 +2025,8 @@ public class RouterClientProtocol implements ClientProtocol {
       }
     }
     long inodeId = 0;
+    Path path = new Path(name);
+    String nameStr = path.getName();
     return new HdfsFileStatus.Builder()
         .isdir(true)
         .mtime(modTime)
@@ -2032,7 +2035,7 @@ public class RouterClientProtocol implements ClientProtocol {
         .owner(owner)
         .group(group)
         .symlink(new byte[0])
-        .path(DFSUtil.string2Bytes(name))
+        .path(DFSUtil.string2Bytes(nameStr))
         .fileId(inodeId)
         .children(childrenNum)
         .flags(flags)
