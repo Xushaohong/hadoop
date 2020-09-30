@@ -277,8 +277,12 @@ public class SaslRpcClient {
           LOG.debug("current ugi: " + ugi.toString());
         }
 
-        TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(ugi.getSubject());
-        TAuthLoginModule.TAuthPrincipal principal = TAuthLoginModule.TAuthPrincipal.getFromSubject(ugi.getSubject());
+        UserGroupInformation realUser = ugi.getRealUser();
+        if (realUser == null) {
+          realUser = ugi;
+        }
+        TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(realUser.getSubject());
+        TAuthLoginModule.TAuthPrincipal principal = TAuthLoginModule.TAuthPrincipal.getFromSubject(realUser.getSubject());
 
         if ((credential == null || !credential.getLocalKeyManager().hasAnyKey())
             && conf.getBoolean(TAUTH_NOKEY_FALLBACK_ALLOWED, TAUTH_NOKEY_FALLBACK_ALLOWED_DEFAULT)) {
