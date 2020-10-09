@@ -622,6 +622,7 @@ public class RPC {
        throws IOException {
     if (UserGroupInformation.isSecurityEnabled()) {
       SaslRpcServer.init(conf);
+      SaslRpcClient.init(conf);
     }
     return getProtocolEngine(protocol, conf).getProxy(protocol, clientVersion,
         addr, ticket, conf, factory, rpcTimeout, connectionRetryPolicy,
