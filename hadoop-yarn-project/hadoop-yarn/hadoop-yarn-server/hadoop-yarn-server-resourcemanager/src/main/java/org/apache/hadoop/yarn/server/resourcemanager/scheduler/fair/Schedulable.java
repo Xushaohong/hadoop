@@ -77,6 +77,8 @@ public interface Schedulable {
    */
   float getWeight();
 
+  float getDemandWeights();
+
   /** Start time for jobs in FIFO queues; meaningless for QueueSchedulables.*/
   long getStartTime();
 

@@ -145,6 +145,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfigValidator;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ActivitiesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppActivitiesInfo;
@@ -165,6 +166,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ClusterMetricsIn
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ClusterUserInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.DelegationToken;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.FairSchedulerInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.FairSchedulerQueueInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.FifoSchedulerInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.LabelsToNodesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NewApplication;
@@ -2591,5 +2593,42 @@ public class RMWebServices extends WebServices implements RMWebServiceProtocol {
     }
 
     return new RMQueueAclInfo(true, user.getUserName(), "");
+  }
+
+  @GET
+  @Path("/queues/{queueName}")
+  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+  public FairSchedulerQueueInfo getQueueInfo(@Context HttpServletRequest hsr,
+                                             @PathParam("queueName") String queueName) {
+    initForReadableEndpoints();
+    if (! (rm.getResourceScheduler() instanceof FairScheduler)) {
+      throw new NotFoundException("only supportted for SFairScheduler");
+    }
+    FairScheduler sfair = (FairScheduler)rm.getResourceScheduler();
+    FSQueue queue = sfair.getQueueManager().getQueue(queueName);
+    if (queue == null) {
+      throw new NotFoundException("queue not found: " + queueName);
+    }
+    return new FairSchedulerQueueInfo(queue, sfair);
+  }
+
+
+  @POST
+  @Path("/queues/{queueName}/dweight/{dweight}")
+  @Produces({ MediaType.TEXT_PLAIN, })
+  public String setQueueDemandWeight(@Context HttpServletRequest hsr,
+                                     @PathParam("queueName") String queueName,
+                                     @PathParam("dweight") int dweight) {
+    initForReadableEndpoints();
+    if (! (rm.getResourceScheduler() instanceof FairScheduler)) {
+      throw new NotFoundException("only supportted for SFairScheduler");
+    }
+    FairScheduler sfair = (FairScheduler)rm.getResourceScheduler();
+    FSQueue queue = sfair.getQueueManager().getQueue(queueName);
+    if (queue == null) {
+      throw new NotFoundException("queue not found: " + queueName);
+    }
+    queue.setDemandWeights((float) dweight);
+    return "";
   }
 }

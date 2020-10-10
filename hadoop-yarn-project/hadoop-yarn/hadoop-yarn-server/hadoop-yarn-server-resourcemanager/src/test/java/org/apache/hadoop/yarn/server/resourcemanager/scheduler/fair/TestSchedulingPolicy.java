@@ -259,6 +259,11 @@ public class TestSchedulingPolicy {
       }
 
       @Override
+      public float getDemandWeights() {
+        return (float)1;
+      }
+
+      @Override
       public long getStartTime() {
         return startTime;
       }

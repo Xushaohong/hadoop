@@ -47,6 +47,8 @@ public class AllocationConfiguration extends ReservationSchedulerConfiguration {
   private final Map<String, ConfigurableResource> maxChildQueueResources;
   // Sharing weights for each queue
   private final Map<String, Float> queueWeights;
+  // Dweight for each queue
+  private final Map<String, Float> queueDemandWeights;
 
   // Max concurrent running applications for each queue and for each user; in addition,
   // for users that have no max specified, we use the userMaxJobsDefault.
@@ -119,6 +121,7 @@ public class AllocationConfiguration extends ReservationSchedulerConfiguration {
     this.userMaxApps = allocationFileParser.getUserMaxApps();
     this.queueMaxAMShares = queueProperties.getQueueMaxAMShares();
     this.queueWeights = queueProperties.getQueueWeights();
+    this.queueDemandWeights = queueProperties.getQueueDemandWeights();
     this.userMaxAppsDefault = allocationFileParser.getUserMaxAppsDefault();
     this.queueMaxResourcesDefault =
             allocationFileParser.getQueueMaxResourcesDefault();
@@ -150,6 +153,7 @@ public class AllocationConfiguration extends ReservationSchedulerConfiguration {
     maxChildQueueResources = new HashMap<>();
     maxQueueResources = new HashMap<>();
     queueWeights = new HashMap<>();
+    queueDemandWeights = new HashMap<>();
     queueMaxApps = new HashMap<>();
     userMaxApps = new HashMap<>();
     queueMaxAMShares = new HashMap<>();
@@ -230,6 +234,15 @@ public class AllocationConfiguration extends ReservationSchedulerConfiguration {
   private float getQueueWeight(String queue) {
     Float weight = queueWeights.get(queue);
     return (weight == null) ? 1.0f : weight;
+  }
+
+  private float getQueueDemandWeight(String queue) {
+    Float weight = queueDemandWeights.get(queue);
+    return (weight == null) ? 1.0f : weight;
+  }
+
+  private void setQueueDemandWeight(String queue, Float weight) {
+    queueDemandWeights.put(queue, weight);
   }
 
   public int getUserMaxApps(String user) {
@@ -382,6 +395,7 @@ public class AllocationConfiguration extends ReservationSchedulerConfiguration {
     // Set queue-specific properties.
     String name = queue.getName();
     queue.setWeights(getQueueWeight(name));
+    queue.setDemandWeights(getQueueDemandWeight(name));
     queue.setMinShare(getMinResources(name));
     queue.setMaxShare(getMaxResources(name));
     queue.setMaxRunningApps(getQueueMaxApps(name));

@@ -43,6 +43,7 @@ public class QueueProperties {
   private final Map<String, Integer> queueMaxApps;
   private final Map<String, Float> queueMaxAMShares;
   private final Map<String, Float> queueWeights;
+  private final Map<String, Float> queueDemandWeights;
   private final Map<String, SchedulingPolicy> queuePolicies;
   private final Map<String, Long> minSharePreemptionTimeouts;
   private final Map<String, Long> fairSharePreemptionTimeouts;
@@ -60,6 +61,7 @@ public class QueueProperties {
     this.minQueueResources = builder.minQueueResources;
     this.fairSharePreemptionTimeouts = builder.fairSharePreemptionTimeouts;
     this.queueWeights = builder.queueWeights;
+    this.queueDemandWeights = builder.queueDemandWeights;
     this.nonPreemptableQueues = builder.nonPreemptableQueues;
     this.configuredQueues = builder.configuredQueues;
     this.queueMaxAMShares = builder.queueMaxAMShares;
@@ -110,6 +112,10 @@ public class QueueProperties {
     return queueWeights;
   }
 
+  public Map<String, Float> getQueueDemandWeights() {
+    return queueDemandWeights;
+  }
+
   public Map<String, Float> getQueueMaxAMShares() {
     return queueMaxAMShares;
   }
@@ -157,6 +163,7 @@ public class QueueProperties {
     private Map<String, Float> queueMaxAMShares = new HashMap<>();
     private Map<String, Resource> queueMaxContainerAllocation = new HashMap<>();
     private Map<String, Float> queueWeights = new HashMap<>();
+    private Map<String, Float> queueDemandWeights = new HashMap<>();
     private Map<String, SchedulingPolicy> queuePolicies = new HashMap<>();
     private Map<String, Long> minSharePreemptionTimeouts = new HashMap<>();
     private Map<String, Long> fairSharePreemptionTimeouts = new HashMap<>();
@@ -212,6 +219,11 @@ public class QueueProperties {
 
     public Builder queueWeights(String queueName, float value) {
       this.queueWeights.put(queueName, value);
+      return this;
+    }
+
+    public Builder queueDemandWeights(String queueName, float value) {
+      this.queueDemandWeights.put(queueName, value);
       return this;
     }
 

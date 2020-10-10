@@ -145,16 +145,10 @@ public class FairSharePolicy extends SchedulingPolicy {
       } else if (s2Needy && !s1Needy) {
         res = 1;
       } else if (s1Needy && s2Needy) {
-        double minShareRatio1 = (double) resourceUsage1.getMemorySize();
-        double minShareRatio2 = (double) resourceUsage2.getMemorySize();
-
-        if (minShare1 > 1) {
-          minShareRatio1 /= minShare1;
-        }
-
-        if (minShare2 > 1) {
-          minShareRatio2 /= minShare2;
-        }
+        double weightedMin1 = Math.max(minShare1, 1) * s1.getDemandWeights();
+        double weightedMin2 = Math.max(minShare2, 1) * s2.getDemandWeights();
+        double minShareRatio1 = (double) resourceUsage1.getMemorySize() / weightedMin1;
+        double minShareRatio2 = (double) resourceUsage2.getMemorySize() / weightedMin2;
 
         res = (int) Math.signum(minShareRatio1 - minShareRatio2);
       } else {

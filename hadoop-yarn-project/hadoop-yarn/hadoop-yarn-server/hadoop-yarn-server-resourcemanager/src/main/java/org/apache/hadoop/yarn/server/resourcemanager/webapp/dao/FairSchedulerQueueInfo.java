@@ -40,7 +40,9 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 @XmlSeeAlso({FairSchedulerLeafQueueInfo.class})
 public class FairSchedulerQueueInfo {  
   private int maxApps;
-  
+
+  private int dWeight;
+
   @XmlTransient
   private float fractionMemUsed;
   @XmlTransient
@@ -112,6 +114,8 @@ public class FairSchedulerQueueInfo {
     fractionMemMaxShare = (float)maxResources.getMemorySize() / clusterResources.getMemorySize();
     
     maxApps = queue.getMaxRunningApps();
+
+    dWeight = (int)queue.getDemandWeights();
 
     allocatedContainers = queue.getMetrics().getAllocatedContainers();
     reservedContainers = queue.getMetrics().getReservedContainers();

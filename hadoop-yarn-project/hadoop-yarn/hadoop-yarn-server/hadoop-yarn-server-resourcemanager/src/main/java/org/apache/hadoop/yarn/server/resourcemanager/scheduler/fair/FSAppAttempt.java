@@ -1337,6 +1337,11 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
   }
 
   @Override
+  public float getDemandWeights() {
+    return (float)1;
+  }
+
+  @Override
   public Priority getPriority() {
     // Right now per-app priorities are not passed to scheduler,
     // so everyone has the same priority.

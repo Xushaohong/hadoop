@@ -138,7 +138,12 @@ public class FakeSchedulable implements Schedulable {
   public float getWeight() {
     return weights;
   }
-  
+
+  @Override
+  public float getDemandWeights() {
+    return (float)1;
+  }
+
   @Override
   public Resource getMinShare() {
     return minShare;

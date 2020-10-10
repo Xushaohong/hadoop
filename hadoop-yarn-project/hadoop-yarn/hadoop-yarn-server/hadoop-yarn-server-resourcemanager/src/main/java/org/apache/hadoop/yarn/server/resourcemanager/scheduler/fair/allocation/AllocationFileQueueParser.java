@@ -54,6 +54,7 @@ public class AllocationFileQueueParser {
   public static final String MAX_CONTAINER_ALLOCATION =
       "maxContainerAllocation";
   private static final String WEIGHT = "weight";
+  private static final String DWEIGHT = "dweight";
   private static final String MIN_SHARE_PREEMPTION_TIMEOUT =
       "minSharePreemptionTimeout";
   private static final String FAIR_SHARE_PREEMPTION_TIMEOUT =
@@ -166,6 +167,10 @@ public class AllocationFileQueueParser {
         String text = getTrimmedTextData(field);
         double val = Double.parseDouble(text);
         builder.queueWeights(queueName, (float) val);
+      } else if (DWEIGHT.equals(field.getTagName())) {
+        String text = getTrimmedTextData(field);
+        double val = Double.parseDouble(text);
+        builder.queueDemandWeights(queueName, (float) val);
       } else if (MIN_SHARE_PREEMPTION_TIMEOUT.equals(field.getTagName())) {
         String text = getTrimmedTextData(field);
         long val = Long.parseLong(text) * 1000L;

@@ -71,6 +71,7 @@ public abstract class FSQueue implements Queue, Schedulable {
   protected SchedulingPolicy policy = SchedulingPolicy.DEFAULT_POLICY;
 
   protected float weights;
+  protected float dWeights;
   protected Resource minShare;
   private ConfigurableResource maxShare;
   protected int maxRunningApps;
@@ -226,7 +227,16 @@ public abstract class FSQueue implements Queue, Schedulable {
     p.setPriority(1);
     return p;
   }
-  
+
+  @Override
+  public float getDemandWeights() {
+    return dWeights;
+  }
+
+  public void setDemandWeights(float resourceWeights) {
+    this.dWeights = resourceWeights;
+  }
+
   @Override
   public QueueInfo getQueueInfo(boolean includeChildQueues, boolean recursive) {
     QueueInfo queueInfo = recordFactory.newRecordInstance(QueueInfo.class);
