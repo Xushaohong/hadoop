@@ -69,12 +69,13 @@ public abstract class QueuePlacementRule {
    *    continue to the next rule, and null indicates that the app should be rejected.
    */
   public String assignAppToQueue(String requestedQueue, String user,
-      Groups groups, Map<FSQueueType, Set<String>> configuredQueues)
+      Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr)
       throws IOException {
    String queue = getQueueForApp(requestedQueue, user, groups,
-        configuredQueues);
+        configuredQueues, queueMgr);
     if (create || configuredQueues.get(FSQueueType.LEAF).contains(queue)
-        || configuredQueues.get(FSQueueType.PARENT).contains(queue)) {
+        || configuredQueues.get(FSQueueType.PARENT).contains(queue)
+        || queueMgr.exists(queue)) {
       return queue;
     } else {
       return "";
@@ -119,7 +120,7 @@ public abstract class QueuePlacementRule {
    *    continue to the next rule.
    */
   protected abstract String getQueueForApp(String requestedQueue, String user,
-      Groups groups, Map<FSQueueType, Set<String>> configuredQueues)
+      Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr)
       throws IOException;
 
   /**
@@ -128,7 +129,7 @@ public abstract class QueuePlacementRule {
   public static class User extends QueuePlacementRule {
     @Override
     protected String getQueueForApp(String requestedQueue, String user,
-        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) {
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr) {
       return "root." + cleanName(user);
     }
     
@@ -144,7 +145,7 @@ public abstract class QueuePlacementRule {
   public static class PrimaryGroup extends QueuePlacementRule {
     @Override
     protected String getQueueForApp(String requestedQueue, String user,
-        Groups groups, Map<FSQueueType, Set<String>> configuredQueues)
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr)
         throws IOException {
       final List<String> groupList = groups.getGroups(user);
       if (groupList.isEmpty()) {
@@ -168,7 +169,7 @@ public abstract class QueuePlacementRule {
   public static class SecondaryGroupExistingQueue extends QueuePlacementRule {
     @Override
     protected String getQueueForApp(String requestedQueue, String user,
-        Groups groups, Map<FSQueueType, Set<String>> configuredQueues)
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr)
         throws IOException {
       List<String> groupNames = groups.getGroups(user);
       for (int i = 1; i < groupNames.size(); i++) {
@@ -233,11 +234,11 @@ public abstract class QueuePlacementRule {
     
     @Override
     protected String getQueueForApp(String requestedQueue, String user,
-        Groups groups, Map<FSQueueType, Set<String>> configuredQueues)
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr)
         throws IOException {
       // Apply the nested rule
       String queueName = nestedRule.assignAppToQueue(requestedQueue, user,
-          groups, configuredQueues);
+          groups, configuredQueues, queueMgr);
       
       if (queueName != null && queueName.length() != 0) {
         if (!queueName.startsWith("root.")) {
@@ -266,7 +267,7 @@ public abstract class QueuePlacementRule {
   public static class Specified extends QueuePlacementRule {
     @Override
     protected String getQueueForApp(String requestedQueue, String user,
-        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) {
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr) {
       if (requestedQueue.equals(YarnConfiguration.DEFAULT_QUEUE_NAME)) {
         return "";
       } else {
@@ -316,7 +317,7 @@ public abstract class QueuePlacementRule {
 
     @Override
     protected String getQueueForApp(String requestedQueue, String user,
-        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) {
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr) {
       return defaultQueueName;
     }
 
@@ -332,13 +333,13 @@ public abstract class QueuePlacementRule {
   public static class Reject extends QueuePlacementRule {
     @Override
     public String assignAppToQueue(String requestedQueue, String user,
-        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) {
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr) {
       return null;
     }
     
     @Override
     protected String getQueueForApp(String requestedQueue, String user,
-        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) {
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr) {
       throw new UnsupportedOperationException();
     }
     

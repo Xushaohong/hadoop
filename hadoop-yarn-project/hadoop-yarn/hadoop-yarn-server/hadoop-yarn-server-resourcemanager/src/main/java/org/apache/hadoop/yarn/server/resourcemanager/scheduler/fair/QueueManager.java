@@ -92,6 +92,8 @@ public class QueueManager {
 
   private final Collection<FSLeafQueue> leafQueues = 
       new CopyOnWriteArrayList<>();
+  private final Map<String, FSLeafQueue> leafQueuesByShortName =
+      new HashMap<>();
   private final Map<String, FSQueue> queues = new HashMap<>();
   private Set<IncompatibleQueueRemovalTask> incompatibleQueuesPendingRemoval =
       new HashSet<>();
@@ -209,16 +211,22 @@ public class QueueManager {
     FSQueue queue;
     synchronized (queues) {
       queue = queues.get(name);
-      if (queue == null && create) {
-        // if the queue doesn't exist,create it and return
-        queue = createQueue(name, queueType);
-      } else {
-        recompute = false;
+      if (queue == null) {
+        queue = leafQueuesByShortName.get(getShortName(name));
+        if (queue != null) {
+          return queue;
+        }
+
+        if (create) {
+          // if the queue doesn't exist,create it and return
+          queue = createQueue(name, queueType);
+        }
+        if (queue != null) {
+          rootQueue.recomputeSteadyShares();
+        }
       }
     }
-    if (recompute) {
-      rootQueue.recomputeSteadyShares();
-    }
+
     return queue;
   }
 
@@ -330,6 +338,7 @@ public class QueueManager {
       if (!i.hasNext() && (queueType != FSQueueType.PARENT)) {
         FSLeafQueue leafQueue = new FSLeafQueue(queueName, scheduler, parent);
         leafQueues.add(leafQueue);
+        leafQueuesByShortName.put(getShortName(leafQueue.getName()), leafQueue);
         queue = leafQueue;
       } else {
         if (childPolicy instanceof FifoPolicy) {
@@ -503,6 +512,7 @@ public class QueueManager {
     synchronized (queues) {
       if (queue instanceof FSLeafQueue) {
         leafQueues.remove(queue);
+        leafQueuesByShortName.remove(getShortName(queue.getName()));
       } else {
         for (FSQueue childQueue:queue.getChildQueues()) {
           removeQueue(childQueue);
@@ -540,7 +550,11 @@ public class QueueManager {
   public FSQueue getQueue(String name) {
     name = ensureRootPrefix(name);
     synchronized (queues) {
-      return queues.get(name);
+      FSQueue queue = queues.get(name);
+      if (queue == null) {
+        return leafQueuesByShortName.get(getShortName(name));
+      }
+      return queue;
     }
   }
 
@@ -550,7 +564,8 @@ public class QueueManager {
   public boolean exists(String name) {
     name = ensureRootPrefix(name);
     synchronized (queues) {
-      return queues.containsKey(name);
+      return queues.containsKey(name) ||
+          leafQueuesByShortName.containsKey(getShortName(name));
     }
   }
   
@@ -645,5 +660,16 @@ public class QueueManager {
     // the built-in JDK methods consider whitespace. See YARN-5272.
     return !node.isEmpty() &&
         node.equals(FairSchedulerUtilities.trimQueueName(node));
+  }
+
+  private String getShortName(String queueName) {
+    int sepIndex = queueName.lastIndexOf('.');
+    return queueName.substring(sepIndex + 1, queueName.length());
+  }
+
+  public FSLeafQueue getLeafQueueByShortName(String fullName) {
+    String shortName = getShortName(fullName);
+    FSLeafQueue queue = leafQueuesByShortName.get(shortName);
+    return queue;
   }
 }

@@ -42,6 +42,7 @@ import org.w3c.dom.Element;
 public class TestQueuePlacementPolicy {
   private final static Configuration conf = new Configuration();
   private Map<FSQueueType, Set<String>> configuredQueues;
+  private QueueManager queueMgr = new QueueManager(null);
   
   @BeforeClass
   public static void setup() {
@@ -66,11 +67,11 @@ public class TestQueuePlacementPolicy {
     sb.append("</queuePlacementPolicy>");
     QueuePlacementPolicy policy = parse(sb.toString());
     assertEquals("root.specifiedq",
-        policy.assignAppToQueue("specifiedq", "someuser"));
+        policy.assignAppToQueue("specifiedq", "someuser", queueMgr));
     assertEquals("root.someuser",
-        policy.assignAppToQueue("default", "someuser"));
+        policy.assignAppToQueue("default", "someuser", queueMgr));
     assertEquals("root.otheruser",
-        policy.assignAppToQueue("default", "otheruser"));
+        policy.assignAppToQueue("default", "otheruser", queueMgr));
   }
   
   @Test
@@ -84,10 +85,10 @@ public class TestQueuePlacementPolicy {
     
     configuredQueues.get(FSQueueType.LEAF).add("root.someuser");
     QueuePlacementPolicy policy = parse(sb.toString());
-    assertEquals("root.specifiedq", policy.assignAppToQueue("specifiedq", "someuser"));
-    assertEquals("root.someuser", policy.assignAppToQueue("default", "someuser"));
-    assertEquals("root.specifiedq", policy.assignAppToQueue("specifiedq", "otheruser"));
-    assertEquals("root.default", policy.assignAppToQueue("default", "otheruser"));
+    assertEquals("root.specifiedq", policy.assignAppToQueue("specifiedq", "someuser", queueMgr));
+    assertEquals("root.someuser", policy.assignAppToQueue("default", "someuser", queueMgr));
+    assertEquals("root.specifiedq", policy.assignAppToQueue("specifiedq", "otheruser", queueMgr));
+    assertEquals("root.default", policy.assignAppToQueue("default", "otheruser", queueMgr));
   }
   
   @Test
@@ -99,8 +100,8 @@ public class TestQueuePlacementPolicy {
     sb.append("</queuePlacementPolicy>");
     QueuePlacementPolicy policy = parse(sb.toString());
     assertEquals("root.specifiedq",
-        policy.assignAppToQueue("specifiedq", "someuser"));
-    assertEquals(null, policy.assignAppToQueue("default", "someuser"));
+        policy.assignAppToQueue("specifiedq", "someuser", queueMgr));
+    assertEquals(null, policy.assignAppToQueue("default", "someuser", queueMgr));
   }
   
   @Test (expected = AllocationConfigurationException.class)
@@ -134,7 +135,7 @@ public class TestQueuePlacementPolicy {
     sb.append("</queuePlacementPolicy>");
     QueuePlacementPolicy policy = parse(sb.toString());
     try {
-      policy.assignAppToQueue("root.otherdefault", "user1");
+      policy.assignAppToQueue("root.otherdefault", "user1", queueMgr);
       fail("Expect exception from having default rule with create=\'false\'");
     } catch (IllegalStateException se) {
     }
@@ -153,7 +154,7 @@ public class TestQueuePlacementPolicy {
 
     QueuePlacementPolicy policy = parse(sb.toString());
     assertEquals("root.someDefaultQueue",
-        policy.assignAppToQueue("root.default", "user1"));
+        policy.assignAppToQueue("root.default", "user1", queueMgr));
   }
   
   @Test
@@ -227,18 +228,18 @@ public class TestQueuePlacementPolicy {
     // User queue would be created under primary group queue
     QueuePlacementPolicy policy = parse(sb.toString());
     assertEquals("root.user1group.user1",
-        policy.assignAppToQueue("root.default", "user1"));
+        policy.assignAppToQueue("root.default", "user1", queueMgr));
     // Other rules above and below hierarchical user queue rule should work as
     // usual
     configuredQueues.get(FSQueueType.LEAF).add("root.specifiedq");
     // test if specified rule(above nestedUserQueue rule) works ok
     assertEquals("root.specifiedq",
-        policy.assignAppToQueue("root.specifiedq", "user2"));
+        policy.assignAppToQueue("root.specifiedq", "user2", queueMgr));
 
     // test if default rule(below nestedUserQueue rule) works
     configuredQueues.get(FSQueueType.LEAF).add("root.user3group");
     assertEquals("root.default",
-        policy.assignAppToQueue("root.default", "user3"));
+        policy.assignAppToQueue("root.default", "user3", queueMgr));
   }
 
   @Test
@@ -257,13 +258,13 @@ public class TestQueuePlacementPolicy {
     // Should return root.default since primary group 'root.user1group' is not
     // configured
     assertEquals("root.default",
-        policy.assignAppToQueue("root.default", "user1"));
+        policy.assignAppToQueue("root.default", "user1", queueMgr));
 
     // Let's configure primary group and check if user queue is created
     configuredQueues.get(FSQueueType.PARENT).add("root.user1group");
     policy = parse(sb.toString());
     assertEquals("root.user1group.user1",
-        policy.assignAppToQueue("root.default", "user1"));
+        policy.assignAppToQueue("root.default", "user1", queueMgr));
 
     // Both Primary group and nestedUserQueue rule has create='false'
     sb = new StringBuffer();
@@ -277,7 +278,7 @@ public class TestQueuePlacementPolicy {
     // Should return root.default since primary group and user queue for user 2
     // are not configured.
     assertEquals("root.default",
-        policy.assignAppToQueue("root.default", "user2"));
+        policy.assignAppToQueue("root.default", "user2", queueMgr));
 
     // Now configure both primary group and the user queue for user2
     configuredQueues.get(FSQueueType.PARENT).add("root.user2group");
@@ -285,7 +286,7 @@ public class TestQueuePlacementPolicy {
     policy = parse(sb.toString());
 
     assertEquals("root.user2group.user2",
-        policy.assignAppToQueue("root.default", "user2"));
+        policy.assignAppToQueue("root.default", "user2", queueMgr));
   }
 
   @Test
@@ -301,14 +302,14 @@ public class TestQueuePlacementPolicy {
     QueuePlacementPolicy policy = parse(sb.toString());
     // Should return root.default since secondary groups are not configured
     assertEquals("root.default",
-        policy.assignAppToQueue("root.default", "user1"));
+        policy.assignAppToQueue("root.default", "user1", queueMgr));
 
     // configure secondary group for user1
     configuredQueues.get(FSQueueType.PARENT).add("root.user1subgroup1");
     policy = parse(sb.toString());
     // user queue created should be created under secondary group
     assertEquals("root.user1subgroup1.user1",
-        policy.assignAppToQueue("root.default", "user1"));
+        policy.assignAppToQueue("root.default", "user1", queueMgr));
   }
 
   @Test
@@ -329,9 +330,9 @@ public class TestQueuePlacementPolicy {
 
     QueuePlacementPolicy policy = parse(sb.toString());
     assertEquals("root.parent1.user1",
-        policy.assignAppToQueue("root.parent1", "user1"));
+        policy.assignAppToQueue("root.parent1", "user1", queueMgr));
     assertEquals("root.parent2.user2",
-        policy.assignAppToQueue("root.parent2", "user2"));
+        policy.assignAppToQueue("root.parent2", "user2", queueMgr));
   }
   
   @Test
@@ -350,7 +351,7 @@ public class TestQueuePlacementPolicy {
 
     QueuePlacementPolicy policy = parse(sb.toString());
     assertEquals("root.parentq.user1",
-        policy.assignAppToQueue("root.default", "user1"));
+        policy.assignAppToQueue("root.default", "user1", queueMgr));
   }
 
   @Test
@@ -362,7 +363,7 @@ public class TestQueuePlacementPolicy {
     sb.append("</queuePlacementPolicy>");
     QueuePlacementPolicy policy = parse(sb.toString());
     assertEquals("root.first_dot_last",
-        policy.assignAppToQueue("default", "first.last"));
+        policy.assignAppToQueue("default", "first.last", queueMgr));
 
     sb = new StringBuffer();
     sb.append("<queuePlacementPolicy>");
@@ -374,7 +375,7 @@ public class TestQueuePlacementPolicy {
     sb.append("</queuePlacementPolicy>");
     policy = parse(sb.toString());
     assertEquals("root.default.first_dot_last",
-        policy.assignAppToQueue("root.default", "first.last"));
+        policy.assignAppToQueue("root.default", "first.last", queueMgr));
   }
 
   @Test
@@ -396,7 +397,7 @@ public class TestQueuePlacementPolicy {
     // in the group name should be converted into _dot_
     QueuePlacementPolicy policy = parse(sb.toString());
     assertEquals("root.user1_dot_group.user1",
-        policy.assignAppToQueue("root.default", "user1"));
+        policy.assignAppToQueue("root.default", "user1", queueMgr));
 
     conf.setClass(CommonConfigurationKeys.HADOOP_SECURITY_GROUP_MAPPING,
         SimpleGroupsMapping.class, GroupMappingServiceProvider.class);
@@ -416,7 +417,7 @@ public class TestQueuePlacementPolicy {
         .HADOOP_USER_GROUP_STATIC_OVERRIDES, "emptygroupuser=");
     Groups.getUserToGroupsMappingServiceWithLoadedConfiguration(conf);
     QueuePlacementPolicy policy = parse(sb.toString());
-    policy.assignAppToQueue(null, "emptygroupuser");
+    policy.assignAppToQueue(null, "emptygroupuser", queueMgr);
   }
 
   private QueuePlacementPolicy parse(String str) throws Exception {

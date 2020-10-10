@@ -628,7 +628,7 @@ public class FairScheduler extends
 
     try {
       QueuePlacementPolicy placementPolicy = allocConf.getPlacementPolicy();
-      queueName = placementPolicy.assignAppToQueue(queueName, user);
+      queueName = placementPolicy.assignAppToQueue(queueName, user, queueMgr);
       if (queueName == null) {
         appRejectMsg = "Application rejected by queue placement policy";
       } else {

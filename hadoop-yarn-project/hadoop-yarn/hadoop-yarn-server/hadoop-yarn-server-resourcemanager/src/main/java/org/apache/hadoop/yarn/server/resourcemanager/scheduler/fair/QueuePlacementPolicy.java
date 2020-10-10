@@ -161,11 +161,11 @@ public class QueuePlacementPolicy {
    * @throws IOException
    *    If an exception is encountered while getting the user's groups
    */
-  public String assignAppToQueue(String requestedQueue, String user)
+  public String assignAppToQueue(String requestedQueue, String user, QueueManager queueMgr)
       throws IOException {
     for (QueuePlacementRule rule : rules) {
       String queue = rule.assignAppToQueue(requestedQueue, user, groups,
-          configuredQueues);
+          configuredQueues, queueMgr);
       if (queue == null || !queue.isEmpty()) {
         return queue;
       }
