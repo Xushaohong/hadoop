@@ -154,7 +154,7 @@ static void assert_valid_setup(char *argv0) {
     exit(INVALID_CONFIG_FILE);
   }
 
-  char *conf_file = get_config_path(argv0);
+  conf_file = get_config_path(argv0);
 
   if (conf_file == NULL) {
     flush_and_close_log_files();
@@ -166,7 +166,6 @@ static void assert_valid_setup(char *argv0) {
     exit(INVALID_CONFIG_FILE);
   }
   read_executor_config(conf_file);
-  free(conf_file);
 
   // look up the node manager group in the config file
   char *nm_group = get_nodemanager_group();

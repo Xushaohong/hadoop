@@ -42,6 +42,7 @@
 #include <string.h>
 #include <strings.h>
 #include <limits.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
@@ -89,6 +90,7 @@ struct passwd *user_detail = NULL;
 
 FILE* LOGFILE = NULL;
 FILE* ERRORFILE = NULL;
+char *conf_file;
 
 static uid_t nm_uid = -1;
 static gid_t nm_gid = -1;
@@ -811,6 +813,29 @@ static int create_container_directories(const char* user, const char *app_id,
 }
 
 /**
+ * A util fun for running shell cmd
+ */
+static int run_shell_cmd(const char* cmd) {
+    if (NULL == cmd) {
+        return -1;
+    }
+    FILE *fp = popen(cmd, "r");
+    if(NULL == fp) {
+        fprintf(LOGFILE, "Run shell cmd: %s error!, reason: %s\n", cmd,
+                strerror(errno));
+        return -1;
+    }
+    int ret = pclose(fp);
+    if (ret == -1) {
+        return ret;
+    }
+    if (WIFEXITED(ret)) {
+        return WEXITSTATUS(ret);
+    }
+    return -1;
+}
+
+/**
  * Load the user information for a given user name.
  */
 static struct passwd* get_user_info(const char* user) {
@@ -831,7 +856,48 @@ static struct passwd* get_user_info(const char* user) {
            strerror(errno));
     return NULL;
   }
+  if (result == NULL) {
+      fprintf(LOGFILE, "User %s doesn't exist\n", user);
+  }
   return result;
+}
+
+/**
+ * Create user and get the user information.
+ */
+static struct passwd* create_user(const char* user) {
+  char* default_group_for_new_users = get_value(DEFAULT_GROUP_FOR_NEW_USERS, &executor_cfg);
+  char* cmd;
+  if (NULL == default_group_for_new_users) {
+    fprintf(LOGFILE, "Config entry: default.group.for.new.users doesn't exist!\n");
+    fflush(LOGFILE);
+    cmd = (char *)malloc(strlen("/usr/sbin/useradd -M ") + strlen(user) + 1);
+    strcpy(cmd, "/usr/sbin/useradd -M ");
+    strcat(cmd, user);
+    fprintf(LOGFILE, "Create user: %s\n", user);
+  } else {
+    cmd = (char *)malloc(strlen("/usr/sbin/useradd -M  -g ") + strlen(user)
+        + strlen(default_group_for_new_users) + 1);
+    strcpy(cmd, "/usr/sbin/useradd -M ");
+    strcat(cmd, user);
+    strcat(cmd, " -g ");
+    strcat(cmd, default_group_for_new_users);
+    fprintf(LOGFILE, "Create user: %s in group: %s\n", user, default_group_for_new_users);
+  }
+  int fd = open(conf_file, O_RDONLY);
+  if (fd != -1) {
+    flock(fd, LOCK_EX);
+    if (get_user_info(user) == NULL && run_shell_cmd(cmd) != 0) {
+        fprintf(LOGFILE, "Create user %s error!\n", user);
+        // maybe the user account exists, so don't return NULL
+    }
+    flock(fd,LOCK_UN);
+  } else {
+    fprintf(LOGFILE, "Can't open file %s for flock - %s\n", conf_file, strerror(errno));
+  }
+  close(fd);
+  free(cmd);
+  return get_user_info(user);
 }
 
 int is_whitelisted(const char *user) {
@@ -879,9 +945,19 @@ struct passwd* check_user(const char *user) {
   }
   struct passwd *user_info = get_user_info(user);
   if (NULL == user_info) {
-    fprintf(LOGFILE, "User %s not found\n", user);
-    fflush(LOGFILE);
-    return NULL;
+      fprintf(LOGFILE, "User %s info not found\n", user);
+      char *need_create_user_str = get_value(NEED_CREATE_USER, &executor_cfg);
+      if (NULL == need_create_user_str) {
+          fprintf(LOGFILE, "Config entry: need.create.user doesn't exist!\n");
+          fflush(LOGFILE);
+          return NULL;
+      }
+      if (strcasecmp(need_create_user_str, "true") != 0 ||
+              NULL == (user_info = create_user(user))) {
+          free(need_create_user_str);
+          fflush(LOGFILE);
+          return NULL;
+      }
   }
   if (user_info->pw_uid < min_uid && !is_whitelisted(user)) {
     fprintf(LOGFILE, "Requested user %s is not whitelisted and has id %d,"

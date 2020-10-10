@@ -31,7 +31,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define MAX_SIZE 10
+#define MAX_SIZE 11
 
 static const char COMMENT_BEGIN_CHAR = '#';
 static const char SECTION_LINE_BEGIN_CHAR = '[';

@@ -66,6 +66,10 @@ enum operations {
 #define TC_SUPPORT_ENABLED_KEY "feature.tc.enabled"
 #define MOUNT_CGROUP_SUPPORT_ENABLED_KEY "feature.mount-cgroup.enabled"
 #define TMP_DIR "tmp"
+#define NEED_CREATE_USER "need.create.user"
+#define DEFAULT_GROUP_FOR_NEW_USERS "default.group.for.new.users"
+
+extern char *conf_file;
 
 extern struct passwd *user_detail;
 
