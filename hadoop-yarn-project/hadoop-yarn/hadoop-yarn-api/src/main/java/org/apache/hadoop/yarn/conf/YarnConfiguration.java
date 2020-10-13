@@ -1055,6 +1055,13 @@ public class YarnConfiguration extends Configuration {
   public static final String DEFAULT_QUEUE_NAME = "default";
 
   /**
+   * Enable supporting short queue.
+   */
+  public static final String RM_SHORT_QUEUE_ENABLE =
+      RM_PREFIX + "short-queue.enable";
+  public static final boolean DEFAULT_RM_SHORT_QUEUE_ENABLE = true;
+
+  /**
    * Buckets (in minutes) for the number of apps running in each queue.
    */
   public static final String RM_METRICS_RUNTIME_BUCKETS =

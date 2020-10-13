@@ -99,6 +99,8 @@ public class QueueManager {
       new HashSet<>();
   private FSParentQueue rootQueue;
 
+  private boolean shortQueueEnable;
+
   public QueueManager(FairScheduler scheduler) {
     this.scheduler = scheduler;
   }
@@ -122,6 +124,9 @@ public class QueueManager {
     defaultQueue.setDynamic(false);
     // Recursively reinitialize to propagate queue properties
     rootQueue.reinit(true);
+
+    shortQueueEnable = conf.getBoolean(YarnConfiguration.RM_SHORT_QUEUE_ENABLE,
+        YarnConfiguration.DEFAULT_RM_SHORT_QUEUE_ENABLE);
   }
 
   /**
@@ -338,7 +343,9 @@ public class QueueManager {
       if (!i.hasNext() && (queueType != FSQueueType.PARENT)) {
         FSLeafQueue leafQueue = new FSLeafQueue(queueName, scheduler, parent);
         leafQueues.add(leafQueue);
-        leafQueuesByShortName.put(getShortName(leafQueue.getName()), leafQueue);
+        if (shortQueueEnable) {
+          leafQueuesByShortName.put(getShortName(leafQueue.getName()), leafQueue);
+        }
         queue = leafQueue;
       } else {
         if (childPolicy instanceof FifoPolicy) {
