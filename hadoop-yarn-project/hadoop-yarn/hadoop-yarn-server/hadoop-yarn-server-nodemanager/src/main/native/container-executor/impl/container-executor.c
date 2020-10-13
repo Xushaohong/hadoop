@@ -866,7 +866,7 @@ static struct passwd* get_user_info(const char* user) {
  * Create user and get the user information.
  */
 static struct passwd* create_user(const char* user) {
-  char* default_group_for_new_users = get_value(DEFAULT_GROUP_FOR_NEW_USERS, &executor_cfg);
+  char* default_group_for_new_users = get_section_value(DEFAULT_GROUP_FOR_NEW_USERS, &executor_cfg);
   char* cmd;
   if (NULL == default_group_for_new_users) {
     fprintf(LOGFILE, "Config entry: default.group.for.new.users doesn't exist!\n");
@@ -946,7 +946,7 @@ struct passwd* check_user(const char *user) {
   struct passwd *user_info = get_user_info(user);
   if (NULL == user_info) {
       fprintf(LOGFILE, "User %s info not found\n", user);
-      char *need_create_user_str = get_value(NEED_CREATE_USER, &executor_cfg);
+      char *need_create_user_str = get_section_value(NEED_CREATE_USER, &executor_cfg);
       if (NULL == need_create_user_str) {
           fprintf(LOGFILE, "Config entry: need.create.user doesn't exist!\n");
           fflush(LOGFILE);
