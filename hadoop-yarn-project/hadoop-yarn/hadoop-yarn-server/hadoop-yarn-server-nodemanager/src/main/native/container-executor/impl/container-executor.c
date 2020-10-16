@@ -75,7 +75,7 @@ static const char* DEFAULT_BANNED_USERS[] = {"yarn", "mapred", "hdfs", "bin", 0}
 
 static const int DEFAULT_DOCKER_SUPPORT_ENABLED = 0;
 static const int DEFAULT_TC_SUPPORT_ENABLED = 0;
-static const int DEFAULT_MOUNT_CGROUP_SUPPORT_ENABLED = 0;
+static const int DEFAULT_MOUNT_CGROUP_SUPPORT_ENABLED = 1;
 
 static const char* PROC_PATH = "/proc";
 
@@ -2538,11 +2538,6 @@ int mount_cgroup(const char *pair, const char *hierarchy) {
     if (strstr(mount_path, "..") != NULL) {
       fprintf(LOGFILE, "Unsupported cgroup mount path detected. %s\n",
           mount_path);
-      result = INVALID_COMMAND_PROVIDED;
-      goto cleanup;
-    }
-    if (!is_empty(mount_path)) {
-      fprintf(LOGFILE, "cgroup mount path is not empty. %s\n", mount_path);
       result = INVALID_COMMAND_PROVIDED;
       goto cleanup;
     }
