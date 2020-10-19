@@ -2247,6 +2247,12 @@ public class YarnConfiguration extends Configuration {
   public static final long DEFAULT_NM_LINUX_CONTAINER_CGROUPS_DELETE_DELAY =
       20;
 
+  public static final String NM_LINUX_CONTAINER_CGROUPS_USING_SYSTEMD =
+          NM_PREFIX + "linux-container-executor.cgroups.using-systemd";
+
+  public static final boolean
+          DEFAULT_NM_LINUX_CONTAINER_CGROUPS_USING_SYSTEMD = true;
+
   /**
    * Indicates if memory and CPU limits will be set for the Windows Job
    * Object for the containers launched by the default container executor.

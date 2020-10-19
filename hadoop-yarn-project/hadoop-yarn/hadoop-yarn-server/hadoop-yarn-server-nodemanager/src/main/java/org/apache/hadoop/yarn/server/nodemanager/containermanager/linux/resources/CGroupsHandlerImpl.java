@@ -74,6 +74,7 @@ class CGroupsHandlerImpl implements CGroupsHandler {
   private final ReadWriteLock rwLock;
   private final PrivilegedOperationExecutor privilegedOperationExecutor;
   private final Clock clock;
+  private final boolean usingSystemd;
 
   /**
    * Create cgroup handler object.
@@ -102,6 +103,9 @@ class CGroupsHandlerImpl implements CGroupsHandler {
     this.parsedMtab = new HashMap<>();
     this.rwLock = new ReentrantReadWriteLock();
     this.privilegedOperationExecutor = privilegedOperationExecutor;
+    this.usingSystemd = conf.getBoolean(
+            YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_USING_SYSTEMD,
+            YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_USING_SYSTEMD);
     this.clock = SystemClock.getInstance();
     mtabFile = mtab;
     init();
@@ -299,6 +303,12 @@ class CGroupsHandlerImpl implements CGroupsHandler {
           mountOptions = controller.getName();
         }
 
+        String controllerName = controller.getName();
+        if (controller.equals(CGroupController.CPU) && usingSystemd) {
+          controllerName = "cpu,cpuacct";
+          LOG.info("using cpu,cpuacct to mount cpu cgroup");
+        }
+
         String cGroupKV =
             mountOptions + "=" + requestedMountPath;
         PrivilegedOperation.OperationType opType = PrivilegedOperation
@@ -306,8 +316,9 @@ class CGroupsHandlerImpl implements CGroupsHandler {
         PrivilegedOperation op = new PrivilegedOperation(opType);
 
         op.appendArgs(cGroupPrefix, cGroupKV);
-        LOG.info("Mounting controller " + controller.getName() + " at " +
+        LOG.info("Mounting controller " + controllerName + " at " +
               requestedMountPath);
+        LOG.info("op:" + op.getOperationType() + ",args:" + op.getArguments());
         privilegedOperationExecutor.executePrivilegedOperation(op, false);
 
         //if privileged operation succeeds, update controller paths
