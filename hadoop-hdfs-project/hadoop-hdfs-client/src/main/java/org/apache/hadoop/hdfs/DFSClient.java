@@ -56,6 +56,7 @@ import javax.net.SocketFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.DistributedConfigHelper;
 import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoOutputStream;
@@ -855,6 +856,9 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         throws IOException {
       URI uri = HAUtilClient.getServiceUriFromToken(
           HdfsConstants.HDFS_URI_SCHEME, token);
+      Configuration distributedCfg = new Configuration(conf);
+      conf = DistributedConfigHelper.get().build(uri, distributedCfg);
+
       if (HAUtilClient.isTokenForLogicalUri(token) &&
           !HAUtilClient.isLogicalUri(conf, uri)) {
         // If the token is for a logical nameservice, but the configuration
