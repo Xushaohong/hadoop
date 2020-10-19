@@ -66,6 +66,7 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
   private boolean strictResourceUsageMode = false;
   private float yarnProcessors;
   private int nodeVCores;
+  private static int cpu_cfs_period_us;
   private static final CGroupsHandler.CGroupController CPU =
       CGroupsHandler.CGroupController.CPU;
 
@@ -97,6 +98,10 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
         YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_STRICT_RESOURCE_USAGE);
     this.cGroupsHandler.initializeCGroupController(CPU);
     nodeVCores = NodeManagerHardwareUtils.getVCores(plugin, conf);
+
+    // assign cpu_period value
+    cpu_cfs_period_us = conf.getInt(YarnConfiguration.NM_RESOURCE_CPU_CFS_PERIOD_US,
+            YarnConfiguration.DEFAULT_NM_RESOURCE_CPU_CFS_PERIOD_US);
 
     // cap overall usage to the number of cores allocated to YARN
     yarnProcessors = NodeManagerHardwareUtils.getContainersCPUs(plugin, conf);
@@ -153,6 +158,13 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
 
     int quotaUS = MAX_QUOTA_US;
     int periodUS = (int) (MAX_QUOTA_US / yarnProcessors);
+
+    // if periodUs has assigned value, should use it
+    if (cpu_cfs_period_us > 0) {
+      periodUS = cpu_cfs_period_us;
+      quotaUS = (int) (periodUS * yarnProcessors);
+    }
+
     if (yarnProcessors < 1.0f) {
       periodUS = MAX_QUOTA_US;
       quotaUS = (int) (periodUS * yarnProcessors);
