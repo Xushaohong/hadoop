@@ -297,17 +297,17 @@ public class WebAppUtils {
     InetAddress resolved = address.getAddress();
     if (resolved == null || resolved.isAnyLocalAddress() ||
         resolved.isLoopbackAddress()) {
-      String lh = address.getHostName();
+      String lh = resolved != null ? resolved.getHostAddress() : address.getHostName();
       try {
-        sb.append(NetUtils.PREFER_HOST
+        lh = NetUtils.PREFER_HOST
             ? InetAddress.getLocalHost().getCanonicalHostName()
-            : InetAddress.getLocalHost().getHostAddress());
+            : InetAddress.getLocalHost().getHostAddress();
       } catch (UnknownHostException e) {
         //Ignore and fallback.
       }
       sb.append(lh);
     } else {
-      sb.append(address.getHostName());
+      sb.append(resolved.getHostAddress());
     }
     sb.append(":").append(address.getPort());
     return sb.toString();
