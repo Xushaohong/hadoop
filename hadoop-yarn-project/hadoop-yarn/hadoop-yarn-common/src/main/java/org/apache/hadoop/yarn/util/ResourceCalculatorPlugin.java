@@ -27,6 +27,9 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.SysInfo;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
 /**
  * Plugin to calculate resource information on the system.
  */
@@ -109,6 +112,15 @@ public class ResourceCalculatorPlugin extends Configured {
    */
   public long getCpuFrequency() {
     return sys.getCpuFrequency();
+  }
+
+  /**
+   * Obtain cpu set
+   *
+   * @return cpu set
+   */
+  public HashMap<Integer, ArrayList<Integer>> getCpuSets() {
+    return sys.getCpuSets();
   }
 
   /**

@@ -73,6 +73,8 @@ public class ResourceHandlerModule {
       cGroupsMemoryResourceHandler;
   private static volatile CGroupsCpuResourceHandlerImpl
       cGroupsCpuResourceHandler;
+  private static volatile CGroupsCpuSetResourceHandlerImpl
+      cGroupsCpuSetResourceHandler;
 
   /**
    * Returns an initialized, thread-safe CGroupsHandler instance.
@@ -139,6 +141,11 @@ public class ResourceHandlerModule {
     return cGroupsCpuResourceHandler;
   }
 
+  public static CpuSetResourceHandler
+      getCpuSetResourceHandler() {
+    return cGroupsCpuSetResourceHandler;
+  }
+
   private static CGroupsCpuResourceHandlerImpl initCGroupsCpuResourceHandler(
       Configuration conf) throws ResourceHandlerException {
     boolean cgroupsCpuEnabled =
@@ -157,6 +164,32 @@ public class ResourceHandlerModule {
                 new CGroupsCpuResourceHandlerImpl(
                     getInitializedCGroupsHandler(conf));
             return cGroupsCpuResourceHandler;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  private static CGroupsCpuSetResourceHandlerImpl initCGroupsCpuSetResourceHandler(
+          Configuration conf) throws ResourceHandlerException {
+    boolean cgroupsCpuEnabled =
+            conf.getBoolean(YarnConfiguration.NM_CPU_RESOURCE_ENABLED,
+                    YarnConfiguration.DEFAULT_NM_CPU_RESOURCE_ENABLED);
+    boolean cgroupsLCEResourcesHandlerEnabled =
+            conf.getClass(YarnConfiguration.NM_LINUX_CONTAINER_RESOURCES_HANDLER,
+                    DefaultLCEResourcesHandler.class)
+                    .equals(CgroupsLCEResourcesHandler.class);
+    // same as cpu
+    if (cgroupsCpuEnabled || cgroupsLCEResourcesHandlerEnabled) {
+      if (cGroupsCpuSetResourceHandler == null) {
+        synchronized (CpuSetResourceHandler.class) {
+          if (cGroupsCpuSetResourceHandler == null) {
+            LOG.debug("Creating new cgroups cpuset handler");
+            cGroupsCpuSetResourceHandler =
+                    new CGroupsCpuSetResourceHandlerImpl(
+                        getInitializedCGroupsHandler(conf));
+            return cGroupsCpuSetResourceHandler;
           }
         }
       }
@@ -300,6 +333,8 @@ public class ResourceHandlerModule {
         initMemoryResourceHandler(conf));
     addHandlerIfNotNull(handlerList,
         initCGroupsCpuResourceHandler(conf));
+    addHandlerIfNotNull(handlerList,
+        initCGroupsCpuSetResourceHandler(conf));
     addHandlerIfNotNull(handlerList, getNumaResourceHandler(conf, nmContext));
     addHandlersFromConfiguredResourcePlugins(handlerList, conf, nmContext);
     resourceHandlerChain = new ResourceHandlerChain(handlerList);

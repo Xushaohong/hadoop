@@ -21,6 +21,9 @@ package org.apache.hadoop.util;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
 /**
  * Plugin to calculate resource information on the system.
  */
@@ -93,6 +96,13 @@ public abstract class SysInfo {
    * @return CPU frequency in kHz
    */
   public abstract long getCpuFrequency();
+
+  /**
+   * Obtain cpu set
+   *
+   * @return cpu set
+   */
+  public abstract HashMap<Integer, ArrayList<Integer>> getCpuSets();
 
   /**
    * Obtain the cumulative CPU time since the system is on.

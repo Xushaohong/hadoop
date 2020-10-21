@@ -66,6 +66,7 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
   private boolean strictResourceUsageMode = false;
   private float yarnProcessors;
   private int nodeVCores;
+  private boolean cpusetEnabled = false;
   private static int cpu_cfs_period_us;
   private static final CGroupsHandler.CGroupController CPU =
       CGroupsHandler.CGroupController.CPU;
@@ -96,6 +97,9 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
     this.strictResourceUsageMode = conf.getBoolean(
         YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_STRICT_RESOURCE_USAGE,
         YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_STRICT_RESOURCE_USAGE);
+    this.cpusetEnabled = conf.getBoolean(
+            YarnConfiguration.NM_RESOURCE_LIMITED_PHYSICAL_CPU_SET,
+            YarnConfiguration.DEFAULT_NM_RESOURCE_LIMITED_PHYSICAL_CPU_SET);
     this.cGroupsHandler.initializeCGroupController(CPU);
     nodeVCores = NodeManagerHardwareUtils.getVCores(plugin, conf);
 
@@ -113,7 +117,7 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
     } catch (IOException ie) {
       throw new ResourceHandlerException(ie);
     }
-    if (systemProcessors != (int) yarnProcessors) {
+    if (systemProcessors != (int) yarnProcessors && !cpusetEnabled) {
       LOG.info("YARN containers restricted to " + yarnProcessors + " cores");
       int[] limits = getOverallLimits(yarnProcessors);
       cGroupsHandler

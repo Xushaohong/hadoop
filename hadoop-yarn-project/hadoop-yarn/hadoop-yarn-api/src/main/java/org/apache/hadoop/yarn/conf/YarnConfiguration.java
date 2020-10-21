@@ -1562,6 +1562,11 @@ public class YarnConfiguration extends Configuration {
           NM_PREFIX + "resource.cpu-cfs-period-us";
   public static final int DEFAULT_NM_RESOURCE_CPU_CFS_PERIOD_US = -1;
 
+  /** If allocate limited CPU sets for containers. */
+  public static final String NM_RESOURCE_LIMITED_PHYSICAL_CPU_SET =
+          NM_PREFIX + "resource.limited-physical-cpu-set";
+  public static final boolean DEFAULT_NM_RESOURCE_LIMITED_PHYSICAL_CPU_SET = false;
+
   /** Enable or disable node hardware capability detection. */
   public static final String NM_ENABLE_HARDWARE_CAPABILITY_DETECTION =
       NM_PREFIX + "resource.detect-hardware-capabilities";

@@ -25,6 +25,7 @@ import java.io.InputStreamReader;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.regex.Matcher;
@@ -150,6 +151,9 @@ public class SysInfoLinux extends SysInfo {
 
   /* map for every disk its sector size */
   private HashMap<String, Integer> perDiskSectorSize = null;
+
+  /* cpu sets on the system */
+  private HashMap<Integer, ArrayList<Integer>> cpuSets = new HashMap<Integer, ArrayList<Integer>>();
 
   public static final long PAGE_SIZE = getConf("PAGESIZE");
   public static final long JIFFY_LENGTH_IN_MILLIS =
@@ -330,10 +334,17 @@ public class SysInfoLinux extends SysInfo {
       numCores = 1;
       String currentPhysicalId = "";
       String str = in.readLine();
+
+      cpuSets.clear();
+      int processorid = -1;
+      ArrayList<Integer> signalPhy = new ArrayList<Integer>();
+
       while (str != null) {
         mat = PROCESSOR_FORMAT.matcher(str);
         if (mat.find()) {
           numProcessors++;
+          processorid = Integer.parseInt(mat.group(1));
+          signalPhy.add(processorid);
         }
         mat = FREQUENCY_FORMAT.matcher(str);
         if (mat.find()) {
@@ -342,6 +353,13 @@ public class SysInfoLinux extends SysInfo {
         mat = PHYSICAL_ID_FORMAT.matcher(str);
         if (mat.find()) {
           currentPhysicalId = str;
+          int phyid = Integer.parseInt(mat.group(1));
+          ArrayList<Integer> result = cpuSets.get(phyid);
+          if (result == null) {
+            result = new ArrayList<Integer>();
+            cpuSets.put(phyid, result);
+          }
+          result.add(processorid);
         }
         mat = CORE_ID_FORMAT.matcher(str);
         if (mat.find()) {
@@ -349,6 +367,11 @@ public class SysInfoLinux extends SysInfo {
           numCores = coreIdSet.size();
         }
         str = in.readLine();
+      }
+
+      // if no physical id, use signal result
+      if (cpuSets.isEmpty()) {
+        cpuSets.put(0, signalPhy);
       }
     } catch (IOException io) {
       LOG.warn("Error reading the stream " + io);
@@ -635,6 +658,14 @@ public class SysInfoLinux extends SysInfo {
   public long getCpuFrequency() {
     readProcCpuInfoFile();
     return cpuFrequency;
+  }
+
+  /** get cpu set */
+  /** {@inheritDoc} */
+  @Override
+  public HashMap<Integer, ArrayList<Integer>> getCpuSets() {
+    readProcCpuInfoFile();
+    return cpuSets;
   }
 
   /** {@inheritDoc} */

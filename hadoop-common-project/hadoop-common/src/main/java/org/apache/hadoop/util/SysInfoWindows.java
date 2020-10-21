@@ -27,6 +27,9 @@ import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
 /**
  * Plugin to calculate resource information on Windows systems.
  */
@@ -186,6 +189,14 @@ public class SysInfoWindows extends SysInfo {
   public long getCpuFrequency() {
     refreshIfNeeded();
     return cpuFrequencyKhz;
+  }
+
+  /** get cpu set */
+  /** {@inheritDoc} */
+  @Override
+  public HashMap<Integer, ArrayList<Integer>> getCpuSets() {
+    // TODO: implemente it if needed
+    return null;
   }
 
   /** {@inheritDoc} */
