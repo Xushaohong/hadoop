@@ -1200,8 +1200,20 @@ public class UserGroupInformation {
     if (!isTAuthEnabled())
       return;
 
-    setLoginUser(loginUserFromTAuthFileAndReturnUGI(user, path));
-    LOG.info("Login successful for user " + user
+    setLoginUser(loginUserFromTAuthFileAndReturnUGI(path));
+    LOG.info("Login successful for user " + getCurrentUser()
+        + " using tauth file " + path);
+  }
+
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
+  public
+  static void loginFromTAuthKeyFile(String path) throws IOException {
+    if (!isTAuthEnabled())
+      return;
+
+    setLoginUser(loginUserFromTAuthFileAndReturnUGI(path));
+    LOG.info("Login successful for user " + getCurrentUser()
         + " using tauth file " + path);
   }
 
@@ -1440,14 +1452,11 @@ public class UserGroupInformation {
   }
 
   public
-  static UserGroupInformation loginUserFromTAuthFileAndReturnUGI(String user,
-                                    String path
-                                    ) throws IOException {
+  static UserGroupInformation loginUserFromTAuthFileAndReturnUGI(String path) throws IOException {
     if (!isTAuthEnabled())
       return UserGroupInformation.getCurrentUser();
 
     LoginParams params = new LoginParams();
-    params.put(LoginParam.PRINCIPAL, user);
     params.put(LoginParam.TAUTH_PATH, path);
     return doSubjectLogin(null, params);
   }
