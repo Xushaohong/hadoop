@@ -26,6 +26,7 @@ public class TqConfigureImpersonationProvider extends DefaultImpersonationProvid
     try {
       this.impersonationProvider =
           SecureServiceFactory.getImpersonationProvider(SecureServiceFactory.getDefault());
+      this.impersonationProvider.start();
       this.initialized = true;
     } catch (Exception e) {
       LOG.error("Failed to init..", e);

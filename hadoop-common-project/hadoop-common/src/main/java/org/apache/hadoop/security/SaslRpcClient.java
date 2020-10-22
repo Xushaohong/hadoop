@@ -49,10 +49,12 @@ import javax.security.sasl.SaslClient;
 import com.google.common.base.Preconditions;
 import com.tencent.tdw.security.Tuple;
 import com.tencent.tdw.security.authentication.LocalKeyManager;
-import com.tencent.tdw.security.authentication.SecurityCenterProvider;
 import com.tencent.tdw.security.authentication.ServiceTarget;
-import com.tencent.tdw.security.authentication.TAuthAuthentication;
-import com.tencent.tdw.security.authentication.client.SecureClient;
+import com.tencent.tdw.security.authentication.tauth.AuthClient;
+import com.tencent.tdw.security.authentication.tauth.AuthClient2;
+import com.tencent.tdw.security.netbeans.AppServerInfo;
+import com.tencent.tdw.security.netbeans.AuthTicket;
+import com.tencent.tdw.security.netbeans.Ticket;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -77,6 +79,7 @@ import org.apache.hadoop.security.sasl.TqClientCallbackHandler;
 import org.apache.hadoop.security.sasl.TqClientSecurityProvider;
 import org.apache.hadoop.security.sasl.TqTicketResponseToken;
 import org.apache.hadoop.security.sasl.TqAuthConst;
+import org.apache.hadoop.security.sasl.TqSaslServer;
 import org.apache.hadoop.security.tauth.TAuthConst;
 import org.apache.hadoop.security.tauth.TAuthLoginModule;
 import org.apache.hadoop.security.tauth.TAuthSaslClient;
@@ -239,10 +242,7 @@ public class SaslRpcClient {
     Map<String, String> saslProperties =
       saslPropsResolver.getClientProperties(serverAddr.getAddress());  
     CallbackHandler saslCallback = null;
-
-    if(LOG.isDebugEnabled()) {
-      LOG.debug("current ugi: " + ugi.toString());
-    }
+    
     final AuthMethod method = AuthMethod.valueOf(authType.getMethod());
     switch (method) {
       case TOKEN: {
@@ -273,18 +273,16 @@ public class SaslRpcClient {
         break;
       }
       case TAUTH: {
-        if (ugi.getRealAuthenticationMethod().getAuthMethod() !=
-            AuthMethod.TAUTH) {
-          LOG.debug("client isn't using tauth");
-          return null;
-        }
-        UserGroupInformation authorizeUser = ugi;
-        if(ugi.getRealUser() != null) {
-          authorizeUser = ugi.getRealUser();
+        if(LOG.isDebugEnabled()) {
+          LOG.debug("current ugi: " + ugi.toString());
         }
 
-        TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(authorizeUser.getSubject());
-        TAuthLoginModule.TAuthPrincipal principal = TAuthLoginModule.TAuthPrincipal.getFromSubject(authorizeUser.getSubject());
+        UserGroupInformation realUser = ugi.getRealUser();
+        if (realUser == null) {
+          realUser = ugi;
+        }
+        TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(realUser.getSubject());
+        TAuthLoginModule.TAuthPrincipal principal = TAuthLoginModule.TAuthPrincipal.getFromSubject(realUser.getSubject());
 
         if ((credential == null || !credential.getLocalKeyManager().hasAnyKey())
             && conf.getBoolean(TAUTH_NOKEY_FALLBACK_ALLOWED, TAUTH_NOKEY_FALLBACK_ALLOWED_DEFAULT)) {
@@ -307,12 +305,7 @@ public class SaslRpcClient {
         if (version == TAuthConst.VERSION) {
           saslCallback = new TAuthSaslClient.DefaultTAuthSaslCallbackHandler(principal.getName(), serverAddr, protocolName);
         } else if (version == TqAuthConst.VERSION) {
-          String realUser = null;
-          if(ugi.getRealUser() != null) {
-            realUser = ugi.getRealUser().getUserName();
-          }
-          saslCallback = new TqAuthClientCallbackHandler(ugi.getUserName(),
-              realUser, credential.getLocalKeyManager(), protocolName);
+          saslCallback = new TqAuthClientCallbackHandler(principal.getName(), credential.getLocalKeyManager(), protocolName);
         }
         break;
       }
@@ -774,31 +767,45 @@ public class SaslRpcClient {
   }
 
   private class TqAuthClientCallbackHandler extends TqClientCallbackHandler {
-    private final String user;
-    private final String realUser;
+    private final String userName;
+    private final LocalKeyManager localKeyManager;
     private final String protocolName;
-    private final SecureClient secureClient;
 
-    public TqAuthClientCallbackHandler(String user, String realUser, LocalKeyManager localKeyManager, String protocolName) {
-      this.user = user;
-      this.realUser = realUser;
+    public TqAuthClientCallbackHandler(String userName, LocalKeyManager localKeyManager, String protocolName) {
+      this.userName = userName;
+      this.localKeyManager = localKeyManager;
       this.protocolName = protocolName;
-      this.secureClient = SecurityCenterProvider.createTauthSecureClient(
-          realUser != null? realUser : user, localKeyManager, true);
     }
 
     @Override
     protected Tuple<byte[], byte[]> processChallenge(String target) throws Exception {
-      TAuthAuthentication tAuthAuthentication = (TAuthAuthentication)secureClient.getAuthentication(
-          ServiceTarget.valueOf(target), realUser != null? user : null);
-      return Tuple.of(tAuthAuthentication.getSessionKey(),
-          new TqTicketResponseToken(tAuthAuthentication.getAuthenticator(),
-              tAuthAuthentication.getServiceTicket(), tAuthAuthentication.getSmkEpoch()).toBytes());
+      Ticket ticket = null;
+      try {
+        if (target != null && !TqSaslServer.DEFAULT_SERVER_NAME.equals(target)) {
+          AuthClient2 authClient = new AuthClient2(userName, localKeyManager);
+          ticket = authClient.ask(ServiceTarget.valueOf(target));
+        }
+      } catch (Exception e) {
+        LOG.error("Failed ask ticket for " + target + ", will try address and protocol index service", e);
+      }
+      if (ticket == null) {
+        AuthClient authClient = new AuthClient(userName, localKeyManager);
+        ticket = authClient.ask(new AppServerInfo(serverAddr.getAddress().getHostAddress(),
+            serverAddr.getPort(), protocolName));
+      }
+      AuthTicket authTicket = ticket.getAuthTicket();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Got ticket for " + userName);
+      }
+      return Tuple.of(ticket.getSessionTicket().getSessionKey(),
+          new TqTicketResponseToken(authTicket.getEncryptedAuthenticator()
+              , authTicket.getServiceTicket(), authTicket.getSmkId())
+              .toBytes());
     }
 
     @Override
     protected String getUserName() {
-      return realUser != null? realUser : user;
+      return userName;
     }
 
     @Override

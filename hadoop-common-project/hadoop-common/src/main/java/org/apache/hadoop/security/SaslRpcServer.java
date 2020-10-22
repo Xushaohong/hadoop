@@ -48,12 +48,11 @@ import javax.security.sasl.SaslServerFactory;
 
 import com.tencent.tdw.security.Tuple;
 import com.tencent.tdw.security.authentication.Authentication;
-import com.tencent.tdw.security.authentication.Authenticator;
-import com.tencent.tdw.security.authentication.SecurityCenterProvider;
-import com.tencent.tdw.security.authentication.TAuthAuthentication;
 import com.tencent.tdw.security.authentication.service.SecureService;
 import com.tencent.tdw.security.authentication.service.SecureServiceFactory;
-import com.tencent.tdw.security.authentication.v2.SecureServiceV2;
+import com.tencent.tdw.security.authentication.tauth.AuthServer;
+import com.tencent.tdw.security.authentication.tauth.ServerAuthResult;
+import com.tencent.tdw.security.netbeans.AuthTicket;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -67,7 +66,6 @@ import org.apache.hadoop.security.sasl.TqServerCallbackHandler;
 import org.apache.hadoop.security.sasl.TqServerSecurityProvider;
 import org.apache.hadoop.security.sasl.TqTicketResponseToken;
 import org.apache.hadoop.security.tauth.TAuthConst;
-import org.apache.hadoop.security.tauth.TAuthLoginModule;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -85,7 +83,6 @@ public class SaslRpcServer {
   public static final Logger LOG = LoggerFactory.getLogger(SaslRpcServer.class);
   public static final String SASL_DEFAULT_REALM = "default";
   private static SaslServerFactory saslFactory;
-  private static SecureServiceV2 secureServiceV2;
 
   public enum QualityOfProtection {
     AUTHENTICATION("auth"),
@@ -125,17 +122,12 @@ public class SaslRpcServer {
       case SIMPLE: {
         return; // no sasl for simple
       }
+      case TAUTH:
       case TOKEN: {
         protocol = "";
         serverId = SaslRpcServer.SASL_DEFAULT_REALM;
         break;
       }
-      case TAUTH:
-        UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-        protocol = "";
-        serverId = ugi.getUserName();
-        initTauthSecureService(authMethod, ugi);
-        break;
       case KERBEROS: {
         String fullName = UserGroupInformation.getCurrentUser().getUserName();
         if (LOG.isDebugEnabled())
@@ -184,7 +176,7 @@ public class SaslRpcServer {
           //no need callback
           callback = null;
         } else if (authVersion == 1) {
-          callback = new TqAuthServerCallbackHandler(serverId, secureServiceV2);
+          callback = new TqAuthServerCallbackHandler(saslProperties);
         } else {
           throw new IOException("Unknown version of TAUTH " + authVersion);
         }
@@ -221,21 +213,6 @@ public class SaslRpcServer {
       LOG.debug("Created SASL server with mechanism = " + mechanism);
     }
     return saslServer;
-  }
-
-  private static void initTauthSecureService(AuthMethod authMethod, UserGroupInformation ugi) throws IOException{
-    if(authMethod == AuthMethod.TAUTH && secureServiceV2 == null) {
-      synchronized(SaslRpcServer.class) {
-        if(secureServiceV2 == null) {
-          TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(ugi.getSubject());
-          if ((credential == null || !credential.getLocalKeyManager().hasAnyKey())) {
-            throw new IOException("No credential found for tauth ");
-          }
-          secureServiceV2 = SecurityCenterProvider.createTauthSecureService(
-              ugi.getUserName(), null, credential.getLocalKeyManager(), true);
-        }
-      }
-    }
   }
 
   public static void init(Configuration conf) {
@@ -516,12 +493,10 @@ public class SaslRpcServer {
   }
 
   private static class TqAuthServerCallbackHandler extends TqServerCallbackHandler {
-    private String serverName;
-    private SecureServiceV2<TAuthAuthentication> secureService;
+    private final Map<String, ?> saslProperties;
 
-    public TqAuthServerCallbackHandler(String serverName, SecureServiceV2<TAuthAuthentication> secureService) {
-      this.serverName = serverName;
-      this.secureService = secureService;
+    public TqAuthServerCallbackHandler(Map<String, ?> saslProperties) {
+      this.saslProperties = saslProperties;
     }
 
     @Override
@@ -539,15 +514,19 @@ public class SaslRpcServer {
     @Override
     protected Tuple<byte[], String> processResponse(byte[] response) throws Exception {
       TqTicketResponseToken token = TqTicketResponseToken.valueOf(response);
-      TAuthAuthentication tAuthAuthentication = new TAuthAuthentication(token.getSmkId(),
-          token.getServiceTicket(), token.getAuthenticator());
-      Authenticator authenticator = secureService.authenticate(tAuthAuthentication);
-      return Tuple.of(authenticator.getSessionKey(), authenticator.getAuthUser());
+      AuthServer authServer = AuthServer.getDefault();
+      ServerAuthResult ret = authServer.auth(new AuthTicket(token.getSmkId(),
+          token.getServiceTicket(), token.getAuthenticator()));
+      return Tuple.of(ret.getTicket().getSessionKey(), ret.getAuthenticator().getPrinciple());
     }
 
     @Override
     protected String getServiceName() {
-      return serverName;
+      Object serviceNameObj = saslProperties.get("tq.service.name");
+      if (serviceNameObj != null) {
+        return serviceNameObj.toString();
+      }
+      return Utils.getSystemPropertyOrEnvVar("tq.service.name");
     }
   }
 }
