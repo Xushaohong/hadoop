@@ -69,6 +69,9 @@ public class TestAMRMProxy extends BaseAMRMProxyE2ETest {
             YarnClient rmClient = YarnClient.createYarnClient()) {
       Configuration conf = new YarnConfiguration();
       conf.setBoolean(YarnConfiguration.AMRM_PROXY_ENABLED, true);
+      conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
+      conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
+
       // Make sure if using FairScheduler that we can assign multiple containers
       // in a single heartbeat later
       conf.setBoolean(FairSchedulerConfiguration.ASSIGN_MULTIPLE, true);
