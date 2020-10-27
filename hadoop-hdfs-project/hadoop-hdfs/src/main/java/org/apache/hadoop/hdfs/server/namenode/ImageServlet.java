@@ -646,6 +646,9 @@ public class ImageServlet extends HttpServlet {
                   metrics.addPutImage(elapsed);
                 }
 
+                // Now that we have a new checkpoint, we might be able to
+                // remove some old ones.
+                nnImage.purgeOldStorage(parsedParams.getNameNodeFile());
               } finally {
                 // Remove the request once we've processed it, or it threw an
                 // error, so we aren't using it either.
