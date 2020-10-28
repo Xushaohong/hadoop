@@ -61,7 +61,7 @@ class User implements Principal {
    */
   @Override
   public String getName() {
-    return fullName;
+    return fullName.replaceAll("[\"'“”]", "");
   }
   
   /**
