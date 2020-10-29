@@ -126,7 +126,7 @@ public class CGroupsCpuSetResourceHandlerImpl implements CpuSetResourceHandler {
         }
         if (!exited) {
             // Check if set successfully
-            throw new ResourceHandlerException("cpuset limit set failed: " + cpusets);
+            throw new ResourceHandlerException("cpuset limit set failed: " + totalCpus);
         }
 
         return null;
@@ -135,7 +135,7 @@ public class CGroupsCpuSetResourceHandlerImpl implements CpuSetResourceHandler {
     @InterfaceAudience.Private
     private boolean totalCpuSetExisted(String existedCpus) throws IOException {
         String controllerPath = this.cGroupsHandler.getPathForCGroup(CPUSET, "");
-        File cpusFile = new File(controllerPath, CPUSET + "." + this.cGroupsHandler.CGROUP_CPUSET_CPUS);
+        File cpusFile = new File(controllerPath, CPUSET.getName() + "." + this.cGroupsHandler.CGROUP_CPUSET_CPUS);
         if (cpusFile.exists()) {
             String contents = FileUtils.readFileToString(cpusFile, "UTF-8").trim();
             if (contents.equals(existedCpus)) {
