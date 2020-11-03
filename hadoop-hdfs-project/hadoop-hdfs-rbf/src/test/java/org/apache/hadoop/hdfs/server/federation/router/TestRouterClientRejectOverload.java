@@ -17,12 +17,15 @@
  */
 package org.apache.hadoop.hdfs.server.federation.router;
 
+import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.recoveryClientConnection;
+import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.simulateClientConnectionClose;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.simulateSlowNamenode;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.simulateThrowExceptionRouterRpcServer;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.transitionClusterNSToStandby;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.transitionClusterNSToActive;
 import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -425,5 +428,41 @@ public class TestRouterClientRejectOverload {
     } finally {
       exec.shutdown();
     }
+  }
+
+  @Test
+  public void testClientConnectionClose() throws Exception {
+    setupCluster(false, false);
+
+    int size = cluster.getRouters().size();
+    List<RouterRpcClient> reservedRpcClientList = new ArrayList<>(size);
+
+    // Simulate client connection close.
+    for (int i = 0; i < size; ++i) {
+      RouterRpcServer server =
+          cluster.getRouters().get(i).getRouter().getRpcServer();
+      simulateClientConnectionClose(server, reservedRpcClientList);
+    }
+
+    Configuration conf = cluster.getRouterClientConf();
+    // Fail fast
+    conf.setInt("dfs.client.failover.max.attempts", 0);
+
+    DFSClient routerClient = new DFSClient(new URI("hdfs://fed"), conf);
+
+    // RPC call must fail
+    try {
+      routerClient.create("/testClientConnectionClose", true);
+    } catch (Exception e) {
+    }
+
+    // Recovery the rpcClient of RouterRpcServer
+    for (int i = 0; i < size; ++i) {
+      RouterRpcServer server =
+          cluster.getRouters().get(i).getRouter().getRpcServer();
+      recoveryClientConnection(server, reservedRpcClientList.get(i));
+    }
+
+    assertFalse(routerClient.exists("/testClientConnectionClose"));
   }
 }

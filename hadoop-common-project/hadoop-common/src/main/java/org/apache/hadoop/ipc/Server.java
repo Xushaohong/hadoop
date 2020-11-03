@@ -816,7 +816,7 @@ public abstract class Server {
      *
      * @return true
      */
-    boolean isOpen() {
+    public boolean isOpen() {
       return true;
     }
 
@@ -945,7 +945,8 @@ public abstract class Server {
   }
 
   /** A RPC extended call queued for handling. */
-  private class RpcCall extends Call {
+  @VisibleForTesting
+  public class RpcCall extends Call {
     final Connection connection;  // connection to client
     final Writable rpcRequest;    // Serialized Rpc request from client
     ByteBuffer rpcResponse;       // the response for this call
@@ -980,7 +981,7 @@ public abstract class Server {
     }
 
     @Override
-    boolean isOpen() {
+    public boolean isOpen() {
       return connection.channel.isOpen();
     }
 
@@ -1005,6 +1006,9 @@ public abstract class Server {
       return connection.getHostInetAddress();
     }
 
+    public Connection getConnection() {
+      return connection;
+    }
     @Override
     public Void run() throws Exception {
       if (!connection.channel.isOpen()) {
@@ -1907,6 +1911,10 @@ public abstract class Server {
 
     public Server getServer() {
       return Server.this;
+    }
+
+    public SocketChannel getChannel() {
+      return channel;
     }
 
     /* Return true if the connection has no outstanding rpc */

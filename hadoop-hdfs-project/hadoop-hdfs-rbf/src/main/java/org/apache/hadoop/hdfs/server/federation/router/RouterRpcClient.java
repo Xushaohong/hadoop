@@ -69,6 +69,7 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc.CallerContext;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.ipc.Server;
@@ -291,6 +292,15 @@ public class RouterRpcClient {
   }
 
   /**
+   * Get the connectionManager of this client.
+   * @return connectionManager.
+   +   */
+  @VisibleForTesting
+  public ConnectionManager getConnectionManager() {
+    return connectionManager;
+  }
+
+  /**
    * Get ClientProtocol proxy client for a NameNode. Each combination of user +
    * NN must use a unique proxy client. Previously created clients are cached
    * and stored in a connection pool by the ConnectionManager.
@@ -303,7 +313,8 @@ public class RouterRpcClient {
    *         NN + current user.
    * @throws IOException If we cannot get a connection to the NameNode.
    */
-  private ConnectionContext getConnection(UserGroupInformation ugi, String nsId,
+  @VisibleForTesting
+  public ConnectionContext getConnection(UserGroupInformation ugi, String nsId,
       String rpcAddress, Class<?> proto) throws IOException {
     ConnectionContext connection = null;
     try {
@@ -433,6 +444,15 @@ public class RouterRpcClient {
         ProxyAndInfo<?> client = connection.getClient();
         final Object proxy = client.getProxy();
 
+        // Return if connection between router server and client is closed
+        Server.Call curCall = RPC.Server.getCurCall().get();
+        if (curCall != null && !curCall.isOpen()) {
+          String msg = "Connection Channel to "
+              + RPC.Server.getRemoteAddress() + " of "
+              + RPC.Server.getRemoteUser() + " is closed!";
+          LOG.error(msg);
+          throw new IOException(msg);
+        }
         ret = invoke(nsId, 0, method, proxy, params);
         if (failover) {
           // Success on alternate server, update
