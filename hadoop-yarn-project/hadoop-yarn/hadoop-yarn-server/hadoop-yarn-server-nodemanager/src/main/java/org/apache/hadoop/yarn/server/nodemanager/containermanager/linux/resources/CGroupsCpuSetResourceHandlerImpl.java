@@ -93,12 +93,23 @@ public class CGroupsCpuSetResourceHandlerImpl implements CpuSetResourceHandler {
         }
 
         if (cpusetEnabled) {
-            LinuxResourceCalculatorPlugin lxplugin = (LinuxResourceCalculatorPlugin) plugin;
+            // get assigned cpu reserved list
+            HashMap<Integer, Boolean> reservedCpuMap;
+            String reservedCPUList = conf.get(
+                    YarnConfiguration.NM_RESOURCE_RESERVED_PHYSICAL_CPU_LIST,
+                    YarnConfiguration.DEFAULT_NM_RESOURCE_RESERVED_PHYSICAL_CPU_LIST);
+            try {
+                reservedCpuMap = parseReservedCpuList(reservedCPUList);
+            } catch (IOException ie) {
+                throw new ResourceHandlerException(ie);
+            }
+
             // cap overall usage to the number of cores allocated to YARN
+            LinuxResourceCalculatorPlugin lxplugin = (LinuxResourceCalculatorPlugin) plugin;
             yarnProcessors = (lxplugin.getNumProcessors() * NodeManagerHardwareUtils.getNodeCpuPercentage(conf)) / 100.0f;
 
             HashMap<Integer, ArrayList<Integer>> systemProcessors = lxplugin.getCpuSets();
-            cpusets = getRestrictCpus(systemProcessors, (int) yarnProcessors);
+            cpusets = getRestrictCpus(systemProcessors, reservedCpuMap, (int) yarnProcessors);
         } else {
             cpusets = totalCpus;
         }
@@ -146,20 +157,65 @@ public class CGroupsCpuSetResourceHandlerImpl implements CpuSetResourceHandler {
     }
 
     @InterfaceAudience.Private
-    private String getRestrictCpus(HashMap<Integer, ArrayList<Integer>> systemCpuSets, int processors) {
+    private HashMap<Integer, Boolean> parseReservedCpuList(String cpuList) throws IOException {
+        HashMap<Integer, Boolean> reservedCpuMap = new HashMap<Integer, Boolean>();
+        reservedCpuMap.clear();
+        if (cpuList.equals("NONE")) {
+            LOG.info("cpu reserved list is none");
+            return reservedCpuMap;
+        }
+
+        String[] reservedArrays = cpuList.trim().split(",");
+        for (int i = 0; i < reservedArrays.length; i++) {
+            if (reservedArrays[i].contains("-")) {
+                String[] arrays = reservedArrays[i].split("-");
+                if (arrays.length != 2)
+                    throw new IOException("invalid cpu resrved list: " + cpuList);
+
+                int startIndex = Integer.parseInt(arrays[0]);
+                int endIndex = Integer.parseInt(arrays[1]);
+                for (int j = startIndex; j <= endIndex; j++)
+                    reservedCpuMap.put(j, true);
+
+            } else {
+                if (reservedArrays[i].length() == 0)
+                        continue;
+                int phyid = Integer.parseInt(reservedArrays[i]);
+                reservedCpuMap.put(phyid, true);
+            }
+        }
+
+        return reservedCpuMap;
+    }
+
+    @InterfaceAudience.Private
+    private String getRestrictCpus(HashMap<Integer, ArrayList<Integer>> systemCpuSets, HashMap<Integer, Boolean> reservedCpuSets, int processors) {
         String limitedCpus;
         ArrayList<Integer> cpulist;
-        if (processors == 0)
-            throw new IllegalArgumentException("The cpuset num is 0!");
+
+        if (reservedCpuSets.size() == 0 && processors == 0)
+            throw new IllegalArgumentException("both reserved cpu list and cpu percent num is 0!");
 
         cpulist = new ArrayList<Integer>();
-        for (ArrayList<Integer> processorlist : systemCpuSets.values()) {
-            int processnum = Math.min(processorlist.size(), processors);
-            if (processnum == 0)
-                break;
-            for (int i = 0; i < processnum; i++) {
-                cpulist.add(processorlist.get(i));
-                processors--;
+        if (reservedCpuSets.size() != 0 ) {
+            LOG.info("assign cpu set based on reserved cpu list:" + reservedCpuSets.toString());
+            for (ArrayList<Integer> processorlist : systemCpuSets.values()) {
+                for (int i = 0; i < processorlist.size(); i++) {
+                    int cpuId = processorlist.get(i);
+                    if (!reservedCpuSets.containsKey(cpuId))
+                        cpulist.add(cpuId);
+                }
+            }
+        } else {
+            LOG.info("assign cpu set based on percent cpu number:" + processors);
+            for (ArrayList<Integer> processorlist : systemCpuSets.values()) {
+                int processnum = Math.min(processorlist.size(), processors);
+                if (processnum == 0)
+                    break;
+                for (int i = 0; i < processnum; i++) {
+                    cpulist.add(processorlist.get(i));
+                    processors--;
+                }
             }
         }
 

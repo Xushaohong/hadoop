@@ -1567,6 +1567,12 @@ public class YarnConfiguration extends Configuration {
           NM_PREFIX + "resource.limited-physical-cpu-set";
   public static final boolean DEFAULT_NM_RESOURCE_LIMITED_PHYSICAL_CPU_SET = false;
 
+  /** assigned cpu reserved list for system, this must be at the head of cpu set enabled*/
+  public static final String NM_RESOURCE_RESERVED_PHYSICAL_CPU_LIST =
+          NM_PREFIX + "resource.reserved-physical-cpu-list";
+  public static final String DEFAULT_NM_RESOURCE_RESERVED_PHYSICAL_CPU_LIST =
+          "NONE";
+
   /** Enable or disable node hardware capability detection. */
   public static final String NM_ENABLE_HARDWARE_CAPABILITY_DETECTION =
       NM_PREFIX + "resource.detect-hardware-capabilities";
