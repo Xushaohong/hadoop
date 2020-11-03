@@ -56,6 +56,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.NameNodeProxiesClient.ProxyAndInfo;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
@@ -129,6 +130,9 @@ public class RouterRpcClient {
       Pattern.compile("\\tat (.*)\\.(.*)\\((.*):(\\d*)\\)");
 
   private static final String CLIENT_IP_STR = "clientIp";
+  private static final String CLIENT_ID_STR = "clientId";
+  private static final String CALL_ID_STR = "callId";
+  private static final String RRETRY_COUNT_STR = "retryCount";
 
   /**
    * Create a router RPC client to manage remote procedure calls to NNs.
@@ -427,7 +431,7 @@ public class RouterRpcClient {
           + router.getRouterId());
     }
 
-    appendClientIpToCallerContextIfAbsent();
+    appendClientInfoToCallerContextIfAbsent();
 
     Object ret = null;
     if (rpcMonitor != null) {
@@ -453,6 +457,7 @@ public class RouterRpcClient {
           LOG.error(msg);
           throw new IOException(msg);
         }
+
         ret = invoke(nsId, 0, method, proxy, params);
         if (failover) {
           // Success on alternate server, update
@@ -554,10 +559,16 @@ public class RouterRpcClient {
 
   /**
    * For tracking which is the actual client address.
-   * It adds trace info "clientIp:ip" to caller context if it's absent.
+   * It adds trace info "clientIp:ip,clientId:id,callId:id,retryCount:count"
+   * to caller context if it's absent.
    */
-  private void appendClientIpToCallerContextIfAbsent() {
+  private void appendClientInfoToCallerContextIfAbsent() {
     String clientIpInfo = CLIENT_IP_STR + ":" + Server.getRemoteAddress();
+    String clientIdInfo = CLIENT_ID_STR + ":"
+        + Base64.encodeBase64String(Server.getClientId());
+    String callIdInfo = CALL_ID_STR + ":" + Server.getCallId();
+    String retryCountInfo = RRETRY_COUNT_STR + ":"
+        + Server.getCallRetryCount();
     final CallerContext ctx = CallerContext.getCurrent();
     if (isClientIpInfoAbsent(clientIpInfo, ctx)) {
       String origContext = ctx == null ? null : ctx.getContext();
@@ -565,6 +576,9 @@ public class RouterRpcClient {
       CallerContext.setCurrent(
           new CallerContext.Builder(origContext, contextFieldSeparator)
               .append(clientIpInfo)
+              .append(clientIdInfo)
+              .append(callIdInfo)
+              .append(retryCountInfo)
               .setSignature(origSignature)
               .build());
     }

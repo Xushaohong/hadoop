@@ -441,12 +441,15 @@ public final class FederationTestUtils {
         // Close the connection channel of current call
         Server.RpcCall curCall = (Server.RpcCall)Server.getCurCall().get();
         curCall.getConnection().getChannel().close();
+        Thread.sleep(3000);
         return connection;
       }
     }).when(spyClient).getConnection(any(UserGroupInformation.class),
         any(String.class), any(String.class), any(Class.class));
 
-    reservedRpcClientList.add(rpcClient);
+    if (reservedRpcClientList != null) {
+      reservedRpcClientList.add(rpcClient);
+    }
     Whitebox.setInternalState(server.getClientProtocolModule(),
         "rpcClient", spyClient);
   }

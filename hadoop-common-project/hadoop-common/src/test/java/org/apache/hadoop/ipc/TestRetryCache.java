@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC.RpcKind;
 import org.apache.hadoop.ipc.RetryCache.CacheEntryWithPayload;
 import org.junit.Assert;
@@ -51,7 +52,7 @@ public class TestRetryCache {
     AtomicInteger retryCount = new AtomicInteger();
     AtomicInteger operationCount = new AtomicInteger();
     private RetryCache retryCache = new RetryCache("TestRetryCache", 1,
-        100 * 1000 * 1000 * 1000L);
+        100 * 1000 * 1000 * 1000L, new Configuration());
 
     /**
      * A server method implemented using {@link RetryCache}.

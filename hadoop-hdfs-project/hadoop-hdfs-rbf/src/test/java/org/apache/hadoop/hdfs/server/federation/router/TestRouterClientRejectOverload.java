@@ -41,9 +41,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.hdfs.DFSClient;
+import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.RouterContext;
 import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
@@ -103,8 +106,7 @@ public class TestRouterClientRejectOverload {
     routerConf.setBoolean(
         RBFConfigKeys.DFS_ROUTER_CLIENT_REJECT_OVERLOAD, overloadControl);
 
-    // No need for datanodes as we use renewLease() for testing
-    cluster.setNumDatanodesPerNameservice(0);
+    cluster.setNumDatanodesPerNameservice(3);
 
     cluster.addRouterOverrides(routerConf);
     cluster.startCluster();
@@ -462,7 +464,43 @@ public class TestRouterClientRejectOverload {
           cluster.getRouters().get(i).getRouter().getRpcServer();
       recoveryClientConnection(server, reservedRpcClientList.get(i));
     }
-
+    Thread.sleep(5000);
     assertFalse(routerClient.exists("/testClientConnectionClose"));
+  }
+
+  @Test
+  public void testClientConnectionClose2() throws Exception {
+    setupCluster(false, false);
+
+    int size = cluster.getRouters().size();
+    List<RouterRpcClient> reservedRpcClientList = new ArrayList<>(size);
+
+    // Simulate connection between client and router0 is close.
+    RouterRpcServer server =
+        cluster.getRouters().get(0).getRouter().getRpcServer();
+
+    simulateClientConnectionClose(server, reservedRpcClientList);
+
+    Configuration conf = cluster.getRouterClientConf();
+
+    // Set dfs.client.failover.random.order false, to pick 1st router at first
+    conf.setBoolean("dfs.client.failover.random.order", false);
+    conf.setBoolean("fs.hdfs.impl.disable.cache", true);
+    conf.setBoolean(HdfsClientConfigKeys.Failover.CACHE_ACTIVE_ENABLED_KEY,
+         false);
+    DFSClient routerClient = new DFSClient(new URI("hdfs://fed"), conf);
+    String p = "/testClientConnectionClose2";
+    String data = "testdata";
+    DFSOutputStream out = (DFSOutputStream) routerClient.create(p, true);
+    out.write(data.getBytes());
+    out.flush();
+    out.close();
+    FileStatus status = routerClient.getLocatedFileInfo(p, false);
+    assertTrue(status.getLen() > 0);
+
+    Thread.sleep(5000);
+    status = routerClient.getLocatedFileInfo(p, false);
+    assertTrue(status.getLen() > 0);
+    recoveryClientConnection(server, reservedRpcClientList.get(0));
   }
 }

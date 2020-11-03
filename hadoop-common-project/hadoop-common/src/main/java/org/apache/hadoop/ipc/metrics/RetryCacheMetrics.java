@@ -57,6 +57,7 @@ public class RetryCacheMetrics {
   @Metric("Number of RetryCache hit") MutableCounterLong cacheHit;
   @Metric("Number of RetryCache cleared") MutableCounterLong cacheCleared;
   @Metric("Number of RetryCache updated") MutableCounterLong cacheUpdated;
+  @Metric("Number of RetryCache Context Retry") MutableCounterLong cacheCtxRetry;
 
   /**
    * One cache hit event
@@ -79,6 +80,13 @@ public class RetryCacheMetrics {
     cacheUpdated.incr();
   }
 
+  /**
+   * One Context retry
+   */
+  public void incrCacheCtxRetry() {
+    cacheCtxRetry.incr();
+  }
+
   public long getCacheHit() {
     return cacheHit.value();
   }
@@ -89,6 +97,10 @@ public class RetryCacheMetrics {
 
   public long getCacheUpdated() {
     return cacheUpdated.value();
+  }
+
+  public long getCacheCtxRetry() {
+    return cacheCtxRetry.value();
   }
 
 }

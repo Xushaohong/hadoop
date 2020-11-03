@@ -183,12 +183,14 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.ipc.RetryCache;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
 import org.apache.hadoop.ipc.RetryCache.CacheEntryWithPayload;
+import org.apache.hadoop.ipc.RetryCache.ContextClientInfo;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.ipc.RefreshRegistry;
@@ -711,15 +713,25 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       throw new IOException("Only an ACTIVE node can invoke startCheckpoint.");
 
     CacheEntryWithPayload cacheEntry = RetryCache.waitForCompletion(retryCache,
-      null);
+        null);
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return (NamenodeCommand) cacheEntry.getPayload();
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntryWithPayload ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient, null);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return (NamenodeCommand) ctxCacheEntry.getPayload();
+    }
+
     NamenodeCommand ret = null;
     try {
       ret = namesystem.startCheckpoint(registration, nn.setRegistration());
     } finally {
       RetryCache.setState(cacheEntry, ret != null, ret);
+      RetryCache.setState(ctxCacheEntry, ret != null, ret);
     }
     return ret;
   }
@@ -733,12 +745,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.endCheckpoint(registration, sig);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -817,6 +838,13 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return (HdfsFileStatus) cacheEntry.getPayload();
     }
 
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntryWithPayload ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient, null);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return (HdfsFileStatus) ctxCacheEntry.getPayload();
+    }
     HdfsFileStatus status = null;
     try {
       PermissionStatus perm = new PermissionStatus(getRemoteUser()
@@ -826,6 +854,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
           ecPolicyName, storagePolicy, cacheEntry != null);
     } finally {
       RetryCache.setState(cacheEntry, status != null, status);
+      RetryCache.setState(ctxCacheEntry, status != null, status);
     }
 
     metrics.incrFilesCreated();
@@ -849,6 +878,13 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return (LastBlockWithStatus) cacheEntry.getPayload();
     }
 
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntryWithPayload ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient, null);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return (LastBlockWithStatus) ctxCacheEntry.getPayload();
+    }
     LastBlockWithStatus info = null;
     boolean success = false;
     try {
@@ -857,6 +893,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success, info);
+      RetryCache.setState(ctxCacheEntry, success, info);
     }
     metrics.incrFilesAppended();
     return info;
@@ -1011,6 +1048,13 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return; // Return previous response
     }
 
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.updatePipeline(clientName, oldBlock, newBlock, newNodes,
@@ -1018,6 +1062,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
   
@@ -1062,11 +1107,19 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return true; // Return previous response
     }
 
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return true;
+    }
     boolean ret = false;
     try {
       ret = namesystem.renameTo(src, dst, cacheEntry != null);
     } finally {
       RetryCache.setState(cacheEntry, ret);
+      RetryCache.setState(ctxCacheEntry, ret);
     }
     if (ret) {
       metrics.incrFilesRenamed();
@@ -1082,6 +1135,14 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
 
     try {
@@ -1089,6 +1150,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry,success);
     }
   }
   
@@ -1115,12 +1177,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.renameTo(src, dst, cacheEntry != null, options);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
     metrics.incrFilesRenamed();
   }
@@ -1162,11 +1233,19 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return true; // Return previous response
     }
 
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return true;
+    }
     boolean ret = false;
     try {
       ret = namesystem.delete(src, recursive, cacheEntry != null);
     } finally {
       RetryCache.setState(cacheEntry, ret);
+      RetryCache.setState(ctxCacheEntry, ret);
     }
     if (ret) 
       metrics.incrDeleteFileOps();
@@ -1318,12 +1397,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return true; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return true;
+    }
     boolean success = false;
     try {
       namesystem.saveNamespace(timeWindow, txGap);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
     return true;
   }
@@ -1501,12 +1589,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.satisfyStoragePolicy(src, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -1543,6 +1640,13 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return; // Return previous response
     }
 
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     /* We enforce the MAX_PATH_LENGTH limit even though a symlink target
      * URI may refer to a non-HDFS file system. 
      */
@@ -1563,6 +1667,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry,success);
     }
   }
 
@@ -1926,6 +2031,13 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return (String) cacheEntry.getPayload();
     }
 
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntryWithPayload ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient, null);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return (String) ctxCacheEntry.getPayload();
+    }
     metrics.incrCreateSnapshotOps();
     String ret = null;
     try {
@@ -1933,6 +2045,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
           cacheEntry != null);
     } finally {
       RetryCache.setState(cacheEntry, ret != null, ret);
+      RetryCache.setState(ctxCacheEntry, ret != null, ret);
     }
     return ret;
   }
@@ -1950,12 +2063,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.deleteSnapshot(snapshotRoot, snapshotName, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry,success);
     }
   }
 
@@ -1989,6 +2111,14 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.renameSnapshot(snapshotRoot, snapshotOldName,
@@ -1996,6 +2126,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry,success);
     }
   }
 
@@ -2052,6 +2183,13 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return (Long) cacheEntry.getPayload();
     }
 
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntryWithPayload ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient, null);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return (Long) ctxCacheEntry.getPayload();
+    }
     boolean success = false;
     long ret = 0;
     try {
@@ -2059,6 +2197,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success, ret);
+      RetryCache.setState(ctxCacheEntry, success, ret);
     }
     return ret;
   }
@@ -2073,12 +2212,20 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return;
     }
 
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.modifyCacheDirective(directive, flags, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2090,12 +2237,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return;
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.removeCacheDirective(id, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2117,12 +2273,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.addCachePool(info, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2134,12 +2299,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.modifyCachePool(info, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2151,12 +2325,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return;
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.removeCachePool(cachePoolName, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2214,12 +2397,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return;
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.createEncryptionZone(src, keyName, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2246,12 +2438,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return;
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.reencryptEncryptionZone(zone, action, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2270,6 +2471,14 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return;
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       if (ecPolicyName == null) {
@@ -2282,6 +2491,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2294,12 +2504,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntryWithPayload ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient, null);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.setXAttr(src, xAttr, flag, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
   
@@ -2324,12 +2543,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return; // Return previous response
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntryWithPayload ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient, null);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.removeXAttr(src, xAttr, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2526,12 +2754,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return;
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.unsetErasureCodingPolicy(src, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2545,6 +2782,14 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return (AddErasureCodingPolicyResponse[]) cacheEntry.getPayload();
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntryWithPayload ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient, null);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return (AddErasureCodingPolicyResponse[]) ctxCacheEntry.getPayload();
+    }
     boolean success = false;
     AddErasureCodingPolicyResponse[] responses =
         new AddErasureCodingPolicyResponse[0];
@@ -2554,6 +2799,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success, responses);
+      RetryCache.setState(ctxCacheEntry, success, responses);
     }
     return responses;
   }
@@ -2567,12 +2813,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return;
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntryWithPayload ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient, null);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       namesystem.removeErasureCodingPolicy(ecPolicyName, cacheEntry != null);
       success = true;
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2585,12 +2840,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return;
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       success = namesystem.enableErasureCodingPolicy(ecPolicyName,
           cacheEntry != null);
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 
@@ -2603,12 +2867,21 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return;
     }
+
+    ContextClientInfo ctxClient = RetryCache.extractContextClientInfo(
+        retryCache, CallerContext.getCurrent());
+    CacheEntry ctxCacheEntry = RetryCache
+        .waitForContextCompletion(retryCache, ctxClient);
+    if (ctxCacheEntry != null && ctxCacheEntry.isSuccess()) {
+      return;
+    }
     boolean success = false;
     try {
       success = namesystem.disableErasureCodingPolicy(ecPolicyName,
           cacheEntry != null);
     } finally {
       RetryCache.setState(cacheEntry, success);
+      RetryCache.setState(ctxCacheEntry, success);
     }
   }
 

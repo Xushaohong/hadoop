@@ -498,6 +498,13 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
   }
 
   /**
+   * Get the clientProto.
+   */
+  public RouterClientProtocol getClientProto() {
+    return this.clientProto;
+  }
+
+  /**
    * Check if the Router is in safe mode. We should only see READ, WRITE, and
    * UNCHECKED. It includes a default handler when we haven't implemented an
    * operation. If not supported, it always throws an exception reporting the

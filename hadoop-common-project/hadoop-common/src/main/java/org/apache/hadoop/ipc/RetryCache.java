@@ -18,11 +18,15 @@
 package org.apache.hadoop.ipc;
 
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.commons.net.util.Base64;
+
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.metrics.RetryCacheMetrics;
 import org.apache.hadoop.util.LightWeightCache;
 import org.apache.hadoop.util.LightWeightGSet;
@@ -32,6 +36,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_SEPARATOR_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_SEPARATOR_KEY;
 
 /**
  * Maintains a cache of non-idempotent requests that have been successfully
@@ -184,6 +191,7 @@ public class RetryCache {
   private final LightWeightGSet<CacheEntry, CacheEntry> set;
   private final long expirationTime;
   private String cacheName;
+  private final String ctxFieldSeparator;
 
   private final ReentrantLock lock = new ReentrantLock();
 
@@ -193,7 +201,8 @@ public class RetryCache {
    * @param percentage percentage of total java heap space used by this cache
    * @param expirationTime time for an entry to expire in nanoseconds
    */
-  public RetryCache(String cacheName, double percentage, long expirationTime) {
+  public RetryCache(String cacheName, double percentage, long expirationTime,
+      Configuration conf) {
     int capacity = LightWeightGSet.computeCapacity(percentage, cacheName);
     capacity = capacity > MAX_CAPACITY ? capacity : MAX_CAPACITY;
     this.set = new LightWeightCache<CacheEntry, CacheEntry>(capacity, capacity,
@@ -201,6 +210,8 @@ public class RetryCache {
     this.expirationTime = expirationTime;
     this.cacheName = cacheName;
     this.retryCacheMetrics =  RetryCacheMetrics.create(this);
+    this.ctxFieldSeparator = conf.get(HADOOP_CALLER_CONTEXT_SEPARATOR_KEY,
+        HADOOP_CALLER_CONTEXT_SEPARATOR_DEFAULT);
   }
 
   private static boolean skipRetryCache() {
@@ -237,6 +248,13 @@ public class RetryCache {
    */
   public String getCacheName() {
     return cacheName;
+  }
+
+  /**
+   * Get ctxFieldSeparator
+   */
+  public String getCtxFieldSeparator() {
+    return ctxFieldSeparator;
   }
 
   /**
@@ -334,10 +352,22 @@ public class RetryCache {
         System.nanoTime() + expirationTime);
   }
 
+  private static CacheEntry newEntry(byte[] clientId, int callId,
+      long expirationTime) {
+    return new CacheEntry(clientId, callId,
+        System.nanoTime() + expirationTime);
+  }
+
   private static CacheEntryWithPayload newEntry(Object payload,
       long expirationTime) {
     return new CacheEntryWithPayload(Server.getClientId(), Server.getCallId(),
         payload, System.nanoTime() + expirationTime);
+  }
+
+  private static CacheEntryWithPayload newEntry(byte[] clientId, int callId,
+      Object payload, long expirationTime) {
+    return new CacheEntryWithPayload(clientId, callId, payload,
+        System.nanoTime() + expirationTime);
   }
 
   /** Static method that provides null check for retryCache */
@@ -350,6 +380,27 @@ public class RetryCache {
   }
 
   /** Static method that provides null check for retryCache */
+  public static CacheEntry waitForContextCompletion(RetryCache cache,
+      ContextClientInfo ctxClient) {
+    if (skipRetryCache()) {
+      return null;
+    }
+
+    if (ctxClient == null || ctxClient.getClientId() == null
+      || ctxClient.getCallId() < 0) {
+      return null;
+    }
+
+    if ( ctxClient.getRetryCount() > 0) {
+      cache.retryCacheMetrics.incrCacheCtxRetry();
+    }
+
+    return cache != null ? cache
+        .waitForCompletion(newEntry(ctxClient.getClientId(),
+            ctxClient.getCallId(), cache.expirationTime)) : null;
+  }
+
+  /** Static method that provides null check for retryCache */
   public static CacheEntryWithPayload waitForCompletion(RetryCache cache,
       Object payload) {
     if (skipRetryCache()) {
@@ -357,6 +408,82 @@ public class RetryCache {
     }
     return (CacheEntryWithPayload) (cache != null ? cache
         .waitForCompletion(newEntry(payload, cache.expirationTime)) : null);
+  }
+
+  /** Static method that provides null check for retryCache */
+  public static CacheEntryWithPayload waitForContextCompletion(
+      RetryCache cache, ContextClientInfo ctxClient, Object payload) {
+    if (skipRetryCache()) {
+      return null;
+    }
+
+    if (ctxClient == null || ctxClient.getClientId() == null
+        || ctxClient.getCallId() < 0) {
+      return null;
+    }
+
+    if ( ctxClient.getRetryCount() > 0) {
+      cache.retryCacheMetrics.incrCacheCtxRetry();
+    }
+
+    return (CacheEntryWithPayload) (cache != null ? cache
+        .waitForCompletion(newEntry(ctxClient.getClientId(),
+            ctxClient.getCallId(), payload, cache.expirationTime)) : null);
+  }
+
+  public static class ContextClientInfo {
+    byte[] clientId;
+    int callId;
+    int retryCount;
+
+    public ContextClientInfo(byte[] clientId, int callId, int retryCount) {
+      this.clientId = clientId;
+      this.callId = callId;
+      this.retryCount = retryCount;
+    }
+
+    public byte[] getClientId() {
+      return clientId;
+    }
+
+    public int getCallId() {
+      return callId;
+    }
+
+    public int getRetryCount() {
+      return retryCount;
+    }
+  }
+
+  public static ContextClientInfo extractContextClientInfo(RetryCache retryCache, CallerContext ctx) {
+
+    if (ctx == null || ctx.getContext() == null
+        || ctx.getContext().isEmpty()) {
+      return null;
+    }
+
+    String[] entries = ctx.getContext()
+        .split(retryCache.getCtxFieldSeparator());
+
+    byte[] clientId = null;
+    int callId = RpcConstants.INVALID_CALL_ID;
+    int retryCount = RpcConstants.INVALID_RETRY_COUNT;
+
+    for(String entry: entries) {
+      String[] keyValue = entry.split(":");
+      if (keyValue.length == 2) {
+        String name = keyValue[0];
+        String value = keyValue[1];
+        if(name.equals("clientId")) {
+          clientId = Base64.decodeBase64(value);
+        } else if (name.equals("callId")) {
+          callId = Integer.parseInt(value);
+        } else if (name.equals("retryCount")) {
+          retryCount = Integer.parseInt(value);
+        }
+      }
+    }
+    return new ContextClientInfo(clientId, callId, retryCount);
   }
 
   public static void setState(CacheEntry e, boolean success) {

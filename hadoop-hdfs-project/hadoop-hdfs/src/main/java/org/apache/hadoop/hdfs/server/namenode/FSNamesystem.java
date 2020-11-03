@@ -24,6 +24,8 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_C
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_ENABLED_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_MAX_SIZE_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_SEPARATOR_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_SEPARATOR_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_SIGNATURE_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_SIGNATURE_MAX_SIZE_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
@@ -1036,7 +1038,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           + entryExpiryMillis + " millis");
       long entryExpiryNanos = entryExpiryMillis * 1000 * 1000;
       return new RetryCache("NameNodeRetryCache", heapPercent,
-          entryExpiryNanos);
+          entryExpiryNanos, conf);
     }
     return null;
   }
@@ -8025,6 +8027,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     private volatile boolean isCallerContextEnabled;
     private int callerContextMaxLen;
     private int callerSignatureMaxLen;
+    private String ctxFieldSeparator;
 
     private boolean logTokenTrackingId;
     private Set<String> debugCmdSet = new HashSet<String>();
@@ -8060,6 +8063,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       callerSignatureMaxLen = conf.getInt(
           HADOOP_CALLER_CONTEXT_SIGNATURE_MAX_SIZE_KEY,
           HADOOP_CALLER_CONTEXT_SIGNATURE_MAX_SIZE_DEFAULT);
+      ctxFieldSeparator = conf.get(HADOOP_CALLER_CONTEXT_SEPARATOR_KEY,
+          HADOOP_CALLER_CONTEXT_SEPARATOR_DEFAULT);
       logTokenTrackingId = conf.getBoolean(
           DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_KEY,
           DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_DEFAULT);
@@ -8116,11 +8121,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             callerContext != null &&
             callerContext.isContextValid()) {
           sb.append("\t").append("callerContext=");
-          if (callerContext.getContext().length() > callerContextMaxLen) {
-            sb.append(callerContext.getContext().substring(0,
-                callerContextMaxLen));
+          String validContent = extractCallerContext(
+              callerContext.getContext());
+          if (validContent.length() > callerContextMaxLen) {
+            sb.append(validContent.substring(0, callerContextMaxLen));
           } else {
-            sb.append(callerContext.getContext());
+            sb.append(validContent);
           }
           if (callerContext.getSignature() != null &&
               callerContext.getSignature().length > 0 &&
@@ -8132,6 +8138,22 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
         logAuditMessage(sb.toString());
       }
+    }
+
+    private String extractCallerContext(String content) {
+      StringBuilder sb = new StringBuilder();
+      String[] fields = content.split(ctxFieldSeparator);
+      for (String field: fields) {
+        if (sb.length() > 0) {
+          sb.append(ctxFieldSeparator);
+        }
+        if (field.contains("clientId") || field.contains("callId")
+             || field.contains("retryCount")) {
+          continue;
+        }
+        sb.append(field);
+      }
+      return sb.toString();
     }
 
     @Override
