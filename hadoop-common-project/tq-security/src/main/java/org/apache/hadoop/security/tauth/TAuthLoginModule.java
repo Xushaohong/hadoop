@@ -3,9 +3,9 @@ package org.apache.hadoop.security.tauth;
 import com.tencent.tdw.security.Tuple;
 import com.tencent.tdw.security.authentication.LocalKeyManager;
 import com.tencent.tdw.security.utils.FileUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.security.auth.Subject;
 import javax.security.auth.callback.CallbackHandler;
@@ -19,7 +19,7 @@ import java.util.Map;
 
 public class TAuthLoginModule implements LoginModule {
 
-  private static final Log LOG = LogFactory.getLog(TAuthLoginModule.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TAuthLoginModule.class);
 
   private Subject subject;
   private Map<String, ?> options;
@@ -29,15 +29,20 @@ public class TAuthLoginModule implements LoginModule {
   public final static String TAUTH_PRINCIPAL = "pricipal";
   public final static String TAUTH_KEY = "tauthKey";
   public final static String TAUTH_KEY_PATH = "tauthKeyPath";
+
+  public final static String TAUTH_SERVICE_KEY_FIRST = "tq.tauth.service.key.first";
   public final static String TAUTH_CUSTOM_ENABLE = "tq.tauth.custom.enable";
   public final static String TAUTH_CUSTOM_USER_KEY_PATH = "tq.tauth.custom.key.path";
   public final static String TAUTH_CUSTOM_USER_KEY = "tq.tauth.custom.key";
   public final static String TAUTH_CUSTOM_USER_PRINCIPAL = "tq.tauth.custom.principal";
   public final static String OS_PRINCIPAL_CLASS = "os.principal.class";
+
+
   private static final boolean CUSTOM_ENABLE = Utils.getSystemPropertyOrEnvVar(TAUTH_CUSTOM_ENABLE, true);
   private static final String CUSTOM_USER = Utils.getSystemPropertyOrEnvVar(TAUTH_CUSTOM_USER_PRINCIPAL);
   private static final String CUSTOM_KEY = Utils.getSystemPropertyOrEnvVar(TAUTH_CUSTOM_USER_KEY);
   private static final String CUSTOM_KEY_PATH = Utils.getSystemPropertyOrEnvVar(TAUTH_CUSTOM_USER_KEY_PATH);
+  private static final boolean SERVICE_KEY_FIRST = Utils.getSystemPropertyOrEnvVar(TAUTH_SERVICE_KEY_FIRST, true);
 
   @Override
   public void initialize(Subject subject, CallbackHandler callbackHandler,
@@ -132,7 +137,6 @@ public class TAuthLoginModule implements LoginModule {
   }
 
   public static Tuple<TAuthPrincipal, TAuthCredential> buildTAuthPrincipalAndCredential(String principal, String masterKey, String keyPath) {
-    TAuthPrincipal tauthPrincipal = new TAuthPrincipal(principal);
     TAuthCredential credential = null;
     if (Utils.isNotNullOrEmpty(masterKey)) {
       credential = TAuthCredential.buildWithMasterKey(masterKey);
@@ -144,6 +148,14 @@ public class TAuthLoginModule implements LoginModule {
     if (credential == null) {
       credential = TAuthCredential.buildWithPrinciple(principal);
     }
+
+    if(credential != null && credential.principal != null && !credential.principal.equals(principal)) {
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("Logging with cmk/smk user {} instead of {}", credential.principal, principal);
+      }
+      principal = credential.principal;
+    }
+    TAuthPrincipal tauthPrincipal = new TAuthPrincipal(principal);
     return Tuple.of(tauthPrincipal, credential);
   }
 
@@ -169,7 +181,7 @@ public class TAuthLoginModule implements LoginModule {
 
     private static final long serialVersionUID = -2951667807823493630L;
 
-    private final String name;
+    private String name;
 
     public TAuthPrincipal(String name) {
       this.name = name;
@@ -204,7 +216,7 @@ public class TAuthLoginModule implements LoginModule {
   }
 
   public static class TAuthCredential {
-    private final String principal;
+    private String principal;
     private final String masterKey;
     private final String keyPath;
 
@@ -212,6 +224,11 @@ public class TAuthLoginModule implements LoginModule {
       this.principal = principal;
       this.masterKey = masterKey;
       this.keyPath = keyPath;
+
+      localKeyManager = getLocalKeyManager();
+      if(localKeyManager != null) {
+        this.principal = localKeyManager.getKeyLoader().getSubject();
+      }
     }
 
     private transient LocalKeyManager localKeyManager;
@@ -231,7 +248,17 @@ public class TAuthLoginModule implements LoginModule {
         } else if (Utils.isNotNullOrEmpty(masterKey)) {
           localKeyManager = LocalKeyManager.generateByKeys(Collections.singletonList(masterKey));
         } else {
-          localKeyManager = LocalKeyManager.generateByUser(principal);
+          if (SERVICE_KEY_FIRST) {
+            localKeyManager = LocalKeyManager.generateByService(principal);
+            if (!localKeyManager.hasAnyKey()) {
+              localKeyManager = LocalKeyManager.generateByUser(principal);
+            }
+          } else {
+            localKeyManager = LocalKeyManager.generateByUser(principal);
+            if (!localKeyManager.hasAnyKey()) {
+              localKeyManager = LocalKeyManager.generateByService(principal);
+            }
+          }
         }
       }
       return localKeyManager;
