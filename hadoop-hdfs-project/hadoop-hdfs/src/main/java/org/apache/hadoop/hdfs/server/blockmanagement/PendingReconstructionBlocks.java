@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RECONSTRUCTION_PENDING_TIMEOUT_SEC_DEFAULT;
-import static org.apache.hadoop.util.Time.monotonicNow;
 
 import java.io.PrintWriter;
 import java.sql.Time;
@@ -203,7 +202,7 @@ class PendingReconstructionBlocks {
     private final List<DatanodeStorageInfo> targets;
 
     PendingBlockInfo(DatanodeStorageInfo[] targets) {
-      this.timeStamp = monotonicNow();
+      this.timeStamp = System.currentTimeMillis();
       this.targets = targets == null ? new ArrayList<DatanodeStorageInfo>()
           : new ArrayList<>(Arrays.asList(targets));
     }
@@ -213,7 +212,7 @@ class PendingReconstructionBlocks {
     }
 
     void setTimeStamp() {
-      timeStamp = monotonicNow();
+      timeStamp = System.currentTimeMillis();
     }
 
     void incrementReplicas(DatanodeStorageInfo... newTargets) {
@@ -270,7 +269,7 @@ class PendingReconstructionBlocks {
       synchronized (pendingReconstructions) {
         Iterator<Map.Entry<BlockInfo, PendingBlockInfo>> iter =
             pendingReconstructions.entrySet().iterator();
-        long now = monotonicNow();
+        long now = System.currentTimeMillis();
         LOG.debug("PendingReconstructionMonitor checking Q");
         while (iter.hasNext()) {
           Map.Entry<BlockInfo, PendingBlockInfo> entry = iter.next();

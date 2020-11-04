@@ -43,7 +43,7 @@ public class RpcDetailedMetrics {
 
   RpcDetailedMetrics(int port) {
     name = "RpcDetailedActivityForPort"+ port;
-    registry = new MetricsRegistry("rpcdetailed")
+    registry = new MetricsRegistry(name)
         .tag("port", "RPC port", String.valueOf(port));
     LOG.debug(registry.info().toString());
   }

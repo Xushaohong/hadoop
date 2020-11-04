@@ -55,7 +55,7 @@ public class RpcMetrics {
     String port = String.valueOf(server.getListenerAddress().getPort());
     name = "RpcActivityForPort" + port;
     this.server = server;
-    registry = new MetricsRegistry("rpc")
+    registry = new MetricsRegistry(name)
         .tag("port", "RPC port", port)
         .tag("serverName", "Name of the RPC server", server.getServerName());
     int[] intervals = conf.getInts(
