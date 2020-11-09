@@ -42,7 +42,7 @@ public class TAuthLoginModule implements LoginModule {
   private static final String CUSTOM_USER = Utils.getSystemPropertyOrEnvVar(TAUTH_CUSTOM_USER_PRINCIPAL);
   private static final String CUSTOM_KEY = Utils.getSystemPropertyOrEnvVar(TAUTH_CUSTOM_USER_KEY);
   private static final String CUSTOM_KEY_PATH = Utils.getSystemPropertyOrEnvVar(TAUTH_CUSTOM_USER_KEY_PATH);
-  private static final boolean SERVICE_KEY_FIRST = Utils.getSystemPropertyOrEnvVar(TAUTH_SERVICE_KEY_FIRST, true);
+  private static final boolean SERVICE_KEY_FIRST = Utils.getSystemPropertyOrEnvVar(TAUTH_SERVICE_KEY_FIRST, false);
 
   @Override
   public void initialize(Subject subject, CallbackHandler callbackHandler,

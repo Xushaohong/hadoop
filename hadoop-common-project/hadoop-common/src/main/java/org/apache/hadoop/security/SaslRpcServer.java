@@ -49,11 +49,14 @@ import javax.security.sasl.SaslServerFactory;
 import com.tencent.tdw.security.Tuple;
 import com.tencent.tdw.security.authentication.Authentication;
 import com.tencent.tdw.security.authentication.Authenticator;
+import com.tencent.tdw.security.authentication.LocalKeyManager;
 import com.tencent.tdw.security.authentication.SecurityCenterProvider;
 import com.tencent.tdw.security.authentication.TAuthAuthentication;
 import com.tencent.tdw.security.authentication.service.SecureService;
 import com.tencent.tdw.security.authentication.service.SecureServiceFactory;
 import com.tencent.tdw.security.authentication.v2.SecureServiceV2;
+import com.tencent.tdw.security.utils.ENVUtils;
+import com.tencent.tdw.security.utils.StringUtils;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -85,6 +88,8 @@ public class SaslRpcServer {
   public static final Logger LOG = LoggerFactory.getLogger(SaslRpcServer.class);
   public static final String SASL_DEFAULT_REALM = "default";
   private static SaslServerFactory saslFactory;
+
+  private static String serviceName;
   private static SecureServiceV2 secureServiceV2;
 
   public enum QualityOfProtection {
@@ -131,9 +136,15 @@ public class SaslRpcServer {
         break;
       }
       case TAUTH:
-        UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
         protocol = "";
-        serverId = ugi.getUserName();
+        serverId = SaslRpcServer.SASL_DEFAULT_REALM;
+
+        UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+        initTauthSecureService(authMethod, ugi);
+        if (!StringUtils.isBlank(serviceName)) {
+          // replace serverId with serviceName if not null
+          serverId = serviceName;
+        }
         break;
       case KERBEROS: {
         String fullName = UserGroupInformation.getCurrentUser().getUserName();
@@ -178,8 +189,6 @@ public class SaslRpcServer {
         break;
       }
       case TAUTH:{
-        ugi = UserGroupInformation.getCurrentUser();
-        initTauthSecureService(authMethod, ugi);
         if (authVersion == 0) {
           //no need callback
           callback = null;
@@ -227,12 +236,29 @@ public class SaslRpcServer {
     if(authMethod == AuthMethod.TAUTH && secureServiceV2 == null) {
       synchronized(SaslRpcServer.class) {
         if(secureServiceV2 == null) {
-          TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(ugi.getSubject());
-          if ((credential == null || !credential.getLocalKeyManager().hasAnyKey())) {
-            throw new IOException("No credential found for tauth ");
+          //Load smk first, otherwise using current login user
+          LocalKeyManager localKeyManager = LocalKeyManager.generateByService(ENVUtils.CURUSER);
+          serviceName = localKeyManager.getKeyLoader().getSubject();
+
+          if(!localKeyManager.hasAnyKey()) {
+            TAuthLoginModule.TAuthPrincipal principal  = TAuthLoginModule.TAuthPrincipal.getFromSubject(ugi.getSubject());
+            TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(ugi.getSubject());
+            if ((credential != null && credential.getLocalKeyManager().hasAnyKey())) {
+              if(LOG.isDebugEnabled()) {
+                LOG.debug("Using local key manager from current login user: " + principal);
+              }
+              serviceName = principal.getName();
+              localKeyManager =  credential.getLocalKeyManager();
+            }
           }
+
+          if(!localKeyManager.hasAnyKey()) {
+            throw new IOException("No credential found for tauth user " + ENVUtils.CURUSER);
+          }
+
+          LOG.info("Secure service initialized with user {}", serviceName);
           secureServiceV2 = SecurityCenterProvider.createTauthSecureService(
-              ugi.getUserName(), null, credential.getLocalKeyManager(), true);
+              serviceName, null, localKeyManager, true);
         }
       }
     }
