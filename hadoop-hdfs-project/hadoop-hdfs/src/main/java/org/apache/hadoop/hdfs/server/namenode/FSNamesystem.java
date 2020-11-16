@@ -591,6 +591,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   private INodeAttributeProvider inodeAttributeProvider;
 
+  private final boolean delegationTokenAllowEmptyReturn;
+
   /**
    * If the NN is in safemode, and not due to manual / low resources, we
    * assume it must be because of startup. If the NN had low resources during
@@ -952,6 +954,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       Preconditions.checkArgument(blockDeletionIncrement > 0,
           DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_INCREMENT_KEY +
               " must be a positive integer.");
+
+      this.delegationTokenAllowEmptyReturn = conf.getBoolean("tq.delegation.token.allow.empty.return", true);
     } catch(IOException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
       close();
@@ -5727,6 +5731,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot issue delegation token");
       if (!isAllowedDelegationTokenOp()) {
+        // return empty token if allowed
+        if(delegationTokenAllowEmptyReturn) {
+          return null;
+        }
         throw new IOException(
           "Delegation Token can be issued only with tauth or kerberos or web authentication");
       }
