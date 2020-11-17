@@ -189,8 +189,10 @@ public class WebAppUtils {
     // If PROXY_ADDRESS isn't set, fallback to RM_WEBAPP(_HTTPS)_ADDRESS
     // There could be multiple if using RM HA
     if (proxyAddr == null || proxyAddr.isEmpty()) {
+      // FIXME: there is a bug in MR, so I add
+      // `HAUtil.isFederationEnabled(conf)` to fix it temporarily.
       // If RM HA is enabled, try getting those addresses
-      if (HAUtil.isHAEnabled(conf)) {
+      if (HAUtil.isHAEnabled(conf) || HAUtil.isFederationEnabled(conf)) {
         List<String> haAddrs =
             RMHAUtils.getRMHAWebappAddresses(new YarnConfiguration(conf));
         for (String addr : haAddrs) {
