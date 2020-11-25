@@ -273,6 +273,8 @@ public class TestRouterClientRejectOverload {
     // Set dfs.client.failover.random.order false, to pick 1st router at first
     Configuration conf = cluster.getRouterClientConf();
     conf.setBoolean("dfs.client.failover.random.order", false);
+    conf.setBoolean(HdfsClientConfigKeys.Failover.CACHE_ACTIVE_ENABLED_KEY,
+        false);
     // Client to access Router Cluster
     DFSClient routerClient =
         new DFSClient(new URI("hdfs://fed"), conf);
