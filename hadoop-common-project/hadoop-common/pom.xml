@@ -576,6 +576,10 @@
                       tar -xf ${project.basedir}/../../downloads/isa-l-x64.tar.gz -C /tmp
                       cd /tmp/isa-l-x64/
                       make install
+                    elif [ "$(uname)" = "Linux" -a "$(uname -m)" = "ppc64le" ]; then
+                      tar -xf ${project.basedir}/../../downloads/isa-l-ppc64le.tar.gz -C /tmp
+                      cd /tmp/isa-l-ppc64le/
+                      make install
                     fi
                 </echo>
                 <exec executable="${shell-executable}" dir="${project.build.directory}"
