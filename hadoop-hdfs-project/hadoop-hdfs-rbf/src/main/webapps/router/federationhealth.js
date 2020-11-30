@@ -410,8 +410,7 @@
               { 'orderDataType': 'ng-value', 'type': 'num' , "defaultContent": 0},
               { 'orderDataType': 'ng-value', 'type': 'num' , "defaultContent": 0},
               { 'type': 'num' , "defaultContent": 0},
-              { 'orderDataType': 'ng-value', 'type': 'num' , "defaultContent": 0},
-              { 'type': 'string' , "defaultContent": ""}
+              { 'orderDataType': 'ng-value', 'type': 'num' , "defaultContent": 0}
             ],
             initComplete: function () {
               var column = this.api().column([0]);

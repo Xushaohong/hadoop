@@ -482,7 +482,7 @@ public class NamenodeBeanMetrics
         innerinfo.put("adminState", node.getAdminState().toString());
         innerinfo.put("nonDfsUsedSpace", node.getNonDfsUsed());
         innerinfo.put("capacity", node.getCapacity());
-        innerinfo.put("numBlocks", -1); // node.numBlocks()
+        innerinfo.put("numBlocks", node.getNumBlocks());
         innerinfo.put("version", (node.getSoftwareVersion() == null ?
                         "UNKNOWN" : node.getSoftwareVersion()));
         innerinfo.put("used", node.getDfsUsed());
@@ -491,6 +491,7 @@ public class NamenodeBeanMetrics
         innerinfo.put("blockPoolUsed", node.getBlockPoolUsed());
         innerinfo.put("blockPoolUsedPercent", node.getBlockPoolUsedPercent());
         innerinfo.put("volfails", -1); // node.getVolumeFailures()
+        innerinfo.put("lastBlockReport", getLastBlockReport(node));
         info.put(node.getHostName() + ":" + node.getXferPort(),
             Collections.unmodifiableMap(innerinfo));
       }
@@ -793,6 +794,9 @@ public class NamenodeBeanMetrics
     return (now() - node.getLastUpdate()) / 1000;
   }
 
+  private Object getLastBlockReport(DatanodeInfo node) {
+    return (now() - node.getLastBlockReportTime()) / 60000;
+  }
   /////////////////////////////////////////////////////////
   // NameNodeStatusMXBean
   /////////////////////////////////////////////////////////
@@ -850,7 +854,7 @@ public class NamenodeBeanMetrics
 
   @Override
   public String getEnteringMaintenanceNodes() {
-    return "N/A";
+    return this.getNodes(DatanodeReportType.ENTERING_MAINTENANCE);
   }
 
   @Override

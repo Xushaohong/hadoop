@@ -348,7 +348,6 @@
       <th style="width:180px; text-align:center">Capacity</th>
       <th>Blocks</th-->
       <th>Block pool used</th>
-      <th>Version</th>
     </tr>
   </thead>
   {#LiveNodes}
@@ -371,7 +370,6 @@
     </td>
     <td>{numBlocks}</td>
     <td ng-value="{blockPoolUsedPercent}">{blockPoolUsed|fmt_bytes} ({blockPoolUsedPercent|fmt_percentage})</td>
-    <td>{version}</td>
   </tr>
   {/LiveNodes}
   {#DeadNodes}
@@ -380,7 +378,6 @@
     <td ng-value="{state}-{name}" class="dfshealth-node-icon dfshealth-node-{state}">{location}/{name} ({xferaddr})</td>
     <td></td>
     <td>{#helper_relative_time value="{lastContact}"/}</td>
-    <td></td>
     <td></td>
     <td></td>
     <td></td>
@@ -504,6 +501,7 @@ No nodes are decommissioning.
 <script type="text/javascript" src="static/dust-full-2.0.0.min.js"></script>
 <script type="text/javascript" src="static/dust-helpers-1.1.1.min.js"></script>
 <script type="text/javascript" src="static/dfs-dust.js"></script>
+<script type="text/javascript" src="/static/d3-v4.1.1.min.js"></script>
 <script type="text/javascript" src="federationhealth.js"></script>
 </body>
 </html>
