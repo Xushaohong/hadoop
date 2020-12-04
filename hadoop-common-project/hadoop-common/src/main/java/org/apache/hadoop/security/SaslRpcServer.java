@@ -56,6 +56,7 @@ import com.tencent.tdw.security.authentication.service.SecureService;
 import com.tencent.tdw.security.authentication.service.SecureServiceFactory;
 import com.tencent.tdw.security.authentication.v2.SecureServiceV2;
 import com.tencent.tdw.security.utils.ENVUtils;
+import com.tencent.tdw.security.utils.PropertiesUtils;
 import com.tencent.tdw.security.utils.StringUtils;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -87,6 +88,9 @@ import org.slf4j.LoggerFactory;
 public class SaslRpcServer {
   public static final Logger LOG = LoggerFactory.getLogger(SaslRpcServer.class);
   public static final String SASL_DEFAULT_REALM = "default";
+  public static final boolean allowNoKeyWithTauth = PropertiesUtils.getPropertyValueOrDefault(
+      TAuthConst.TAUTH_NOKEY_SERVER_ALLOWED, TAuthConst.TAUTH_NOKEY_SERVER_ALLOWED_DEFAULT);
+
   private static SaslServerFactory saslFactory;
 
   private static String serviceName;
@@ -252,13 +256,15 @@ public class SaslRpcServer {
             }
           }
 
-          if(!localKeyManager.hasAnyKey()) {
+          if(localKeyManager.hasAnyKey()) {
+            LOG.info("Secure service initialized with user {}", serviceName);
+            secureServiceV2 = SecurityCenterProvider.createTauthSecureService(
+                serviceName, null, localKeyManager, true);
+          }else if(!allowNoKeyWithTauth) {
             throw new IOException("No credential found for tauth user " + ENVUtils.CURUSER);
+          }else {
+            LOG.info("Server configured with tauth authentication bu with no key.");
           }
-
-          LOG.info("Secure service initialized with user {}", serviceName);
-          secureServiceV2 = SecurityCenterProvider.createTauthSecureService(
-              serviceName, null, localKeyManager, true);
         }
       }
     }
