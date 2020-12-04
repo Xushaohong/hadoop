@@ -8152,12 +8152,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       StringBuilder sb = new StringBuilder();
       String[] fields = content.split(ctxFieldSeparator);
       for (String field: fields) {
-        if (sb.length() > 0) {
-          sb.append(ctxFieldSeparator);
-        }
         if (field.contains("clientId") || field.contains("callId")
              || field.contains("retryCount")) {
           continue;
+        }
+        if (sb.length() > 0) {
+          sb.append(ctxFieldSeparator);
         }
         sb.append(field);
       }
