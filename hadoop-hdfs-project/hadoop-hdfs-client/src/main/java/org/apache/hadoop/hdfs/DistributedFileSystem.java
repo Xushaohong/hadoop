@@ -3222,6 +3222,14 @@ public class DistributedFileSystem extends FileSystem
     return dfs.getProtection();
   }
 
+  /**
+   * Get remote path.
+   */
+  public String getRemotePath(Path src) throws IOException {
+    Path absF = fixRelativePart(src);
+    return dfs.getRemotePath(getPathName(absF));
+  }
+
   @Override
   public Token<?>[] addDelegationTokens(String renewer, Credentials credentials) throws IOException {
     //try hdfs union delegation token

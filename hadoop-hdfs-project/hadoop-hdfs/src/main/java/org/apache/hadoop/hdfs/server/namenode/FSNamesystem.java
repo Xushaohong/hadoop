@@ -6950,6 +6950,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
   }
 
+  public String getNameserviceId() {
+    return nameserviceId;
+  }
+
   public RollingUpgradeInfo getRollingUpgradeInfo() {
     return rollingUpgradeInfo;
   }

@@ -1927,4 +1927,15 @@ public class TestRouterRpc {
         .contains("callerContext=clientContext,clientIp:"));
     assertTrue(verifyFileExists(routerFS, dirPath));
   }
+
+  @Test
+  public void testGetRemotePath() throws IOException {
+    MockResolver resolver = (MockResolver) router.getRouter()
+        .getSubclusterResolver();
+    String ns0 = cluster.getNameservices().get(0);
+    resolver.addLocation("/tmp", ns0, "/tmp");
+    String src = "/tmp/test/remotePath";
+    String path = routerProtocol.getRemotePath(src);
+    assertEquals("hdfs://" + ns0 + src, path);
+  }
 }

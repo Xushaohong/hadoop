@@ -2055,4 +2055,16 @@ public class TestDistributedFileSystem {
       assertEquals("Number of SSD should be 1 but was : " + numSSD, 1, numSSD);
     }
   }
+
+  @Test
+  public void testGetRemotePath() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .nnTopology(MiniDFSNNTopology.simpleFederatedTopology(1)).build();
+    cluster.waitActive();
+    assertEquals("ns1", cluster.getNamesystem().getNameserviceId());
+    DistributedFileSystem fs = cluster.getFileSystem();
+    String path = fs.getRemotePath(new Path("/tmp/test/remotePath"));
+    assertEquals("hdfs://ns1/tmp/test/remotePath", path);
+  }
 }

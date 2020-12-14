@@ -1853,4 +1853,13 @@ public interface ClientProtocol {
    */
   @Idempotent
   String getProtection() throws IOException;
+
+  /**
+   * Get the remote path which contains name service and path. Namenode will
+   * return the path directly and Router will return the forwarding path.
+   * @return the remote path.
+   * @throws IOException
+   */
+  @Idempotent
+  String getRemotePath(String src) throws IOException;
 }

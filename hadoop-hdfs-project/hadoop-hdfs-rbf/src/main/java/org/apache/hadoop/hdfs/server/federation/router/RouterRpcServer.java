@@ -1568,6 +1568,11 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
 
   }
 
+  @Override
+  public String getRemotePath(String src) throws IOException {
+    return clientProto.getRemotePath(src);
+  }
+
   /**
    * Locate the location with the matching block pool id.
    *

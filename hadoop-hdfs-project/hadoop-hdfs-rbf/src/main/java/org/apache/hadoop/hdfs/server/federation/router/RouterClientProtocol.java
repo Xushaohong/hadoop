@@ -1796,6 +1796,18 @@ public class RouterClientProtocol implements ClientProtocol {
 
   }
 
+  @Override
+  public String getRemotePath(String src) throws IOException {
+    final List<RemoteLocation> locations =
+        rpcServer.getLocationsForPath(src, false, false);
+    if (locations.isEmpty()) {
+      return src;
+    }
+    RemoteLocation location = locations.get(0);
+    return HdfsConstants.HDFS_URI_SCHEME + "://" + location.getNameserviceId()
+        + location.getDest();
+  }
+
   /**
    * Determines combinations of eligible src/dst locations for a rename. A
    * rename cannot change the namespace. Renames are only allowed if there is an

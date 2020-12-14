@@ -1945,4 +1945,15 @@ public class ClientNamenodeProtocolTranslatorPB implements
       throw ProtobufHelper.getRemoteException(e);
     }
   }
+
+  @Override
+  public String getRemotePath(String src) throws IOException {
+    GetRemotePathRequestProto req =
+        GetRemotePathRequestProto.newBuilder().setSrc(src).build();
+    try {
+      return rpcProxy.getRemotePath(null, req).getPath();
+    } catch(ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
 }

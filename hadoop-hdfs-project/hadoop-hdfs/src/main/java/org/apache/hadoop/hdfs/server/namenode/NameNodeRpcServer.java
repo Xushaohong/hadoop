@@ -107,6 +107,7 @@ import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSLimitException;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
 import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
@@ -2952,5 +2953,16 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     // only get contents form active NN.
     namesystem.checkOperation(OperationCategory.WRITE);
     return protectionManager.getProtection();
+  }
+
+  @Override // ClientProtocol
+  public String getRemotePath(String src) throws IOException {
+    checkNNStartup();
+    namesystem.checkOperation(OperationCategory.READ);
+    String nameServiceId = namesystem.getNameserviceId();
+    if (nameServiceId != null) {
+      return HdfsConstants.HDFS_URI_SCHEME + "://" +nameServiceId + src;
+    }
+    return src;
   }
 }

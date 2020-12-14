@@ -1844,4 +1844,15 @@ public class ClientNamenodeProtocolServerSideTranslatorPB implements
       throw new ServiceException(e);
     }
   }
+
+  @Override
+  public GetRemotePathResponseProto getRemotePath(RpcController controller,
+      GetRemotePathRequestProto req) throws ServiceException {
+    try {
+      String path = server.getRemotePath(req.getSrc());
+      return GetRemotePathResponseProto.newBuilder().setPath(path).build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
 }

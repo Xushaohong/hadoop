@@ -853,6 +853,14 @@ message GetProtectionResponseProto {
   required string value = 1;
 }
 
+message GetRemotePathRequestProto {
+  required string src = 1;
+}
+
+message GetRemotePathResponseProto {
+  required string path = 1;
+}
+
 message MsyncRequestProto {
 }
 
@@ -1066,6 +1074,8 @@ service ClientNamenodeProtocol {
       returns(RefreshProtectionResponseProto);
   rpc getProtection(GetProtectionRequestProto)
       returns(GetProtectionResponseProto);
+  rpc getRemotePath(GetRemotePathRequestProto)
+      returns(GetRemotePathResponseProto);
   rpc msync(MsyncRequestProto)
       returns(MsyncResponseProto);
   rpc satisfyStoragePolicy(SatisfyStoragePolicyRequestProto)

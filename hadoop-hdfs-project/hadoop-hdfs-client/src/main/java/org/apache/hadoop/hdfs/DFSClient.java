@@ -3049,6 +3049,19 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     }
   }
 
+  /**
+   * Get the remote path.
+   * See {@link ClientProtocol#getRemotePath(String)}
+   * for more details.
+   *
+   * @see ClientProtocol#getRemotePath(String)
+   */
+  public String getRemotePath(String src) throws IOException {
+    try (TraceScope ignored = tracer.newScope("getProtection")) {
+      return namenode.getRemotePath(src);
+    }
+  }
+
   public DFSInotifyEventInputStream getInotifyEventStream() throws IOException {
     checkOpen();
     return new DFSInotifyEventInputStream(namenode, tracer);
