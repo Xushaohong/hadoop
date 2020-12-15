@@ -466,6 +466,7 @@ public class DFSAdmin extends FsShell {
     "\t[-listOpenFiles [-blockingDecommission] [-path <path>]]\n" +
     "\t[-refreshProtection]\n" +
     "\t[-printProtection]\n" +
+    "\t[-getRemotePath <path>]\n" +
     "\t[-help [cmd]]\n";
 
   /**
@@ -1273,6 +1274,9 @@ public class DFSAdmin extends FsShell {
         + "\tIf 'blockingDecommission' option is specified, it will list the\n"
         + "\topen files only that are blocking the ongoing Decommission.";
 
+    String getRemotePath = "-getRemotePath <path>\n"
+        + "\tGet the real remote path.\n";
+
     String help = "-help [cmd]: \tDisplays help for the given command or all commands if none\n" +
       "\t\tis specified.\n";
 
@@ -1344,6 +1348,8 @@ public class DFSAdmin extends FsShell {
       System.out.println(triggerBlockReport);
     } else if ("listOpenFiles".equalsIgnoreCase(cmd)) {
       System.out.println(listOpenFiles);
+    } else if ("getRemotePath".equalsIgnoreCase(cmd)) {
+      System.out.println(getRemotePath);
     } else if ("help".equals(cmd)) {
       System.out.println(help);
     } else {
@@ -1381,6 +1387,7 @@ public class DFSAdmin extends FsShell {
       System.out.println(getDatanodeInfo);
       System.out.println(triggerBlockReport);
       System.out.println(listOpenFiles);
+      System.out.println(getRemotePath);
       System.out.println(help);
       System.out.println();
       ToolRunner.printGenericCommandUsage(System.out);
@@ -2180,6 +2187,8 @@ public class DFSAdmin extends FsShell {
       System.err.println("Usage: hdfs dfsadmin [-refreshProtection]");
     } else if ("-printProtection".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin [-printProtection]");
+    } else if ("-getRemotePath".equals(cmd)) {
+      System.err.println("Usage: hdfs dfsadmin [-getRemotePath <path>]");
     } else {
       System.err.println("Usage: hdfs dfsadmin");
       System.err.println("Note: Administrative commands can only be run as the HDFS superuser.");
@@ -2343,6 +2352,11 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
+    } else if ("-getRemotePath".equals(cmd)) {
+      if (argv.length != 2) {
+        printUsage(cmd);
+        return exitCode;
+      }
     }
     
     // initialize DFSAdmin
@@ -2432,6 +2446,8 @@ public class DFSAdmin extends FsShell {
         exitCode = refreshProtection();
       } else if ("-printProtection".equals(cmd)) {
         exitCode = printProtection();
+      } else if ("-getRemotePath".equals(cmd)) {
+        exitCode = getRemotePath(argv[i]);
       } else if ("-help".equals(cmd)) {
         if (i < argv.length) {
           printHelp(argv[i]);
@@ -2642,6 +2658,21 @@ public class DFSAdmin extends FsShell {
     System.out.println(ret);
     exitCode = 0;
 
+    return exitCode;
+  }
+
+  /**
+   * Get the real remote path.
+   *
+   * Usage: hdfs dfsadmin -getRemotePath path
+   */
+  public int getRemotePath(String src) throws IOException {
+    int exitCode = -1;
+    DistributedFileSystem dfs = (DistributedFileSystem) new Path(src)
+        .getFileSystem(new Configuration());
+    String dst = dfs.getRemotePath(new Path(src));
+    System.out.println(dst);
+    exitCode = 0;
     return exitCode;
   }
 
