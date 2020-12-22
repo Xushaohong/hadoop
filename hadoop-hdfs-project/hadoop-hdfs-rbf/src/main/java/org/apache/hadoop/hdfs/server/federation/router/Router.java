@@ -23,11 +23,14 @@ import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_
 
 import static org.apache.hadoop.hdfs.server.federation.router.FederationUtil.newActiveNamenodeResolver;
 import static org.apache.hadoop.hdfs.server.federation.router.FederationUtil.newFileSubclusterResolver;
+import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_MONITOR_DISTRIBUTED_ENABLE;
+import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_MONITOR_DISTRIBUTED_ENABLE_DEFAULT;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,6 +38,8 @@ import java.util.Map;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.DistributedConfigHelper;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -112,6 +117,8 @@ public class Router extends CompositeService implements
   private ActiveNamenodeResolver namenodeResolver;
   /** Updates the namenode status in the namenode resolver. */
   private Collection<NamenodeHeartbeatService> namenodeHeartbeatServices;
+  /** Check Name Sevice from zk. */
+  private NameserviceCheckingService nameserviceCheckingService;
 
   /** Router metrics. */
   private RouterMetricsService metrics;
@@ -229,6 +236,12 @@ public class Router extends CompositeService implements
       // Periodically update the router state
       this.routerHeartbeatService = new RouterHeartbeatService(this);
       addService(this.routerHeartbeatService);
+    }
+
+    if (conf.getBoolean(DFS_ROUTER_MONITOR_DISTRIBUTED_ENABLE,
+        DFS_ROUTER_MONITOR_DISTRIBUTED_ENABLE_DEFAULT)) {
+      this.nameserviceCheckingService = new NameserviceCheckingService(this);
+      addService(this.nameserviceCheckingService);
     }
 
     // Router metrics system
@@ -505,7 +518,6 @@ public class Router extends CompositeService implements
       createNamenodeHeartbeatServices() {
 
     Map<String, NamenodeHeartbeatService> ret = new HashMap<>();
-
     if (conf.getBoolean(
         RBFConfigKeys.DFS_ROUTER_MONITOR_LOCAL_NAMENODE,
         RBFConfigKeys.DFS_ROUTER_MONITOR_LOCAL_NAMENODE_DEFAULT)) {
@@ -521,6 +533,7 @@ public class Router extends CompositeService implements
     // Create heartbeat services for a list specified by the admin
     Collection<String> namenodes = this.conf.getTrimmedStringCollection(
         RBFConfigKeys.DFS_ROUTER_MONITOR_NAMENODE);
+
     for (String namenode : namenodes) {
       String[] namenodeSplit = namenode.split("\\.");
       String nsId = null;

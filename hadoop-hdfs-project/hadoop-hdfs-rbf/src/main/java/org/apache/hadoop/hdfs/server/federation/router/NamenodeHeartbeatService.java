@@ -337,6 +337,13 @@ public class NamenodeHeartbeatService extends PeriodicService {
   }
 
   /**
+   * Get nameserviceId.
+   */
+  public String getNameserviceId() {
+    return nameserviceId;
+  }
+
+  /**
    * Get the parameters for a Namenode from JMX and add them to the report.
    * @param address Web interface of the Namenode to monitor.
    * @param report Namenode status report to update with JMX data.

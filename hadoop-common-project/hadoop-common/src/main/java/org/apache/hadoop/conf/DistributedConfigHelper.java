@@ -1088,6 +1088,27 @@ public final class DistributedConfigHelper {
     return true;
   }
 
+  /**
+   * Get all configured name services.
+   */
+  public static List<String> getAllNameServices(Configuration config) {
+    String quorum = config.get(CONFIG_ZK_QUORUM_KEY);
+    ZooKeeperHolder holder =holder = ZooKeeperHolder.init(quorum, config);
+    List<String> ret = new ArrayList<String>();
+    try {
+      if (!holder.connect()) {
+        LOG.warn("can't connect zk,zk's quorum:" + quorum);
+        return ret;
+      }
+      ret = holder.get().getChildren(REMOTE_BASE_PATH, true);
+    } catch (Exception e) {
+      LOG.error("occur exception, zk quorum:" + quorum, e);
+    } finally {
+      holder.close();
+    }
+    return ret;
+  }
+
   private void dump(String nn, File dest, Configuration conf) {
     FileOutputStream out = null;
     try {
