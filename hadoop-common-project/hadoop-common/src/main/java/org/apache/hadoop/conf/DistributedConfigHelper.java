@@ -222,14 +222,16 @@ public final class DistributedConfigHelper {
 
     isAll = filter(Arrays.asList(resources), resourceSet);
 
-    if (configuration.get(DISTIRBUTED_BUILT_CONFIG) != null) {
+    if (configuration.get(DISTIRBUTED_BUILT_CONFIG + "."
+        + nameNodeUri.getHost()) != null) {
       builtRs.addAll(Arrays.asList(configuration.
-          getStrings(DISTIRBUTED_BUILT_CONFIG)));
+          getStrings(DISTIRBUTED_BUILT_CONFIG + "." + nameNodeUri.getHost())));
     }
 
     if (!builtRs.isEmpty()) {
       if (isBuilt(builtRs, resourceSet)) {
-        LOG.info("configuration is built"+ (resourceSet.isEmpty() ? ""
+        LOG.warn("configuration is built for " + nameNodeUri.getHost()
+            + ", resources: " + (resourceSet.isEmpty() ? ""
             : resourceSet.toString()));
         return configuration;
       }
@@ -320,7 +322,7 @@ public final class DistributedConfigHelper {
       } else {
         builtRs.addAll(resourceSet);
       }
-      configuration.set(DISTIRBUTED_BUILT_CONFIG,
+      configuration.set(DISTIRBUTED_BUILT_CONFIG + "." + nameNodeUri.getHost(),
           Joiner.on(",").join(builtRs.iterator()).toString());
     } finally {
       fileLock.unlock();
