@@ -85,6 +85,8 @@ public class NetUtils {
    * Resolve host
    */
   public static final boolean RESOLVE_HOST = StringUtils.getPropOrEnvVar("tq.resolve.host") != null;
+  public static final boolean EXTRACT_IP_FROM_HOST =
+      Boolean.valueOf(StringUtils.getPropOrEnvVar("tq.extract.ip.from.host", null, "true"));
 
 
   /**
@@ -566,7 +568,18 @@ public class NetUtils {
         "No daemon is listening on the target port.");
     }
   }
-  
+
+  private static String extractIpFromHost(String host) {
+    String[] fields = host.split("-");
+    if(fields.length == 5) {
+      return new StringBuilder().append(fields[1]).append(".")
+          .append(fields[2]).append(".")
+          .append(fields[3]).append(".")
+          .append(fields[4]).append(".").toString();
+    }
+    return null;
+  }
+
   /** 
    * Given a string representation of a host, return its ip address
    * in textual presentation.
@@ -576,6 +589,13 @@ public class NetUtils {
    * @return its IP address in the string format
    */
   public static String normalizeHostName(String name) {
+    if(EXTRACT_IP_FROM_HOST && hostWithIpPattern.matcher(name).matches()) {
+      String ip = extractIpFromHost(name);
+      if(ip != null) {
+        return ip;
+      }
+    }
+
     try {
       return InetAddress.getByName(name).getHostAddress();
     } catch (UnknownHostException e) {
@@ -630,7 +650,8 @@ public class NetUtils {
 
   private static final Pattern ipPortPattern = // Pattern for matching ip[:port]
     Pattern.compile("\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}(:\\d+)?");
-  
+  private static final Pattern hostWithIpPattern = // Pattern for matching host with ip
+      Pattern.compile("tdw-\\d{1,3}-\\d{1,3}-\\d{1,3}-\\d{1,3}");
   /**
    * Attempt to obtain the host name of the given string which contains
    * an IP address and an optional port.

@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -36,6 +38,8 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
+  private static final Log LOG = LogFactory.getLog(CachedDNSToSwitchMapping.class);
+
   private Map<String, String> cache = new ConcurrentHashMap<String, String>();
 
   /**
@@ -106,7 +110,12 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
   @Override
   public List<String> resolve(List<String> names) {
     // normalize all input names to be in the form of IP addresses
+    long time = System.currentTimeMillis();
     names = NetUtils.normalizeHostNames(names);
+    if(LOG.isDebugEnabled()) {
+      time = System.currentTimeMillis() - time;
+      LOG.debug("normalizeHostNames time: " + time + "ms, hosts: " + String.join(",", names));
+    }
 
     List <String> result = new ArrayList<String>(names.size());
     if (names.isEmpty()) {
@@ -115,13 +124,18 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
 
     List<String> uncachedHosts = getUncachedHosts(names);
 
+    time = System.currentTimeMillis();
     // Resolve the uncached hosts
     List<String> resolvedHosts = rawMapping.resolve(uncachedHosts);
+    if(LOG.isDebugEnabled()) {
+      time = System.currentTimeMillis() - time;
+      LOG.debug("resolve time: " + time + "ms，hosts: " + String.join(",", uncachedHosts));
+    }
+
     //cache them
     cacheResolvedHosts(uncachedHosts, resolvedHosts);
     //now look up the entire list in the cache
     return getCachedHosts(names);
-
   }
 
   /**
