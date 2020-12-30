@@ -23,8 +23,12 @@ import org.apache.hadoop.hdfs.server.federation.router.FederationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.concurrent.Semaphore;
 
 import static org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessConstants.CONCURRENT_NS;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_COUNT_KEY;
@@ -42,6 +46,9 @@ public class StaticRouterRpcFairnessPolicyController extends
   private static final Logger LOG =
       LoggerFactory.getLogger(StaticRouterRpcFairnessPolicyController.class);
 
+  Set<String> allConfiguredNS = new HashSet<>();
+  RouterRpcFairnessPolicyUpdateService updateService;
+
   public StaticRouterRpcFairnessPolicyController(Configuration conf) {
     init(conf);
   }
@@ -49,32 +56,43 @@ public class StaticRouterRpcFairnessPolicyController extends
   public void init(Configuration conf)
       throws IllegalArgumentException {
     super.init(conf);
+
+    // Get all name services configured
+    allConfiguredNS = FederationUtil.getAllConfiguredNS(getConf());
+    assignHandlers(allConfiguredNS);
+
+    // Start update service
+    updateService = new RouterRpcFairnessPolicyUpdateService(this);
+    updateService.init(conf);
+    updateService.start();
+  }
+
+  private void assignHandlers(Set<String> configuredNS) {
+    Map<String, Semaphore> permits = new HashMap<>();
     // Total handlers configured to process all incoming Rpc.
-    int handlerCount = conf.getInt(
+    int handlerCount = getConf().getInt(
         DFS_ROUTER_HANDLER_COUNT_KEY,
         DFS_ROUTER_HANDLER_COUNT_DEFAULT);
 
     LOG.info("Handlers available for fairness assignment {} ", handlerCount);
 
-    // Get all name services configured
-    Set<String> allConfiguredNS = FederationUtil.getAllConfiguredNS(conf);
 
     // Set to hold name services that are not
     // configured with dedicated handlers.
     Set<String> unassignedNS = new HashSet<>();
 
     // Insert the concurrent nameservice into the set to process together
-    allConfiguredNS.add(CONCURRENT_NS);
-    for (String nsId : allConfiguredNS) {
+    configuredNS.add(CONCURRENT_NS);
+    for (String nsId : configuredNS) {
       int dedicatedHandlers =
-          conf.getInt(DFS_ROUTER_FAIR_HANDLER_COUNT_KEY_PREFIX + nsId, 0);
+          getConf().getInt(DFS_ROUTER_FAIR_HANDLER_COUNT_KEY_PREFIX + nsId, 0);
       LOG.info("Dedicated handlers {} for ns {} ", dedicatedHandlers, nsId);
       if (dedicatedHandlers > 0) {
         handlerCount -= dedicatedHandlers;
         // Total handlers should not be less than sum of dedicated
         // handlers.
         validateCount(nsId, handlerCount, 0);
-        insertNameServiceWithPermits(nsId, dedicatedHandlers);
+        permits.put(nsId, new Semaphore(dedicatedHandlers));
         logAssignment(nsId, dedicatedHandlers);
       } else {
         unassignedNS.add(nsId);
@@ -90,21 +108,22 @@ public class StaticRouterRpcFairnessPolicyController extends
       for (String nsId : unassignedNS) {
         // Each NS should have at least one handler assigned.
         validateCount(nsId, handlersPerNS, 1);
-        insertNameServiceWithPermits(nsId, handlersPerNS);
+        permits.put(nsId, new Semaphore(handlersPerNS));
         logAssignment(nsId, handlersPerNS);
       }
     }
 
     // Assign remaining handlers if any to fan out calls.
     int leftOverHandlers = handlerCount % unassignedNS.size();
-    int existingPermits = getAvailablePermits(CONCURRENT_NS);
+    int existingPermits = permits.get(CONCURRENT_NS).availablePermits();
     if (leftOverHandlers > 0) {
       LOG.info("Assigned extra {} handlers to commons pool", leftOverHandlers);
-      insertNameServiceWithPermits(CONCURRENT_NS,
-          existingPermits + leftOverHandlers);
+      permits.put(CONCURRENT_NS,
+          new Semaphore(existingPermits + leftOverHandlers));
     }
     LOG.info("Final permit allocation for concurrent ns: {}",
-        getAvailablePermits(CONCURRENT_NS));
+        permits.get(CONCURRENT_NS).availablePermits());
+    setPermits(permits);
   }
 
   private static void logAssignment(String nsId, int count) {
@@ -122,5 +141,31 @@ public class StaticRouterRpcFairnessPolicyController extends
       LOG.error(msg);
       throw new IllegalArgumentException(msg);
     }
+  }
+
+  public void update() {
+    Set<String> tmpConfiguredNS = FederationUtil.getAllConfiguredNS(getConf());
+    if (!isConfiguredNSChanged(tmpConfiguredNS)) {
+      return;
+    }
+    assignHandlers(tmpConfiguredNS);
+    allConfiguredNS = tmpConfiguredNS;
+  }
+
+  private boolean isConfiguredNSChanged(Set<String> configuredNS) {
+    Iterator<String> it = configuredNS.iterator();
+    while(it.hasNext()) {
+      String ns = it.next();
+      if (!allConfiguredNS.contains(ns)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public void shutdown() {
+    updateService.stop();
+    super.shutdown();
   }
 }

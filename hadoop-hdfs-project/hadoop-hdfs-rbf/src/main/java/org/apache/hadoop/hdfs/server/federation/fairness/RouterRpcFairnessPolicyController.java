@@ -62,4 +62,9 @@ public interface RouterRpcFairnessPolicyController {
    * Shutdown steps to stop accepting new permission requests and clean-up.
    */
   void shutdown();
+
+  /**
+   * Update strategy of this controller
+   */
+  void update();
 }

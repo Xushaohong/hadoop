@@ -38,10 +38,16 @@ public class AbstractRouterRpcFairnessPolicyController
       LoggerFactory.getLogger(AbstractRouterRpcFairnessPolicyController.class);
 
   /** Hash table to hold semaphore for each configured name service. */
-  private Map<String, Semaphore> permits;
+  private volatile Map<String, Semaphore> permits;
+  private Configuration conf;
 
   public void init(Configuration conf) {
     this.permits = new HashMap<>();
+    this.conf = conf;
+  }
+
+  public Configuration getConf() {
+    return this.conf;
   }
 
   @Override
@@ -68,8 +74,17 @@ public class AbstractRouterRpcFairnessPolicyController
     }
   }
 
+  @Override
+  public void update() {
+    // do nothing
+  }
+
   protected void insertNameServiceWithPermits(String nsId, int maxPermits) {
     this.permits.put(nsId, new Semaphore(maxPermits));
+  }
+
+  protected void setPermits(Map<String, Semaphore> newPermits) {
+    this.permits = newPermits;
   }
 
   protected int getAvailablePermits(String nsId) {

@@ -15,40 +15,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.hdfs.server.federation.fairness;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.server.federation.router.PeriodicService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/**
- * A pass through fairness policy that implements
- * {@link RouterRpcFairnessPolicyController} and allows any number
- * of handlers to connect to any specific downstream name service.
- */
-public class NoRouterRpcFairnessPolicyController implements
-    RouterRpcFairnessPolicyController {
+public class RouterRpcFairnessPolicyUpdateService extends PeriodicService
+{
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RouterRpcFairnessPolicyUpdateService.class);
 
-  public NoRouterRpcFairnessPolicyController(Configuration conf) {
-      // Dummy constructor.
+  private RouterRpcFairnessPolicyController controller;
+
+  public RouterRpcFairnessPolicyUpdateService(
+      RouterRpcFairnessPolicyController controller) {
+    super(RouterRpcFairnessPolicyUpdateService.class.getSimpleName());
+    this.controller = controller;
+    LOG.info("RouterRpcFairnessPolicyUpdateService Init.");
   }
 
   @Override
-  public boolean acquirePermit(String nsId) {
-    return true;
-  }
-
-  @Override
-  public void releasePermit(String nsId) {
-    // Dummy, pass through.
-  }
-
-  @Override
-  public void shutdown() {
-    // Nothing for now.
-  }
-
-  @Override
-  public void update() {
-    // Nothing to do.
+  protected void periodicInvoke() {
+    controller.update();
   }
 }
