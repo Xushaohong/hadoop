@@ -17,12 +17,23 @@
  */
 package org.apache.hadoop.ipc.metrics;
 
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedList;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRatesWithAggregation;
+import org.apache.hadoop.metrics2.util.MBeans;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +43,7 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 @Metrics(about="Per method RPC metrics", context="rpcdetailed")
-public class RpcDetailedMetrics {
+public class RpcDetailedMetrics implements RpcDetailedMetricsMBean {
 
   @Metric MutableRatesWithAggregation rates;
   @Metric MutableRatesWithAggregation deferredRpcRates;
@@ -40,12 +51,19 @@ public class RpcDetailedMetrics {
   static final Logger LOG = LoggerFactory.getLogger(RpcDetailedMetrics.class);
   final MetricsRegistry registry;
   final String name;
+  // A map of "ThreadID -> currently performing RPC method".
+  final ConcurrentHashMap<Long, String> threadRPCMethod;
 
   RpcDetailedMetrics(int port) {
     name = "RpcDetailedActivityForPort"+ port;
     registry = new MetricsRegistry(name)
         .tag("port", "RPC port", String.valueOf(port));
     LOG.debug(registry.info().toString());
+
+    // Do not use @Metric annotation to generate JMX, as
+    // @Metric has a default 60s cache period therefore not real-time.
+    threadRPCMethod = new ConcurrentHashMap<Long, String>();
+    MBeans.register("NameNode", this.getClass().getSimpleName() + port, this);
   }
 
   public String name() { return name; }
@@ -76,6 +94,54 @@ public class RpcDetailedMetrics {
 
   public void addDeferredProcessingTime(String name, long processingTime) {
     deferredRpcRates.add(name, processingTime);
+  }
+
+  public void setThreadRPCMethod(String method) {
+    Long threadId = Thread.currentThread().getId();
+    threadRPCMethod.put(threadId, method);
+  }
+
+  public void clearThreadRPCMethod() {
+    Long threadId = Thread.currentThread().getId();
+    threadRPCMethod.put(threadId, StringUtils.EMPTY);
+  }
+
+  @Override
+  public String getRPCMethodsThreadCount() {
+    LinkedList<String> methods =
+        new LinkedList<String>(threadRPCMethod.values());
+
+    // remove EMPTY elements
+    methods.removeIf(e -> e.isEmpty());
+
+    // higher frequency RPC method displayed first.
+    Comparator<String> cmp = new Comparator<String>() {
+      @Override
+      public int compare(String o1, String o2) {
+        if (Collections.frequency(methods, o1)
+            > Collections.frequency(methods, o2)) {
+          return -1;
+        } else if (Collections.frequency(methods, o1)
+            == Collections.frequency(methods, o2)) {
+          return 0;
+        } else {
+          return 1;
+        }
+      }
+    };
+
+    // generate a TreeMap of "RPC method -> corresponding handler count"
+    TreeMap<String, Long> methodsThreadCount =
+        methods.stream().collect(Collectors.groupingBy(
+                                e -> e,
+                                () -> new TreeMap<>(cmp),
+                                Collectors.counting()));
+    try {
+      return new ObjectMapper().writeValueAsString(methodsThreadCount);
+    } catch (IOException e) {
+      LOG.warn("Failed to fetch threads op count", e);
+    }
+    return null;
   }
 
   /**

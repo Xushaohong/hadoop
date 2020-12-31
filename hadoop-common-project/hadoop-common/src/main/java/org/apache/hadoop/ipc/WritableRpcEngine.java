@@ -546,6 +546,7 @@ public class WritableRpcEngine implements RpcEngine {
           method.setAccessible(true);
           server.rpcDetailedMetrics.init(protocolImpl.protocolClass);
           currentCall.setDetailedMetricsName(call.getMethodName());
+          server.rpcDetailedMetrics.setThreadRPCMethod(call.getMethodName());
           Object value = 
               method.invoke(protocolImpl.protocolImpl, call.getParameters());
           if (server.verbose) log("Return: "+value);
@@ -575,6 +576,7 @@ public class WritableRpcEngine implements RpcEngine {
             currentCall.setDetailedMetricsName(
                 exception.getClass().getSimpleName());
           }
+          server.rpcDetailedMetrics.clearThreadRPCMethod();
         }
       }
     }

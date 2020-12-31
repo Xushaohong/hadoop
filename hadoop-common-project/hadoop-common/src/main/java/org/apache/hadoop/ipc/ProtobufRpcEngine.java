@@ -525,6 +525,7 @@ public class ProtobufRpcEngine implements RpcEngine {
           server.rpcDetailedMetrics.init(protocolImpl.protocolClass);
           currentCallInfo.set(new CallInfo(server, methodName));
           currentCall.setDetailedMetricsName(methodName);
+          server.rpcDetailedMetrics.setThreadRPCMethod(methodName);
           result = service.callBlockingMethod(methodDescriptor, null, param);
           // Check if this needs to be a deferred response,
           // by checking the ThreadLocal callback being set
@@ -543,6 +544,7 @@ public class ProtobufRpcEngine implements RpcEngine {
           throw e;
         } finally {
           currentCallInfo.set(null);
+          server.rpcDetailedMetrics.clearThreadRPCMethod();
         }
         return RpcWritable.wrap(result);
       }
