@@ -86,7 +86,7 @@ public class NetUtils {
    */
   public static final boolean RESOLVE_HOST = StringUtils.getPropOrEnvVar("tq.resolve.host") != null;
   public static final boolean EXTRACT_IP_FROM_HOST =
-      Boolean.valueOf(StringUtils.getPropOrEnvVar("tq.extract.ip.from.host", null, "true"));
+      Boolean.valueOf(StringUtils.getPropOrEnvVar("tq.extract.ip.from.host", null, "false"));
 
 
   /**
