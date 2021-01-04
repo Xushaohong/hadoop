@@ -81,6 +81,9 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_DISTRIBUTED_CONFIG_BASE_PATH;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_DISTRIBUTED_CONFIG_BASE_PATH_DEFAULT;
+
 /**
  * load resource from remote.
  */
@@ -93,8 +96,6 @@ public final class DistributedConfigHelper {
   public static final String HDFS = "hdfs";
 
   public static final String ZK_PATH_SPLITER = "/";
-
-  public static final String REMOTE_BASE_PATH = "/hadoop-distributed-config";
 
   private static final String COLON = ":";
 
@@ -295,8 +296,12 @@ public final class DistributedConfigHelper {
         holder = ZooKeeperHolder.init(zkQuorum, localConf);
       }
 
+      String remoteBasePath =
+          configuration.get(HADOOP_DISTRIBUTED_CONFIG_BASE_PATH,
+              HADOOP_DISTRIBUTED_CONFIG_BASE_PATH_DEFAULT);
       Map<String, InputStream> inputStreams = getResourceStream(host,
-          localConfigDir, holder, isAll, resourceSet, loadMode, fileLock);
+          localConfigDir, holder, isAll, resourceSet, remoteBasePath,
+          loadMode, fileLock);
       if (MapUtils.isNotEmpty(inputStreams)) {
         if (configuration.getBoolean(DISTRIBUTED_CONFIG_PREFERRED_KEY, true)){
           Configuration tmpCfg = new Configuration(false);
@@ -360,8 +365,8 @@ public final class DistributedConfigHelper {
 
   private Map<String, InputStream> getResourceStream(String host,
       File localConfigDir, ZooKeeperHolder holder, boolean isAll,
-      final Set<String> resourceSet, LoadMode loadMode,
-      LocalFileLock fileLock) {
+      final Set<String> resourceSet, final String remoteBasePath,
+      LoadMode loadMode, LocalFileLock fileLock) {
     boolean ignoreLocal = false;
     // process extra situation
     if (LoadMode.LOCAL == loadMode) {
@@ -424,7 +429,7 @@ public final class DistributedConfigHelper {
       ignoreLocal = true;
     case MIX:
       inputStreams = loadResource(holder, host, localConfigDir, isAll,
-          resourceSet, ignoreLocal);
+          resourceSet, remoteBasePath, ignoreLocal);
       LOG.info("load resources:" + resourceSet + ", load mode:" + loadMode);
       break;
 
@@ -544,15 +549,17 @@ public final class DistributedConfigHelper {
 
       LOG.info("found resources:" + rsFilesMap.keySet());
 
-      final String path = REMOTE_BASE_PATH + ZK_PATH_SPLITER + nnUri.getHost();
+      String remoteBasePath = config.get(HADOOP_DISTRIBUTED_CONFIG_BASE_PATH,
+          HADOOP_DISTRIBUTED_CONFIG_BASE_PATH_DEFAULT);
+      final String path = remoteBasePath + ZK_PATH_SPLITER + nnUri.getHost();
       String versionPath = path + ZK_PATH_SPLITER + VERSION;
 
       boolean exists = false;
 
-      if (holder.get().exists(REMOTE_BASE_PATH, true) == null) {
-        holder.get().create(REMOTE_BASE_PATH, null, ALL_ACL_LIST,
+      if (holder.get().exists(remoteBasePath, true) == null) {
+        holder.get().create(remoteBasePath, null, ALL_ACL_LIST,
             CreateMode.PERSISTENT);
-        LOG.info(" not exists path:" + REMOTE_BASE_PATH
+        LOG.info(" not exists path:" + remoteBasePath
             + " on zk,create firstly");
       }
 
@@ -676,7 +683,9 @@ public final class DistributedConfigHelper {
 
       final boolean isAll = filter(Arrays.asList(resources), rsSet);
 
-      final String basePath = REMOTE_BASE_PATH + ZK_PATH_SPLITER
+      String remoteBasePath = config.get(HADOOP_DISTRIBUTED_CONFIG_BASE_PATH,
+          HADOOP_DISTRIBUTED_CONFIG_BASE_PATH_DEFAULT);
+      final String basePath = remoteBasePath + ZK_PATH_SPLITER
           + nnUri.getHost();
 
       if (holder.get().exists(basePath, true) == null) {
@@ -778,11 +787,12 @@ public final class DistributedConfigHelper {
 
   private Map<String, InputStream> loadResource(ZooKeeperHolder holder,
       String authority, File localDir, boolean isAll,
-      final Set<String> resources, boolean ignoreLocal) {
+      final Set<String> resources, final String remoteBasePath,
+      boolean ignoreLocal) {
     Map<String, InputStream> loadResources =
         new LinkedHashMap<String, InputStream>();
 
-    String remotePath = REMOTE_BASE_PATH + ZK_PATH_SPLITER + authority;
+    String remotePath = remoteBasePath + ZK_PATH_SPLITER + authority;
 
     Map<String, Long> localTimeStamp = new HashMap<String, Long>();
     Set<String> totalResources = new HashSet<String>();
@@ -936,7 +946,9 @@ public final class DistributedConfigHelper {
       final Set<String> rsSet = new HashSet<String>();
 
       final boolean isAll = filter(Arrays.asList(specifiedRs), rsSet);
-      final String basePath = REMOTE_BASE_PATH + ZK_PATH_SPLITER
+      String remoteBasePath = config.get(HADOOP_DISTRIBUTED_CONFIG_BASE_PATH,
+          HADOOP_DISTRIBUTED_CONFIG_BASE_PATH_DEFAULT);
+      final String basePath = remoteBasePath + ZK_PATH_SPLITER
           + nnUri.getHost();
 
       if (holder.get().exists(basePath, true) == null) {
@@ -1039,7 +1051,8 @@ public final class DistributedConfigHelper {
       final Set<String> rsSet = new HashSet<String>();
 
       final boolean isAll = filter(Arrays.asList(specifiedRs), rsSet);
-      final String basePath = REMOTE_BASE_PATH + ZK_PATH_SPLITER
+      final String basePath = config.get(HADOOP_DISTRIBUTED_CONFIG_BASE_PATH,
+          HADOOP_DISTRIBUTED_CONFIG_BASE_PATH_DEFAULT) + ZK_PATH_SPLITER
           + nnUri.getHost();
 
       if (holder.get().exists(basePath, true) == null) {
@@ -1100,7 +1113,8 @@ public final class DistributedConfigHelper {
         LOG.warn("can't connect zk,zk's quorum:" + quorum);
         return ret;
       }
-      ret = holder.get().getChildren(REMOTE_BASE_PATH, true);
+      ret = holder.get().getChildren(config.get(HADOOP_DISTRIBUTED_CONFIG_BASE_PATH,
+          HADOOP_DISTRIBUTED_CONFIG_BASE_PATH_DEFAULT), true);
     } catch (Exception e) {
       LOG.error("occur exception, zk quorum:" + quorum, e);
     } finally {

@@ -968,5 +968,15 @@ public class CommonConfigurationKeysPublic {
   public static final String HADOOP_HTTP_IDLE_TIMEOUT_MS_KEY =
       "hadoop.http.idle_timeout.ms";
   public static final int HADOOP_HTTP_IDLE_TIMEOUT_MS_DEFAULT = 1000;
+
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String HADOOP_DISTRIBUTED_CONFIG_BASE_PATH =
+      "hadoop.distributed.config.base.path";
+  public static final String HADOOP_DISTRIBUTED_CONFIG_BASE_PATH_DEFAULT =
+      "/hadoop-distributed-config";
 }
 

@@ -3383,4 +3383,12 @@
       Enable Server Name Indication (SNI) host check for HTTPS enabled server.
     </description>
   </property>
+
+  <property>
+    <name>hadoop.distributed.config.base.path</name>
+    <value>/hadoop-distributed-config</value>
+    <description>
+      The base path for DistributedConfigHelper.
+    </description>
+  </property>
 </configuration>
