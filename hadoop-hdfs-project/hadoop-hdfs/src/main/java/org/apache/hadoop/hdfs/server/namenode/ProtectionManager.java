@@ -23,22 +23,19 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -47,15 +44,14 @@ import org.apache.hadoop.util.Time;
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
 /**
- * Provide data protect functionalities, just now there are 4 type of rules:
+ * Provide data protect functionalities, right now there are 4 type of rules:
  *
  * FinalPath rules:
- *  1. a finalPath itself can't be modified (delete or rename), if this path
- *     refers to a file, then the file can't be overwritten as well.
- *  2. a finalPaths's parent directory and ancestor directory can't be modified
- *     (delete or rename).
+ *  1. a finalPath itself can't be deleted or renamed.
+ *  2. a finalPaths's parent directory and ancestor directory can't be
+ *     deleted or renamed.
  *  3. if a finalPath refers to a directory, then its children can't be
- *     modified (delete or rename or overwrite), note this is not recursive.
+ *     deleted or renamed, note this is not recursive.
  *
  * Trash rules:
  *  1. Trash directory itself and its parent or ancestor can't be deleted.
@@ -103,35 +99,33 @@ public class ProtectionManager {
   private static final Path CURRENT = new Path("Current");
   private static final Path TRASH = new Path(FileSystem.TRASH_PREFIX);
   private static final FsPermission PERMISSION =
-      new FsPermission(FsAction.ALL, FsAction.NONE, FsAction.NONE);
+    new FsPermission(FsAction.ALL, FsAction.NONE, FsAction.NONE);
 
-  private Configuration conf;
   private NameNodeRpcServer nameNodeRpcServer;
-  private ReentrantReadWriteLock rwlock;
+  private AtomicReference<Configuration> conf = new AtomicReference<>();
 
-  private boolean isProtectDataEnabled;
-  private boolean isHDFSEncryptionEnabled;
-  private List<String> finalPaths;
-  private List<String> whitePaths;
-  private List<String> whiteIPs;
+  private AtomicBoolean isProtectDataEnabled = new AtomicBoolean();
+  private AtomicBoolean isHDFSEncryptionEnabled = new AtomicBoolean();
+  private AtomicReference<List<String>> finalPaths = new AtomicReference<>();
+  private AtomicReference<List<String>> whitePaths = new AtomicReference<>();
+  private AtomicReference<List<String>> whiteIPs = new AtomicReference<>();
 
   public ProtectionManager(final NameNodeRpcServer server,
       final Configuration conf) throws IOException {
     this.nameNodeRpcServer = server;
-    this.rwlock = new ReentrantReadWriteLock();
     initialize(conf);
   }
 
   private void initialize(Configuration config) throws IOException {
-    this.conf = config;
-    isProtectDataEnabled = conf.getBoolean(PROTECT_DATA_ENABLE_KEY,
-        PROTECT_DATA_ENABLE_DEFAULT);
-    isHDFSEncryptionEnabled = !conf.getTrimmed(
+    conf.set(config);
+    isProtectDataEnabled.set(config.getBoolean(PROTECT_DATA_ENABLE_KEY,
+        PROTECT_DATA_ENABLE_DEFAULT));
+    isHDFSEncryptionEnabled.set(!config.getTrimmed(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH, "")
-        .isEmpty();
-    finalPaths = parseFinalPaths();
-    whitePaths = parseWhitePaths();
-    whiteIPs = parseWhiteIPs();
+        .isEmpty());
+    finalPaths.set(parseFinalPaths());
+    whitePaths.set(parseWhitePaths());
+    whiteIPs.set(parseWhiteIPs());
   }
 
   private List<String> parseFinalPaths() throws IOException {
@@ -160,7 +154,7 @@ public class ProtectionManager {
 
   private List<String> parseWhiteIPs() throws IOException {
     List<String> ips = new ArrayList<String>();
-    // add NameNode clientRpcServer's IP address
+    // add NameNode RpcServer's IP address
     ips.add(nameNodeRpcServer.getRpcAddress().getAddress().getHostAddress());
 
     String value = resolveConfIndirection(WHITE_IPS_KEY);
@@ -177,7 +171,7 @@ public class ProtectionManager {
 
   private String resolveConfIndirection(String key)
       throws IOException {
-    String valInConf = conf.get(key);
+    String valInConf = conf.get().get(key);
     if (valInConf == null) {
       return null;
     }
@@ -187,20 +181,14 @@ public class ProtectionManager {
     }
 
     String path = valInConf.substring(1).trim();
-    return Files.asCharSource(new File(path), Charsets.UTF_8).read();
+    return Files.toString(new File(path), Charsets.UTF_8).trim();
   }
 
-  public void refreshProtection(Configuration newConf) throws IOException {
-    writeLock();
-    try {
-      initialize(newConf);
-    } finally {
-      writeUnlock();
-    }
+  public void refreshProtection(Configuration newConfig) throws IOException {
+    initialize(newConfig);
   }
 
   public String getProtection() throws IOException {
-    readLock();
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
          PrintStream ps = new PrintStream(baos)) {
       // write isProtectDataEnabled flag
@@ -210,48 +198,40 @@ public class ProtectionManager {
 
       // write final paths
       ps.println("Final Paths:");
-      for (String path : finalPaths) {
+      for (String path : finalPaths.get()) {
         ps.println(path);
       }
       ps.println();
 
       // write white paths
       ps.println("White Paths:");
-      for (String path : whitePaths) {
+      for (String path : whitePaths.get()) {
         ps.println(path);
       }
       ps.println();
 
       // write white ips
       ps.println("White IPs:");
-      for (String ip : whiteIPs) {
+      for (String ip : whiteIPs.get()) {
         ps.println(ip);
       }
       ps.println();
 
       return baos.toString();
-    } finally {
-      readUnlock();
     }
   }
 
   /**
-   * Check whether the subPath is truly the sub path of the path.
-   * note that all paths are sub path of root(/).
-   *
-   * ifUnderPath("/aa/bb", "/aa") returns true.
-   * ifUnderPath("/aa/bb/cc.txt", "/aa") returns true.
-   * ifUnderPath("/aaa/bb", "/aa") returns false.
-   * ifUnderPath("/aaa/bb", "/") returns true.
+   * Check if the former path is the child of the latter path
+   * isChild("/aa/bb", "/aa") returns true.
+   * isChild("/aa/bb/cc.txt", "/aa") returns true.
+   * isChild("/aaa/bb", "/aa") returns false.
+   * isChild("/aaa/bb", "/") returns true.
    */
-  private boolean ifUnderPath(String subPath, String path) {
-    if (path.equals("/")) {
-      return true;
-    }
-
-    if (subPath.length() > path.length()
-        && subPath.startsWith(path)
-        && subPath.charAt(path.length()) == '/') {
+  private boolean isChild(String child, String path) {
+    if (child.length() > path.length()
+        && child.startsWith(path)
+        && child.charAt(path.length()) == Path.SEPARATOR_CHAR) {
       return true;
     }
     return false;
@@ -263,20 +243,14 @@ public class ProtectionManager {
    * @throws AccessControlException if the src encounter a violation against
    *         any finalPath.
    */
-  private void checkFinalPathProtection(String src) throws IOException {
-    String parent;
-    // root's parent is itself.
-    if (src.equals("/")) {
-      parent = src;
-    } else {
-      parent = new Path(src).getParent().toString();
-    }
+  private void checkFinalPath(String src) throws IOException {
+    String parent = new Path(src).getParent().toString();
 
-    for (String finalPath : finalPaths) {
+    for (String finalPath : finalPaths.get()) {
       if (finalPath.equals(src)
           || finalPath.equals(parent)
-          || ifUnderPath(finalPath, src)) {
-        throw new AccessControlException(src+ " cannot be modified due to a "
+          || isChild(finalPath, src)) {
+        throw new AccessControlException(src + " cannot be modified due to a "
             + "violation against finalPath: " + finalPath);
       }
     }
@@ -290,10 +264,9 @@ public class ProtectionManager {
    * @return true if the src is within the effective scope of any whilePath,
    *         otherwise return false.
    */
-  private boolean checkWhitePathProtection(String src) throws IOException {
-    for (String whitePath : whitePaths) {
-      if (whitePath.equals(src)
-          || ifUnderPath(src, whitePath)) {
+  private boolean checkWhitePath(String src) throws IOException {
+    for (String whitePath : whitePaths.get()) {
+      if (whitePath.equals(src) || isChild(src, whitePath)) {
         return true;
       }
     }
@@ -303,9 +276,9 @@ public class ProtectionManager {
   /**
    * Check whiteIP protection.
    */
-  private void checkWhiteIPProtection(String src) throws IOException {
+  private void checkWhiteIP(String src) throws IOException {
     String ip = Server.getRemoteAddress();
-    if (!whiteIPs.contains(ip)) {
+    if (!whiteIPs.get().contains(ip)) {
       throw new AccessControlException(ip + " cannot delete " + src +
           " because only whiteIPs can delete trash contents.");
     }
@@ -314,46 +287,20 @@ public class ProtectionManager {
   /**
    * Check Trash protection.
    */
-  private void checkTrashProtection(String src) throws IOException {
+  private void checkTrash(String src) throws IOException {
     String trashRoot = getTrashRoot(src);
-    if (trashRoot.equals(src)
-        || ifUnderPath(trashRoot, src)) {
+    if (trashRoot.equals(src) || isChild(trashRoot, src)) {
       throw new AccessControlException(src + " cannot be deleted because it "
         + "is the parent or ancestor of Trash: " + trashRoot);
     }
   }
 
-  public HdfsFileStatus create(String src, FsPermission masked,
-      String clientName, EnumSetWritable<CreateFlag> flag,
-      boolean createParent, short replication, long blockSize,
-      CryptoProtocolVersion[] supportedVersions, String ecPolicyName,
-      String storagePolicy)
-      throws IOException {
-    readLock();
-    try {
-      if (isProtectDataEnabled) {
-        if (nameNodeRpcServer.getFileInfo(src) != null
-            && flag.contains(CreateFlag.OVERWRITE)) {
-          checkFinalPathProtection(src);
-        }
-      }
-    }finally {
-      readUnlock();
-    }
-
-    return nameNodeRpcServer.createOriginal(src, masked, clientName, flag,
-        createParent, replication, blockSize, supportedVersions, ecPolicyName,
-        storagePolicy);
-  }
-
   public boolean rename(String src, String dst) throws IOException {
-    readLock();
-    try {
-      if (isProtectDataEnabled) {
-        checkFinalPathProtection(src);
-      }
-    }finally {
-      readUnlock();
+    // root directory is a special case, just delegate it to NN
+    if (!src.equals("/")
+        && isProtectDataEnabled.get()
+        && nameNodeRpcServer.getFileInfo(src) != null) {
+      checkFinalPath(src);
     }
 
     return nameNodeRpcServer.renameOriginal(src, dst);
@@ -361,47 +308,44 @@ public class ProtectionManager {
 
   public void rename2(String src, String dst, Options.Rename... options)
       throws IOException {
-    readLock();
-    try {
-      if (isProtectDataEnabled) {
-        checkFinalPathProtection(src);
-      }
-    }finally {
-      readUnlock();
+    // root directory is a special case, just delegate it to NN
+    if (!src.equals("/")
+        && isProtectDataEnabled.get()
+        && nameNodeRpcServer.getFileInfo(src) != null) {
+      checkFinalPath(src);
     }
 
     nameNodeRpcServer.rename2Original(src, dst, options);
   }
 
   public boolean delete(String src, boolean recursive) throws IOException  {
-    readLock();
-    try {
-      if (!isProtectDataEnabled) {
-        return nameNodeRpcServer.deleteOriginal(src, recursive);
-      }
+    // root directory is a special case, just delegate it to NN
+    if (!src.equals("/")
+        && isProtectDataEnabled.get()
+        && nameNodeRpcServer.getFileInfo(src) != null) {
 
       // check finalPath rules.
-      checkFinalPathProtection(src);
+      checkFinalPath(src);
 
       // check Trash rules
-      checkTrashProtection(src);
+      checkTrash(src);
 
       // check WhiteIP rules
       String trashRoot = getTrashRoot(src);
-      if (ifUnderPath(src, trashRoot)) {
-        checkWhiteIPProtection(src);
+      if (isChild(src, trashRoot)) {
+        checkWhiteIP(src);
         return nameNodeRpcServer.deleteOriginal(src, recursive);
       }
 
       // check whitePath rules.
-      if (checkWhitePathProtection(src)) {
+      if (checkWhitePath(src)) {
         return nameNodeRpcServer.deleteOriginal(src, recursive);
       } else {
-        return moveToTrash(src);
+        return moveToTrashWithRetry(src);
       }
-    } finally {
-      readUnlock();
     }
+
+    return nameNodeRpcServer.deleteOriginal(src, recursive);
   }
 
   private String getUserName() throws IOException {
@@ -425,7 +369,7 @@ public class ProtectionManager {
   private String getTrashRoot(String p) throws IOException {
     String userName = getUserName();
 
-    if (isHDFSEncryptionEnabled) {
+    if (isHDFSEncryptionEnabled.get()) {
       Path path = new Path(p);
       String parentSrc = path.isRoot() ? path.toString()
                                        : path.getParent().toString();
@@ -444,63 +388,59 @@ public class ProtectionManager {
     return new Path("/user/" + userName, TRASH).toString();
   }
 
-  private boolean moveToTrash(String path) throws IOException {
+  // try twice, in case checkpoint between the mkdirs() & rename()
+  private boolean moveToTrashWithRetry(String path) throws IOException {
+    for (int i = 0; i < 2; i++) {
+      try {
+        moveToTrash(path);
+        return true;
+      } catch (IOException e) {
+        if (i == 1) {
+          throw e;
+        }
+      }
+    }
+    return false;
+  }
+
+  private void moveToTrash(String path) throws IOException {
     String trashRoot = getTrashRoot(path);
     String trashCurrent = new Path(trashRoot, CURRENT).toString();
-
     String trashPath = Path.mergePaths(new Path(trashCurrent), new Path(path)).
                        toString();
     String baseTrashPath = new Path(trashPath).getParent().toString();
 
-    // try twice, in case checkpoint between the mkdirs() & rename()
-    for (int i = 0; i < 2; i++) {
-      try {
-        // create base trash directory if it did not exist.
-        if (nameNodeRpcServer.getFileInfo(baseTrashPath) == null) {
-          if (!nameNodeRpcServer.mkdirs(baseTrashPath, PERMISSION, true)) {
-            LOG.warn("Can't create(mkdir) trash directory: " + baseTrashPath);
-            return false;
-          }
+    // create base trash directory if it did not exist right now.
+    try {
+      if (nameNodeRpcServer.getFileInfo(baseTrashPath) == null) {
+        if (!nameNodeRpcServer.mkdirs(baseTrashPath, PERMISSION, true)) {
+          throw new IOException();
         }
-      } catch (IOException e) {
-        LOG.warn("Failed to move " + path + " to Trash due to can't create "
-            + "base trash directory: " + baseTrashPath, e);
-        throw e;
       }
-
-      try {
-        // if the target path in Trash already exists, then append with
-        // a current time in millisecs.
-        String orig = trashPath;
-        while(nameNodeRpcServer.getFileInfo(trashPath) != null) {
-          trashPath = new Path(orig + Time.now()).toString();
-        }
-        // move to trash
-        if (nameNodeRpcServer.renameOriginal(path, trashPath)) {
-          return true;
-        }
-      } catch (IOException e) {
-        LOG.warn("Failed to move " + path + " to Trash", e);
-        throw e;
-      }
+    } catch (IOException e) {
+      String msg = "Can't create(mkdir) trash directory: " + baseTrashPath ;
+      LOG.warn(msg, e);
+      throw new IOException(msg, e);
     }
 
-    return true;
-  }
+    // move to trash
+    try {
+      // if the target path in Trash already exists, then append with
+      // a current time in milliseconds.
+      String orig = trashPath;
+      while (nameNodeRpcServer.getFileInfo(trashPath) != null) {
+        trashPath = new Path(orig + Time.now()).toString();
+      }
 
-  private void readLock() {
-    rwlock.readLock().lock();
-  }
-
-  private void readUnlock() {
-    rwlock.readLock().unlock();
-  }
-
-  private void writeLock() {
-    rwlock.writeLock().lock();
-  }
-
-  private void writeUnlock() {
-    rwlock.writeLock().unlock();
+      if (nameNodeRpcServer.renameOriginal(path, trashPath)) {
+        return;
+      } else {
+        throw new IOException();
+      }
+    } catch (IOException e) {
+      String msg = "Failed to rename " + path + " to " + trashPath;
+      LOG.warn(msg, e);
+      throw new IOException(msg, e);
+    }
   }
 }

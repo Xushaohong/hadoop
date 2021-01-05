@@ -22,7 +22,6 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -67,14 +66,14 @@ public class TestProtectionManager {
 
   // creates a zero file.
   private void touchFile(Path path)
-      throws IOException {
+    throws IOException {
     fs.create(path).close();
   }
 
 
   // mkdir
   private void mkdir(Path dir)
-      throws IOException {
+    throws IOException {
     fs.mkdirs(dir);
   }
 
@@ -91,8 +90,8 @@ public class TestProtectionManager {
       ioe = e;
     }
 
-    assertTrue(!result);
-    assertTrue(hitException);
+    assertTrue(result == false);
+    assertTrue(hitException == true);
     assertTrue(ioe instanceof AccessControlException);
   }
 
@@ -109,8 +108,8 @@ public class TestProtectionManager {
       ioe = e;
     }
 
-    assertTrue(result);
-    assertTrue(!hitException);
+    assertTrue(result == true);
+    assertTrue(hitException == false);
     assertTrue(ioe == null);
   }
 
@@ -126,8 +125,8 @@ public class TestProtectionManager {
       ioe = e;
     }
 
-    assertTrue(!result);
-    assertTrue(hitException);
+    assertTrue(result == false);
+    assertTrue(hitException == true);
     assertTrue(ioe instanceof AccessControlException);
   }
 
@@ -143,42 +142,8 @@ public class TestProtectionManager {
       ioe = e;
     }
 
-    assertTrue(result);
-    assertTrue(!hitException);
-    assertTrue(ioe == null);
-  }
-
-  private void assertCannotOverwrite(Path src) {
-    FSDataOutputStream result = null;
-    boolean hitException = false;
-    IOException ioe = null;
-
-    try {
-      result = fs.create(src);
-    } catch (IOException e) {
-      hitException = true;
-      ioe = e;
-    }
-
-    assertTrue(result == null);
-    assertTrue(hitException);
-    assertTrue(ioe instanceof AccessControlException);
-  }
-
-  private void assertCanOverwrite(Path src) {
-    FSDataOutputStream result = null;
-    boolean hitException = false;
-    IOException ioe = null;
-
-    try {
-      result = fs.create(src);
-    } catch (IOException e) {
-      hitException = true;
-      ioe = e;
-    }
-
-    assertTrue(result != null);
-    assertTrue(!hitException);
+    assertTrue(result == true);
+    assertTrue(hitException == false);
     assertTrue(ioe == null);
   }
 
@@ -187,7 +152,7 @@ public class TestProtectionManager {
 
     Path trashRoot = fs.getTrashRoot(src);
     Path trashPath = new Path(trashRoot, src);
-    assertTrue(!fs.exists(trashPath));
+    assertTrue(fs.exists(trashPath) == false);
   }
 
   private void assertFakeDelete(Path src) throws IOException {
@@ -196,7 +161,7 @@ public class TestProtectionManager {
     Path trashRoot = fs.getTrashRoot(src);
     Path trashCurrent = new Path(trashRoot, CURRENT);
     Path trashPath = Path.mergePaths(trashCurrent, src);
-    assertTrue(fs.exists(trashPath));
+    assertTrue(fs.exists(trashPath) == true);
   }
 
   /**
@@ -214,7 +179,6 @@ public class TestProtectionManager {
     touchFile(src);
     assertCannotDelete(src);
     assertCannotRename(src);
-    assertCannotOverwrite(src);
 
     src = new Path(FINAL_PATH, "dir/");
     mkdir(src);
@@ -227,7 +191,6 @@ public class TestProtectionManager {
     touchFile(src);
     assertCanRename(src);
     touchFile(src);
-    assertCanOverwrite(src);
 
     src = new Path(FINAL_PATH, "dir1/dir2/");
     mkdir(src);
@@ -241,7 +204,6 @@ public class TestProtectionManager {
     touchFile(src);
     assertCanRename(src);
     touchFile(src);
-    assertCanOverwrite(src);
 
     src = new Path("/test/testFinal/");
     assertCannotDelete(src);
@@ -251,17 +213,12 @@ public class TestProtectionManager {
     assertCannotDelete(src);
     assertCannotRename(src);
 
-    src = new Path("/");
-    assertCannotDelete(src);
-    assertCannotRename(src);
-
     src = new Path("/test/testFinal/a.txt");
     touchFile(src);
     assertCanDelete(src);
     touchFile(src);
     assertCanRename(src);
     touchFile(src);
-    assertCanOverwrite(src);
   }
 
   /**
