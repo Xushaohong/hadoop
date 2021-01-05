@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.net;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +32,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 
 /**
  * A cached implementation of DNSToSwitchMapping that takes an
@@ -48,11 +56,106 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
   protected final DNSToSwitchMapping rawMapping;
 
   /**
+  * The script to get all rack resolution items upon initiating.
+  */
+  private final String getAllRackResolveItemsScript;
+
+  /**
    * cache a raw DNS mapping
    * @param rawMapping the raw mapping to cache
    */
   public CachedDNSToSwitchMapping(DNSToSwitchMapping rawMapping) {
     this.rawMapping = rawMapping;
+
+    // initialize caches
+    Configuration conf = new Configuration();
+    conf.addResource("hdfs-site.xml");
+    this.getAllRackResolveItemsScript = conf.get(
+        ScriptBasedMapping.GET_ALL_ITEMS_SCRIPT_FILENAME_KEY, null);
+    if (this.getAllRackResolveItemsScript != null) {
+      loadAllRackResolveItems();
+    }
+  }
+
+  /**
+   * Load all rack resolution results.
+   */
+  private void loadAllRackResolveItems() {
+    long startTime = System.currentTimeMillis();
+
+    // Get all rack resolution items, using shell command executor
+    List<String> cmdList = new ArrayList<String>();
+    cmdList.add(getAllRackResolveItemsScript);
+
+    File dir = null;
+    String userDir;
+    if ((userDir = System.getProperty("user.dir")) != null) {
+      dir = new File(userDir);
+    }
+    ShellCommandExecutor s = new ShellCommandExecutor(
+        cmdList.toArray(new String[cmdList.size()]), dir);
+    String results;
+    try {
+      s.execute();
+      results = s.getOutput();
+    } catch (Exception e) {
+      LOG.warn("Exception running " + s
+          + " while loading all rack resolution items.", e);
+      return;
+    }
+
+    /*
+     * rack resolution items' format:
+     * 1. one item per line.
+     * 2. each item should be presented as: nodeIP rack
+     */
+    BufferedReader in = new BufferedReader(new InputStreamReader(
+        new ByteArrayInputStream(results.getBytes())));
+    int number = 0;
+    while (true) {
+      String line = null;
+      try {
+        line = in.readLine();
+      } catch (IOException e) {
+        LOG.warn("Loading all rack resolution items aborted.", e);
+        break;
+      }
+
+      // meets EOF
+      if (line == null) {
+        break;
+      }
+
+      // skip blank lines
+      if (line.trim().isEmpty()) {
+        continue;
+      }
+
+      // cache a item
+      String [] components = line.split("\\s+");
+      if (components.length != 2) {
+        LOG.warn("Loading all rack resolution results skipped illegal item "
+            + line + ",  each item should be presented as: nodeIP rack.");
+        continue;
+      }
+      String node = components[0];
+      String rack = components[1];
+
+      // sanity check
+      if (!rack.startsWith(Path.SEPARATOR)) {
+        LOG.warn("Loading all rack resolution results skipped illegal item "
+            + line + ",  each item should be presented as: nodeIP rack.");
+        continue;
+      }
+
+      // now cache it
+      cache.put(node, rack);
+      number++;
+    }
+
+    long elapsedTime = System.currentTimeMillis() - startTime;
+    LOG.info("Successfully loaded " + number
+          + " rack resolution items in " + elapsedTime + " ms.");
   }
 
   /**

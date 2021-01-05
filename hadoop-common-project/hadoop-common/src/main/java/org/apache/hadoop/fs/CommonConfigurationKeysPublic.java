@@ -110,6 +110,10 @@ public class CommonConfigurationKeysPublic {
    */
   public static final String  NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY =
     "net.topology.script.file.name";
+
+  public static final String  NET_TOPOLOGY_GET_ALL_ITEMS_SCRIPT_FILE_NAME_KEY =
+    "net.topology.get-all-items.script.file.name";
+
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">

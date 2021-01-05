@@ -65,6 +65,12 @@ public class ScriptBasedMapping extends CachedDNSToSwitchMapping {
                      CommonConfigurationKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY ;
 
   /**
+   * key to the get-all-rack-resolve-items script filename
+   */
+  static final String GET_ALL_ITEMS_SCRIPT_FILENAME_KEY =
+                     CommonConfigurationKeys.NET_TOPOLOGY_GET_ALL_ITEMS_SCRIPT_FILE_NAME_KEY ;
+
+  /**
    * key to the argument count that the script supports
    * {@value}
    */
