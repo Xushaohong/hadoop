@@ -239,6 +239,12 @@ public class FSPermissionChecker implements AccessControlEnforcer {
       FsAction parentAccess, FsAction access, FsAction subAccess,
       boolean ignoreEmptyDir)
       throws AccessControlException {
+    if(!AuthConfigureHolder.isAuthorizationEnable()) {
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("Ignore permission check by auth configure holder.");
+      }
+      return;
+    }
     for(; ancestorIndex >= 0 && inodes[ancestorIndex] == null;
         ancestorIndex--);
 
