@@ -23,10 +23,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Stack;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.security.AuthConfigureHolder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.permission.AclEntryScope;
@@ -37,8 +33,18 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.server.namenode.INodeAttributeProvider.AccessControlEnforcer;
 import org.apache.hadoop.hdfs.util.ReadOnlyList;
+import org.apache.hadoop.metrics2.annotation.Metric;
+import org.apache.hadoop.metrics2.annotation.Metrics;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.AuthConfigureHolder;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 /** 
  * Class that helps in checking file system permission.
@@ -49,6 +55,21 @@ import org.apache.hadoop.security.UserGroupInformation;
  */
 public class FSPermissionChecker implements AccessControlEnforcer {
   static final Logger LOG = LoggerFactory.getLogger(UserGroupInformation.class);
+  private static final FSPermissionCheckerMetrics metrics =
+      new FSPermissionCheckerMetrics();
+
+  @Metrics(context="dfs", name="FSPermissionChecker")
+  private static class FSPermissionCheckerMetrics {
+    private @Metric MutableRate checkPermission;
+
+    public FSPermissionCheckerMetrics() {
+      DefaultMetricsSystem.instance().register(this);
+    }
+
+    public void addCheckPermissionTime(int time) {
+      checkPermission.add(time);
+    }
+  }
 
   private static String getPath(byte[][] components, int start, int end) {
     return DFSUtil.byteArray2PathString(components, start, end - start + 1);
@@ -190,10 +211,16 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     String path = inodesInPath.getPath();
     int ancestorIndex = inodes.length - 2;
 
-    AccessControlEnforcer enforcer = getAccessControlEnforcer();
-    enforcer.checkPermission(fsOwner, supergroup, callerUgi, inodeAttrs, inodes,
-        components, snapshotId, path, ancestorIndex, doCheckOwner,
-        ancestorAccess, parentAccess, access, subAccess, ignoreEmptyDir);
+    long startTime = Time.now();
+    try {
+      AccessControlEnforcer enforcer = getAccessControlEnforcer();
+      enforcer.checkPermission(fsOwner, supergroup, callerUgi, inodeAttrs, inodes,
+          components, snapshotId, path, ancestorIndex, doCheckOwner,
+          ancestorAccess, parentAccess, access, subAccess, ignoreEmptyDir);
+    } finally {
+      int checkPermissionTime = (int)(Time.now() - startTime);
+      metrics.addCheckPermissionTime(checkPermissionTime);
+    }
   }
 
   /**
