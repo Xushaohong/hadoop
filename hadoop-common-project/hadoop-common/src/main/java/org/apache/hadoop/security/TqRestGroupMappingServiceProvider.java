@@ -1,6 +1,8 @@
 package org.apache.hadoop.security;
 
+import com.tencent.tdw.security.utils.PropertiesUtils;
 import com.tencent.tdw.security.utils.RestUtil;
+import com.tencent.tdw.security.utils.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,11 +12,21 @@ import java.util.List;
 
 public class TqRestGroupMappingServiceProvider implements GroupMappingServiceProvider {
   private static final Logger LOG = LoggerFactory.getLogger(TqRestGroupMappingServiceProvider.class);
+  private static final String TQ_SECURITY_CLUSTER = "tq.security.cluster";
+
+  protected String cluster;
   private GroupMappingServiceProvider fallback = new ShellBasedUnixGroupsMapping();
+
+  public TqRestGroupMappingServiceProvider() {
+    cluster = PropertiesUtils.getPropertyValue(TQ_SECURITY_CLUSTER);
+  }
 
   @Override
   public List<String> getGroups(String user) throws IOException {
     try {
+      if(!StringUtils.isBlank(cluster)) {
+        return RestUtil.getGroups(cluster, user);
+      }
       return RestUtil.getGroups(user);
     } catch (Exception e) {
       LOG.warn("Failed to get group for " + user + ", by " + e.getMessage());
