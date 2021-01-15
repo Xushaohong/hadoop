@@ -354,6 +354,15 @@ public class FSLeafQueue extends FSQueue {
       return assigned;
     }
 
+    if (scheduler.getConf().isSortAppsEnabled()) {
+      return assignContainerWithSort(node);
+    } else {
+      return assignContainerWithoutSort(node);
+    }
+  }
+  private Resource assignContainerWithSort(FSSchedulerNode node) {
+    Resource assigned = Resources.none();
+
     CuedFloydHeap<FSAppAttempt> heap = fetchAppsByHeapSort();
     while (heap.size() > 0) {
       FSAppAttempt sched = heap.poll();
@@ -373,6 +382,33 @@ public class FSLeafQueue extends FSQueue {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Assigned container in queue:" + getName() + " " +
               "container:" + assigned);
+        }
+        break;
+      }
+    }
+    return assigned;
+  }
+
+  private Resource assignContainerWithoutSort(FSSchedulerNode node) {
+    Resource assigned = Resources.none();
+    for (FSAppAttempt sched : runnableApps) {
+      if (sched.isRemoved()) {
+        LOG.debug(sched.getName() + " has been removed, skip assign container for it.");
+        continue;
+      }
+      if (!sched.isNeedResource()) {
+        LOG.debug(sched.getName() + " does not need resource, skip assign container for it.");
+        continue;
+      }
+      if (SchedulerAppUtils.isPlaceBlacklisted(sched, node, LOG)) {
+        continue;
+      }
+
+      assigned = sched.assignContainer(node);
+      if (!assigned.equals(Resources.none())) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Assigned container in queue:" + getName() + " " +
+                  "container:" + assigned);
         }
         break;
       }

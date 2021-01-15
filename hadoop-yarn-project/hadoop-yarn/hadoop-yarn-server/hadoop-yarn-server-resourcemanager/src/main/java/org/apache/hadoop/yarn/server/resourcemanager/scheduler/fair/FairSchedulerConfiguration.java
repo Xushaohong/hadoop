@@ -226,6 +226,10 @@ public class FairSchedulerConfiguration extends Configuration {
   private static final String INVALID_RESOURCE_DEFINITION_PREFIX =
           "Error reading resource config--invalid resource definition: ";
 
+  /** Whether to sort apps in the leaf queue when assigning containers */
+  public static final String SORT_APPS_ENABLED = CONF_PREFIX + "sort-apps-enabled";
+  public static final boolean DEFAULT_SORT_APPS_ENABLED = true;
+
   public FairSchedulerConfiguration() {
     super();
   }
@@ -427,6 +431,10 @@ public class FairSchedulerConfiguration extends Configuration {
 
   public float getReservableNodes() {
     return getFloat(RESERVABLE_NODES, RESERVABLE_NODES_DEFAULT);
+  }
+
+  public boolean isSortAppsEnabled() {
+    return getBoolean(SORT_APPS_ENABLED, DEFAULT_SORT_APPS_ENABLED);
   }
 
   /**
