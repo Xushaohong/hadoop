@@ -384,15 +384,17 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
       throw retryInfo.getFailException();
     }
 
-    log(method, retryInfo.isFailover(), counters.failovers, retryInfo.delay, e);
+    log(method, retryInfo.isFailover(), counters.failovers,
+        counters.retries, retryInfo.delay, e);
     return retryInfo;
   }
 
   private void log(final Method method, final boolean isFailover,
-      final int failovers, final long delay, final Exception ex) {
+      final int failovers, final int retries, final long delay,
+      final Exception ex) {
     // log info if this has made some successful calls or
     // this is not the first failover
-    final boolean info = hasSuccessfulCall || failovers != 0
+    final boolean info = hasSuccessfulCall || failovers != 0 || retries != 0
         || asyncCallHandler.hasSuccessfulCall();
     if (!info && !LOG.isDebugEnabled()) {
       return;
