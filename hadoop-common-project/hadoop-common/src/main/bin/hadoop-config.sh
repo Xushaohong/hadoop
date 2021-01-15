@@ -163,3 +163,17 @@ hadoop_exec_hadooprc
 if [[ -z "${HADOOP_NEW_CONFIG}" ]]; then
   hadoop_finalize
 fi
+
+if [ "$HADOOP_DISABLE_ASYNC_PROFILER" != "true" ] ; then
+  if [ "x$ASYNC_PROFILER_HOME" == "x" ]; then
+    if [ -d "$HADOOP_HOME/async-profiler" ]; then
+      export ASYNC_PROFILER_HOME="$HADOOP_HOME/async-profiler"
+    elif [ -d "$HADOOP_HOME/../async-profiler" ]; then
+      export ASYNC_PROFILER_HOME="$HADOOP_HOME/../async-profiler"
+    elif [ -d "$HADOOP_HOME/../../async-profiler" ]; then
+      export ASYNC_PROFILER_HOME="$HADOOP_HOME/../../async-profiler"
+    else
+      export ASYNC_PROFILER_HOME="$HADOOP_HOME/async-profiler"
+    fi
+  fi
+fi

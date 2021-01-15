@@ -27,6 +27,9 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -628,7 +631,7 @@ public final class HttpServer2 implements FilterContainer {
       }
     }
 
-    addDefaultServlets();
+    addDefaultServlets(contexts);
 
     if (pathSpecs != null) {
       for (String path : pathSpecs) {
@@ -774,13 +777,33 @@ public final class HttpServer2 implements FilterContainer {
   /**
    * Add default servlets.
    */
-  protected void addDefaultServlets() {
+  protected void addDefaultServlets(ContextHandlerCollection contexts) {
     // set up default servlets
     addServlet("stacks", "/stacks", StackServlet.class);
     addServlet("logLevel", "/logLevel", LogLevel.Servlet.class);
     addServlet("jmx", "/jmx", JMXJsonServlet.class);
     addServlet("conf", "/conf", ConfServlet.class);
     addServlet("auth", "/auth", AuthConfigureHolder.RefreshAuthServlet.class);
+    final String asyncProfilerHome = ProfileServlet.getAsyncProfilerHome();
+    if (asyncProfilerHome != null && !asyncProfilerHome.trim().isEmpty()) {
+      addServlet("prof", "/prof", ProfileServlet.class);
+      Path tmpDir = Paths.get(ProfileServlet.OUTPUT_DIR);
+      if (Files.notExists(tmpDir)) {
+        try {
+          Files.createDirectories(tmpDir);
+        } catch (IOException e) {
+          LOG.warn("Failed to create tmp directory: ", e);
+        }
+      }
+      ServletContextHandler genCtx = new ServletContextHandler(contexts, "/prof-output");
+      genCtx.addServlet(ProfileOutputServlet.class, "/*");
+      genCtx.setResourceBase(tmpDir.toAbsolutePath().toString());
+      genCtx.setDisplayName("prof-output");
+    } else {
+      addServlet("prof", "/prof", ProfileServlet.DisabledServlet.class);
+      LOG.info("ASYNC_PROFILER_HOME environment variable and async.profiler.home system property " +
+          "not specified. Disabling /prof endpoint.");
+    }
   }
 
   public void addContext(ServletContextHandler ctxt, boolean isFiltered) {

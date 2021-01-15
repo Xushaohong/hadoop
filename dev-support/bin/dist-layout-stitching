@@ -148,7 +148,12 @@ run copy "${ROOT}/hadoop-tools/hadoop-tools-dist/target/hadoop-tools-dist-${VERS
 # copy isal library
 if [ "$(uname)" = "Linux" -a "$(uname -m)" = "x86_64" ]; then tar -xf $ROOT/downloads/isa-l-x64.tar.gz -C /tmp; cp -rP /tmp/isa-l-x64/.libs/libisal.so* lib/native/; fi
 if [ "$(uname)" = "Linux" -a "$(uname -m)" = "ppc64le" ]; then tar -xf $ROOT/downloads/isa-l-ppc64le.tar.gz -C /tmp; cp -rP /tmp/isa-l-ppc64le/.libs/libisal.so* lib/native/; fi
-
+if [ "$(uname)" = "Linux" -a "$(uname -m)" = "x86_64" ];
+  then
+  tar -xf $ROOT/downloads/async-profiler-1.8.3-linux-x64.tar.gz -C /tmp;
+  run mkdir async-profiler
+  run cp -rP /tmp/async-profiler-1.8.3-linux-x64/* async-profiler/;
+fi
 echo
 echo "Hadoop dist layout available at: ${BASEDIR}/hadoop-${VERSION}"
 echo
