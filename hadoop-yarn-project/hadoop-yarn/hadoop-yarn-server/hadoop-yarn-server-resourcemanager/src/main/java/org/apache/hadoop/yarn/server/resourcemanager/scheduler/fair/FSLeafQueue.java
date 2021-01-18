@@ -343,6 +343,8 @@ public class FSLeafQueue extends FSQueue {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Node " + node.getNodeName() + " offered to queue: " +
           getName() + " fairShare: " + getFairShare());
+      LOG.debug("isSortAppsEnabled: " + scheduler.getConf().isSortAppsEnabled());
+      LOG.debug("isAssignAllResourceEnabled: " + scheduler.getConf().isAssignAllResourceEnabled());
     }
 
     if (!assignContainerPreCheck(node)) {
@@ -390,7 +392,7 @@ public class FSLeafQueue extends FSQueue {
   }
 
   private Resource assignContainerWithoutSort(FSSchedulerNode node) {
-    Resource assigned = Resources.none();
+    Resource totalAssigned = Resources.none();
     for (FSAppAttempt sched : runnableApps) {
       if (sched.isRemoved()) {
         LOG.debug(sched.getName() + " has been removed, skip assign container for it.");
@@ -404,16 +406,22 @@ public class FSLeafQueue extends FSQueue {
         continue;
       }
 
-      assigned = sched.assignContainer(node);
+      Resource assigned = sched.assignContainer(node);
       if (!assigned.equals(Resources.none())) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Assigned container in queue:" + getName() + " " +
                   "container:" + assigned);
         }
-        break;
+        if (scheduler.getConf().isAssignAllResourceEnabled()
+            && !assigned.equals(FairScheduler.CONTAINER_RESERVED)) {
+          totalAssigned = Resources.add(totalAssigned, assigned);
+        } else {
+          totalAssigned = Resources.add(totalAssigned, assigned);
+          break;
+        }
       }
     }
-    return assigned;
+    return totalAssigned;
   }
 
   /**

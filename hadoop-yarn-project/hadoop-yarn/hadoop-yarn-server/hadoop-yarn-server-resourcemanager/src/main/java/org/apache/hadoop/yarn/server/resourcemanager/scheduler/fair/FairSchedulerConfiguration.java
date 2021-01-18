@@ -230,6 +230,10 @@ public class FairSchedulerConfiguration extends Configuration {
   public static final String SORT_APPS_ENABLED = CONF_PREFIX + "sort-apps-enabled";
   public static final boolean DEFAULT_SORT_APPS_ENABLED = true;
 
+  /** Whether try to allocate all node resource at every FSLeafQueue.AssignContainer*/
+  public static final String ASSIGN_ALL_RESOURCE_ENABLED = CONF_PREFIX + "assign-all-resource-enabled";
+  public static final boolean DEFAULT_ASSIGN_ALL_RESOURCE_ENABLED = false;
+
   public FairSchedulerConfiguration() {
     super();
   }
@@ -437,6 +441,9 @@ public class FairSchedulerConfiguration extends Configuration {
     return getBoolean(SORT_APPS_ENABLED, DEFAULT_SORT_APPS_ENABLED);
   }
 
+  public boolean isAssignAllResourceEnabled() {
+    return getBoolean(ASSIGN_ALL_RESOURCE_ENABLED, DEFAULT_ASSIGN_ALL_RESOURCE_ENABLED);
+  }
   /**
    * Parses a resource config value in one of three forms:
    * <ol>

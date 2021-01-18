@@ -1207,8 +1207,8 @@ public class FairScheduler extends
 
           assignedContainers++;
           Resources.addTo(assignedResource, assignment);
-          if (!shouldContinueAssigning(assignedContainers, maxResourcesToAssign,
-              assignedResource)) {
+          if (!getConf().isAssignAllResourceEnabled() && !shouldContinueAssigning(assignedContainers,
+              maxResourcesToAssign, assignedResource)) {
             break;
           }
         }
