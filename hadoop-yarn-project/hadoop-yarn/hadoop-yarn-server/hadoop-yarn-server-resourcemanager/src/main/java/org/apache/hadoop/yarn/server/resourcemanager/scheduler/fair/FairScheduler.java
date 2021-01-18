@@ -1058,15 +1058,31 @@ public class FairScheduler extends
   @Deprecated
   void continuousSchedulingAttempt() throws InterruptedException {
     long start = getClock().getTime();
-    TreeSet<FSSchedulerNode> nodeIdSet;
-    // Hold a lock to prevent node changes as much as possible.
-    readLock.lock();
-    try {
-      nodeIdSet = nodeTracker.sortedNodeSet(nodeAvailableResourceComparator);
-    } finally {
-      readLock.unlock();
+    Collection<FSSchedulerNode> nodeIdSet;
+    if (getConf().isSortNodesEnabled()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("isSortNodesEnabled: " + getConf().isSortNodesEnabled());
+      }
+      // Hold a lock to prevent node changes as much as possible.
+      readLock.lock();
+      try {
+        nodeIdSet = nodeTracker.sortedNodeSet(nodeAvailableResourceComparator);
+      } finally {
+        readLock.unlock();
+      }
+    }else {
+      // Hold a lock to prevent node changes as much as possible.
+      readLock.lock();
+      try {
+        nodeIdSet = nodeTracker.getAllNodes();
+      } finally {
+        readLock.unlock();
+      }
     }
+    continuousSchedulingIterator(nodeIdSet, start);
+  }
 
+  void continuousSchedulingIterator(Collection<FSSchedulerNode> nodeIdSet, long start) throws InterruptedException {
     // iterate all nodes
     for (FSSchedulerNode node : nodeIdSet) {
       try {

@@ -234,6 +234,10 @@ public class FairSchedulerConfiguration extends Configuration {
   public static final String ASSIGN_ALL_RESOURCE_ENABLED = CONF_PREFIX + "assign-all-resource-enabled";
   public static final boolean DEFAULT_ASSIGN_ALL_RESOURCE_ENABLED = false;
 
+  /** Whether to sort nodes when doing continous scheduling. */
+  public static final String SORT_NODES_ENABLED = CONF_PREFIX + "sort-nodes-enabled";
+  public static final boolean DEFAULT_SORT_NODES_ENABLED = true;
+
   public FairSchedulerConfiguration() {
     super();
   }
@@ -444,6 +448,11 @@ public class FairSchedulerConfiguration extends Configuration {
   public boolean isAssignAllResourceEnabled() {
     return getBoolean(ASSIGN_ALL_RESOURCE_ENABLED, DEFAULT_ASSIGN_ALL_RESOURCE_ENABLED);
   }
+
+  public boolean isSortNodesEnabled() {
+    return getBoolean(SORT_NODES_ENABLED, DEFAULT_SORT_NODES_ENABLED);
+  }
+
   /**
    * Parses a resource config value in one of three forms:
    * <ol>
