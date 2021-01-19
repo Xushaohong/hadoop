@@ -310,7 +310,8 @@ public class FSPermissionChecker implements AccessControlEnforcer {
   private INodeAttributes getINodeAttrs(byte[][] pathByNameArr, int pathIdx,
       INode inode, int snapshotId) {
     INodeAttributes inodeAttrs = inode.getSnapshotINode(snapshotId);
-    if (getAttributesProvider() != null) {
+    INodeAttributeProvider ap = getAttributesProvider();
+    if (ap != null && ap.needRetrieveExtraInodeAttrs()) {
       String[] elements = new String[pathIdx + 1];
       /**
        * {@link INode#getPathComponents(String)} returns a null component
@@ -323,7 +324,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
           elements[i] = DFSUtil.bytes2String(pathByNameArr[i]);
         }
       }
-      inodeAttrs = getAttributesProvider().getAttributes(elements, inodeAttrs);
+      inodeAttrs = ap.getAttributes(elements, inodeAttrs);
     }
     return inodeAttrs;
   }

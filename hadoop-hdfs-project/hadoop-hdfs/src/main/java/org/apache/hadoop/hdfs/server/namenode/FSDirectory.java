@@ -2004,7 +2004,7 @@ public class FSDirectory implements Closeable {
     INodeAttributes nodeAttrs = node.getSnapshotINode(snapshot);
     UserGroupInformation ugi = NameNode.getRemoteUser();
     INodeAttributeProvider ap = this.getUserFilteredAttributeProvider(ugi);
-    if (ap != null) {
+    if (ap != null && ap.needRetrieveExtraInodeAttrs()) {
       // permission checking sends the full components array including the
       // first empty component for the root.  however file status
       // related calls are expected to strip out the root component according

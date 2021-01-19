@@ -116,6 +116,11 @@ public abstract class INodeAttributeProvider {
   public abstract INodeAttributes getAttributes(String[] pathElements,
       INodeAttributes inode);
 
+  // override this method in specific inherited instances (e.g. ranger)
+  public boolean needRetrieveExtraInodeAttrs() {
+    return false;
+  }
+
   public INodeAttributes getAttributes(byte[][] components,
       INodeAttributes inode) {
     String[] elements = new String[components.length];
