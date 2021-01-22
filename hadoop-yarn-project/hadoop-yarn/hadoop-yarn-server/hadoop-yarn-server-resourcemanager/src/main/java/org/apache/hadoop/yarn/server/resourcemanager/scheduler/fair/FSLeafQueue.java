@@ -392,8 +392,14 @@ public class FSLeafQueue extends FSQueue {
   }
 
   private Resource assignContainerWithoutSort(FSSchedulerNode node) {
+    readLock.lock();
+    List<FSAppAttempt> apps = new ArrayList<>(runnableApps);
+    readLock.unlock();
+
     Resource totalAssigned = Resources.none();
-    for (FSAppAttempt sched : runnableApps) {
+    int index = 0;
+    for (FSAppAttempt sched : apps) {
+      index++;
       if (sched.isRemoved()) {
         LOG.debug(sched.getName() + " has been removed, skip assign container for it.");
         continue;
@@ -421,6 +427,15 @@ public class FSLeafQueue extends FSQueue {
         }
       }
     }
+
+    // Put apps those get allocated containers to the end, so as to allocate apps for rest apps firstly
+    // in the following assign circle.
+    writeLock.lock();
+    if (index > 0 && index < runnableApps.size() - 1) {
+      Collections.rotate(runnableApps, runnableApps.size() - index);
+    }
+    writeLock.unlock();
+
     return totalAssigned;
   }
 
