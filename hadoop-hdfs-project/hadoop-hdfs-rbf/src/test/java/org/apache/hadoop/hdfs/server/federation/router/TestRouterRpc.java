@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.federation.router;
 
+import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REDUNDANCY_CONSIDERLOAD_KEY;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.addDirectory;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.countContents;
@@ -126,8 +127,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service.STATE;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.hadoop.util.DefaultFsUtil;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -1937,5 +1940,35 @@ public class TestRouterRpc {
     String src = "/tmp/test/remotePath";
     String path = routerProtocol.getRemotePath(src);
     assertEquals("hdfs://" + ns0 + src, path);
+  }
+
+
+  @Test
+  public void testRediretPath() throws IOException {
+    String defaultNs = cluster.getNameservices().get(0);
+    String ns1 = cluster.getNameservices().get(1);
+    String redirectNs = routerFS.getUri().getAuthority();
+
+    String group = "tdw_group";
+    String redirectPath = "/tmp/.staging";
+    String redirectUri = "hdfs://" + redirectNs + redirectPath;
+    String defaultUri = "hdfs://" + defaultNs;
+
+    //设置路径映射
+    MockResolver resolver = (MockResolver) router.getRouter()
+        .getSubclusterResolver();
+    resolver.addLocation(redirectPath, ns1, redirectPath);
+
+    Configuration conf = router.getConf();
+    conf.set(FS_DEFAULT_NAME_KEY, defaultUri);
+    Assert.assertEquals(defaultUri, conf.get(FS_DEFAULT_NAME_KEY));
+
+    //添加rbf redirect配置
+    conf.set(DefaultFsUtil.RBF_REDIRECT_DEFAULTFS_PATH, redirectUri);
+    conf.set(DefaultFsUtil.RBF_REDIRECT_DEFAULTFS_GROUP, group);
+    conf.setBoolean(DefaultFsUtil.RBF_REDIRECT_DEFAULTFS_ENABLE, true);
+    System.out.println(conf.get(FS_DEFAULT_NAME_KEY));
+    DefaultFsUtil.replaceDefaultFs(conf);
+    Assert.assertEquals("hdfs://" + ns1, conf.get(FS_DEFAULT_NAME_KEY));
   }
 }

@@ -45,6 +45,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.QueueACL;
+import org.apache.hadoop.util.DefaultFsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -254,6 +255,13 @@ class JobSubmitter {
       ReservationId reservationId = job.getReservationId();
       if (reservationId != null) {
         conf.set(MRJobConfig.RESERVATION_ID, reservationId.toString());
+      }
+
+      if (DefaultFsUtil.rbfRedirectEnable(conf)) {
+        startTime = System.currentTimeMillis();
+        DefaultFsUtil.replaceDefaultFs(conf);
+        DefaultFsUtil.removeRbfRedirectConf(conf);
+        LOG.info(jobId + " replace defaultFS cost:" + (System.currentTimeMillis() - startTime) + "ms");
       }
 
       // Write job file to submit dir
