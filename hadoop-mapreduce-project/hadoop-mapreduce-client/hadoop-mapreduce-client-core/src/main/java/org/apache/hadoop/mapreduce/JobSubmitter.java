@@ -257,13 +257,6 @@ class JobSubmitter {
         conf.set(MRJobConfig.RESERVATION_ID, reservationId.toString());
       }
 
-      if (DefaultFsUtil.rbfRedirectEnable(conf)) {
-        startTime = System.currentTimeMillis();
-        DefaultFsUtil.replaceDefaultFs(conf);
-        DefaultFsUtil.removeRbfRedirectConf(conf);
-        LOG.info(jobId + " replace defaultFS cost:" + (System.currentTimeMillis() - startTime) + "ms");
-      }
-
       // Write job file to submit dir
       startTime = System.currentTimeMillis();
       writeConf(conf, submitJobFile);

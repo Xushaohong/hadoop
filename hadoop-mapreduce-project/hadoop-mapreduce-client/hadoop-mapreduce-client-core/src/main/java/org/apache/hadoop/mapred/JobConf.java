@@ -49,6 +49,7 @@ import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.util.ClassUtil;
+import org.apache.hadoop.util.DefaultFsUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Tool;
 import org.slf4j.Logger;
@@ -474,6 +475,7 @@ public class JobConf extends Configuration {
   public JobConf(Configuration conf, Class exampleClass) {
     this(conf);
     setJarByClass(exampleClass);
+    replaceDefaultFs();
   }
 
 
@@ -492,6 +494,7 @@ public class JobConf extends Configuration {
   public JobConf(Path config) {
     super();
     addResource(config);
+    replaceDefaultFs();
     checkAndWarnDeprecation();
   }
 
@@ -505,7 +508,15 @@ public class JobConf extends Configuration {
    */
   public JobConf(boolean loadDefaults) {
     super(loadDefaults);
+    replaceDefaultFs();
     checkAndWarnDeprecation();
+  }
+
+  private void replaceDefaultFs() {
+    if (DefaultFsUtil.rbfRedirectEnable(this)) {
+      DefaultFsUtil.replaceDefaultFs(this);
+      DefaultFsUtil.removeRbfRedirectConf(this);
+    }
   }
 
   /**
