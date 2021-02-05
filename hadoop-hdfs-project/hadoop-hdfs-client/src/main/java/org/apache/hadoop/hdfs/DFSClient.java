@@ -357,8 +357,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       this.dtService = proxyInfo.getDelegationTokenService();
       this.namenode = proxyInfo.getProxy();
     } else if (rpcNamenode != null) {
-      // This case is used for testing.
-      Preconditions.checkArgument(nameNodeUri == null);
       this.namenode = rpcNamenode;
       dtService = null;
     } else {
