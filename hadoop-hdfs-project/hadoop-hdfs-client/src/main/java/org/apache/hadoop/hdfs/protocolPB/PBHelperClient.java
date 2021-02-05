@@ -426,7 +426,9 @@ public class PBHelperClient {
         .setLastUpdateMonotonic(info.getLastUpdateMonotonic())
         .setXceiverCount(info.getXceiverCount())
         .setAdminState(convert(info.getAdminState()))
+        // TODO(baoloongmao): remove this compatible purpose logic future.
         .setReadonly(info.getReadonly())
+        .setReadonly2(info.getReadonly())
         .setLastBlockReportTime(info.getLastBlockReportTime())
         .setLastBlockReportMonotonic(info.getLastBlockReportMonotonic())
         .setNumBlocks(info.getNumBlocks())
@@ -802,14 +804,19 @@ public class PBHelperClient {
             .setLastUpdateMonotonic(di.getLastUpdateMonotonic())
             .setXceiverCount(di.getXceiverCount())
             .setAdminState(convert(di.getAdminState()))
-            .setReadonly(di.getReadonly()).setUpgradeDomain(
+            .setUpgradeDomain(
             di.hasUpgradeDomain() ? di.getUpgradeDomain() : null)
             .setLastBlockReportTime(di.hasLastBlockReportTime() ?
                 di.getLastBlockReportTime() : 0)
             .setLastBlockReportMonotonic(di.hasLastBlockReportMonotonic() ?
                 di.getLastBlockReportMonotonic() : 0)
             .setNumBlocks(di.getNumBlocks());
-
+    // TODO(baoloongmao): remove this compatible purpose logic future.
+    if (di.hasReadonly2()) {
+      dinfo.setReadonly(di.getReadonly2());
+    } else if (di.hasReadonly()) {
+      dinfo.setReadonly(di.getReadonly());
+    }
     if (di.hasNonDfsUsed()) {
       dinfo.setNonDfsUsed(di.getNonDfsUsed());
     } else {
