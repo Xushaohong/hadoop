@@ -37,6 +37,8 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.management.ObjectName;
+
 /**
  * This class is for maintaining RPC method related statistics
  * and publishing them through the metrics interfaces.
@@ -53,9 +55,10 @@ public class RpcDetailedMetrics implements RpcDetailedMetricsMBean {
   final String name;
   // A map of "ThreadID -> currently performing RPC method".
   final ConcurrentHashMap<Long, String> threadRPCMethod;
+  ObjectName nnMBeanObjectName;
 
   RpcDetailedMetrics(int port) {
-    name = "RpcDetailedActivityForPort"+ port;
+    name = "RpcDetailedActivityForPort" + port;
     registry = new MetricsRegistry(name)
         .tag("port", "RPC port", String.valueOf(port));
     LOG.debug(registry.info().toString());
@@ -63,7 +66,8 @@ public class RpcDetailedMetrics implements RpcDetailedMetricsMBean {
     // Do not use @Metric annotation to generate JMX, as
     // @Metric has a default 60s cache period therefore not real-time.
     threadRPCMethod = new ConcurrentHashMap<Long, String>();
-    MBeans.register("NameNode", this.getClass().getSimpleName() + port, this);
+    nnMBeanObjectName = MBeans
+        .register("NameNode", this.getClass().getSimpleName() + port, this);
   }
 
   public String name() { return name; }
@@ -150,5 +154,6 @@ public class RpcDetailedMetrics implements RpcDetailedMetricsMBean {
   //@Override // some instrumentation interface
   public void shutdown() {
     DefaultMetricsSystem.instance().unregisterSource(name);
+    MBeans.unregister(nnMBeanObjectName);
   }
 }
