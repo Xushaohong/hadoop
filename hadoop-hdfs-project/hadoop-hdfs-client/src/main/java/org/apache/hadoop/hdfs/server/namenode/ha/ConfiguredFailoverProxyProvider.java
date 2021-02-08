@@ -46,6 +46,7 @@ public class ConfiguredFailoverProxyProvider<T> extends
   private int currentProxyIndex = 0;
   private boolean cacheActiveEnabled;
   private File cacheActiveFile;
+  private static final Object FILE_SYNC_OBJ = new Object();
 
   public ConfiguredFailoverProxyProvider(Configuration conf, URI uri,
       Class<T> xface, HAProxyFactory<T> factory) {
@@ -121,7 +122,7 @@ public class ConfiguredFailoverProxyProvider<T> extends
     String currentActive =
         proxies.get(currentProxyIndex).getAddress().getHostString();
 
-    synchronized (cacheActiveFile) {
+    synchronized (FILE_SYNC_OBJ) {
       try (RandomAccessFile raf = new RandomAccessFile(cacheActiveFile, "rw");
           FileChannel fc = raf.getChannel();
           FileLock lock = fc.tryLock(0, Long.MAX_VALUE, false)) {
@@ -156,7 +157,7 @@ public class ConfiguredFailoverProxyProvider<T> extends
     String currentActive = null;
     int activeindex = 0;
 
-    synchronized (cacheActiveFile) {
+    synchronized (FILE_SYNC_OBJ) {
       if (!cacheActiveFile.exists()) {
         return 0;
       }
