@@ -325,6 +325,10 @@ public class DFSck extends Configured implements Tool {
       dir = "/";
     }
 
+    // set fsck global conf to the final composite distributed configuration.
+    Configuration distConf = new Path(dir).getFileSystem(getConf()).getConf();
+    setConf(distConf);
+
     Path dirpath = null;
     URI namenodeAddress = null;
     try {
