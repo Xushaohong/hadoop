@@ -120,6 +120,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_NAMENODE_RPC_PORT_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_ENABLED_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_CALLER_CONTEXT_ENABLED_DEFAULT;
@@ -312,7 +314,8 @@ public class NameNode extends ReconfigurableBase implements
           DFS_STORAGE_POLICY_SATISFIER_MODE_KEY,
           DFS_NAMENODE_REPLICATION_MAX_STREAMS_KEY,
           DFS_NAMENODE_REPLICATION_STREAMS_HARD_LIMIT_KEY,
-          DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION));
+          DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION,
+          DFS_IMAGE_PARALLEL_LOAD_KEY));
 
   private static final String USAGE = "Usage: hdfs namenode ["
       + StartupOption.BACKUP.getName() + "] | \n\t["
@@ -2147,6 +2150,8 @@ public class NameNode extends ReconfigurableBase implements
         || property.equals(
             DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION)) {
       return reconfReplicationParameters(newVal, property);
+    } else if (property.equals(DFS_IMAGE_PARALLEL_LOAD_KEY)) {
+      return reconfigureParallelLoad(newVal);
     } else {
       throw new ReconfigurationException(property, newVal, getConf().get(
           property));
@@ -2315,6 +2320,17 @@ public class NameNode extends ReconfigurableBase implements
       }
     }
     return newVal;
+  }
+
+  String reconfigureParallelLoad(String newVal) {
+    boolean enableParallelLoad;
+    if (newVal == null) {
+      enableParallelLoad = DFS_IMAGE_PARALLEL_LOAD_DEFAULT;
+    } else {
+      enableParallelLoad = Boolean.parseBoolean(newVal);
+    }
+    FSImageFormatProtobuf.refreshParallelSaveAndLoad(enableParallelLoad);
+    return Boolean.toString(enableParallelLoad);
   }
 
   @Override  // ReconfigurableBase

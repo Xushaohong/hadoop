@@ -241,6 +241,7 @@ public class FSImageFormat {
    * the layout version.
    */
   public static LoaderDelegator newLoader(Configuration conf, FSNamesystem fsn) {
+
     return new LoaderDelegator(conf, fsn);
   }
 
