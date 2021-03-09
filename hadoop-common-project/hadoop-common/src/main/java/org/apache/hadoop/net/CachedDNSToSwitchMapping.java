@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
@@ -48,7 +50,7 @@ import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
   private static final Log LOG = LogFactory.getLog(CachedDNSToSwitchMapping.class);
 
-  private Map<String, String> cache = new ConcurrentHashMap<String, String>();
+  private ConcurrentHashMap<String, String> cache = new ConcurrentHashMap<>();
 
   /**
    * The uncached mapping
@@ -59,6 +61,12 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
   * The script to get all rack resolution items upon initiating.
   */
   private final String getAllRackResolveItemsScript;
+
+  /**
+  * Interval in milliseconds to refresh rack cache.
+  */
+  private Timer cacheRefresher;
+  private final int cacheRefreshInterval;
 
   /**
    * cache a raw DNS mapping
@@ -72,8 +80,12 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
     conf.addResource("hdfs-site.xml");
     this.getAllRackResolveItemsScript = conf.get(
         ScriptBasedMapping.GET_ALL_ITEMS_SCRIPT_FILENAME_KEY, null);
+    this.cacheRefreshInterval = conf.getInt(
+        ScriptBasedMapping.RACK_CACHE_REFRESH_INTERVALE_KEY,
+        ScriptBasedMapping.RACK_CACHE_REFRESH_INTERVALE_DEFAULT) * 1000;
     if (this.getAllRackResolveItemsScript != null) {
       loadAllRackResolveItems();
+      initRefreshTimer();
     }
   }
 
@@ -156,6 +168,24 @@ public class CachedDNSToSwitchMapping extends AbstractDNSToSwitchMapping {
     long elapsedTime = System.currentTimeMillis() - startTime;
     LOG.info("Successfully loaded " + number
           + " rack resolution items in " + elapsedTime + " ms.");
+  }
+
+  /**
+   * Initiate the cache refreshing timer.
+   */
+  private void initRefreshTimer() {
+    cacheRefresher = new Timer("RackCacheRefresher", true);
+    TimerTask task = new TimerTask() {
+      @Override
+      public void run() {
+        try {
+          loadAllRackResolveItems();
+        } catch (Throwable e) {
+          LOG.warn("RackCacheRefresher caught an exception:", e);
+        }
+      }
+    };
+    cacheRefresher.schedule(task, cacheRefreshInterval, cacheRefreshInterval);
   }
 
   /**

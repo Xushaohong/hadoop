@@ -114,6 +114,10 @@ public class CommonConfigurationKeysPublic {
   public static final String  NET_TOPOLOGY_GET_ALL_ITEMS_SCRIPT_FILE_NAME_KEY =
     "net.topology.get-all-items.script.file.name";
 
+  public static final String  NET_TOPOLOGY_REFRESH_INTERVAL_KEY =
+    "net.topology.refresh.interval.seconds";
+  public static final int NET_TOPOLOGY_REFRESH_INTERVAL_DEFAULT = 3600;
+
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">

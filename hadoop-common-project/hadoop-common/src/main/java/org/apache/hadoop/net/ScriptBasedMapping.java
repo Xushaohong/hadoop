@@ -71,6 +71,17 @@ public class ScriptBasedMapping extends CachedDNSToSwitchMapping {
                      CommonConfigurationKeys.NET_TOPOLOGY_GET_ALL_ITEMS_SCRIPT_FILE_NAME_KEY ;
 
   /**
+   * key to interval for refreshing rack cache.
+   */
+  static final String RACK_CACHE_REFRESH_INTERVALE_KEY =
+                     CommonConfigurationKeys.NET_TOPOLOGY_REFRESH_INTERVAL_KEY ;
+  /**
+   * default value of refreshing interval for rack cache.
+   */
+  static final int RACK_CACHE_REFRESH_INTERVALE_DEFAULT =
+                     CommonConfigurationKeys.NET_TOPOLOGY_REFRESH_INTERVAL_DEFAULT;
+
+  /**
    * key to the argument count that the script supports
    * {@value}
    */
