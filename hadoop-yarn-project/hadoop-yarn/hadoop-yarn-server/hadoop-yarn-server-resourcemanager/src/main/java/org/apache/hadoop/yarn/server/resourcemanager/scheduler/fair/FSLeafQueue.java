@@ -22,7 +22,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.Comparator;
@@ -78,6 +80,10 @@ public class FSLeafQueue extends FSQueue {
 
   private final ActiveUsersManager activeUsersManager;
 
+  private String lastScheduledNodeId;
+  private Map<String, Integer> assignedContainersForApp;
+  private int maxAssignForSameApp;
+
   public FSLeafQueue(String name, FairScheduler scheduler,
       FSParentQueue parent) {
     super(name, scheduler, parent);
@@ -86,6 +92,9 @@ public class FSLeafQueue extends FSQueue {
     activeUsersManager = new ActiveUsersManager(getMetrics());
     amResourceUsage = Resource.newInstance(0, 0);
     getMetrics().setAMResourceUsage(amResourceUsage);
+    assignedContainersForApp = new HashMap<>();
+    lastScheduledNodeId = "";
+    maxAssignForSameApp = scheduler.getConf().getMaxAssignForSameApp();
   }
   
   void addApp(FSAppAttempt app, boolean runnable) {
@@ -394,6 +403,10 @@ public class FSLeafQueue extends FSQueue {
   private Resource assignContainerWithoutSort(FSSchedulerNode node) {
     readLock.lock();
     List<FSAppAttempt> apps = new ArrayList<>(runnableApps);
+    if (maxAssignForSameApp > 0 && !lastScheduledNodeId.equals(node.getNodeName())) {
+      assignedContainersForApp.clear();
+      lastScheduledNodeId = node.getNodeName();
+    }
     readLock.unlock();
 
     Resource totalAssigned = Resources.none();
@@ -410,6 +423,19 @@ public class FSLeafQueue extends FSQueue {
       }
       if (SchedulerAppUtils.isPlaceBlacklisted(sched, node, LOG)) {
         continue;
+      }
+      if (maxAssignForSameApp > 0) {
+        int max = 0;
+        String name = sched.getName();
+        if (assignedContainersForApp.containsKey(name)) {
+          max = assignedContainersForApp.get(name);
+          if (max > maxAssignForSameApp) {
+            LOG.debug(name + " has been allocated too many containers, skip assign container for it.");
+            continue;
+          }
+        }
+        max += 1;
+        assignedContainersForApp.put(name, max);
       }
 
       Resource assigned = sched.assignContainer(node);

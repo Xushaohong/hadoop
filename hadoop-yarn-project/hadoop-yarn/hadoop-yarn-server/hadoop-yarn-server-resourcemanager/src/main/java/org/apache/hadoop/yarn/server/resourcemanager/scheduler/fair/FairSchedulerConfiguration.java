@@ -238,6 +238,9 @@ public class FairSchedulerConfiguration extends Configuration {
   public static final String SORT_NODES_ENABLED = CONF_PREFIX + "sort-nodes-enabled";
   public static final boolean DEFAULT_SORT_NODES_ENABLED = true;
 
+  public static final String MAX_ASSIGN_FOR_SAME_APP = CONF_PREFIX + "max-assign-for-same-app";
+  public static final int DEFAULT_MAX_ASSIGN_FOR_SAME_APP = -1;
+
   public FairSchedulerConfiguration() {
     super();
   }
@@ -451,6 +454,10 @@ public class FairSchedulerConfiguration extends Configuration {
 
   public boolean isSortNodesEnabled() {
     return getBoolean(SORT_NODES_ENABLED, DEFAULT_SORT_NODES_ENABLED);
+  }
+
+  public int getMaxAssignForSameApp() {
+    return getInt(MAX_ASSIGN_FOR_SAME_APP, DEFAULT_MAX_ASSIGN_FOR_SAME_APP);
   }
 
   /**
