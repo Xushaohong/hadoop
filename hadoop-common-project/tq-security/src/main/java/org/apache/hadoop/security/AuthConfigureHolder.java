@@ -17,6 +17,7 @@ public class AuthConfigureHolder {
   private static final Logger LOG = LoggerFactory.getLogger(AuthConfigureHolder.class);
   private static String AUTH_CONF_FILE_NAME = "auth-config.properties";
   private static String AUTH_ENABLE_KEY = "auth.enable";
+  private static String AUTH_SMK_ENABLE_KEY = "auth.smk.enable";
   private static String AUTHORIZATION_ENABLE_KEY = "authorization.enable";
   private static String UNION_TOKEN_ENABLE_KEY = "union.token.enable";
   private static String TQ_TOKEN_ENABLE_KEY = "tq.token.enable";
@@ -31,6 +32,7 @@ public class AuthConfigureHolder {
 
   private static boolean AUTH_WEB_CONFIG_ENABLE = false;
   private static boolean AUTH_ENABLE = true;
+  private static boolean AUTH_SMK_ENABLE = true;
   private static boolean AUTHORIZATION_ENABLE = true;
   private static boolean UNION_TOKEN_ENABLE = true;
   private static boolean TQ_TOKEN_ENABLE = true;
@@ -59,6 +61,7 @@ public class AuthConfigureHolder {
     }
     AUTH_WEB_CONFIG_ENABLE = Boolean.parseBoolean(Utils.getProperty(authProps, AUTH_WEB_CONFIG_ENABLE_KEY, "false"));
     AUTH_ENABLE = Boolean.parseBoolean(Utils.getProperty(authProps, AUTH_ENABLE_KEY, "true"));
+    AUTH_SMK_ENABLE = Boolean.parseBoolean(Utils.getProperty(authProps, AUTH_SMK_ENABLE_KEY, "true"));
     AUTHORIZATION_ENABLE = Boolean.parseBoolean(Utils.getProperty(authProps, AUTHORIZATION_ENABLE_KEY, "true"));
     UNION_TOKEN_ENABLE = Boolean.parseBoolean(Utils.getProperty(authProps, UNION_TOKEN_ENABLE_KEY, "true"));
     TQ_TOKEN_ENABLE = Boolean.parseBoolean(Utils.getProperty(authProps, TQ_TOKEN_ENABLE_KEY, "true"));
@@ -102,6 +105,10 @@ public class AuthConfigureHolder {
 
   public static boolean isAuthEnable() {
     return AUTH_ENABLE;
+  }
+
+  public static boolean isAuthSmkEnable() {
+    return AUTH_SMK_ENABLE;
   }
 
   public static boolean isAuthorizationEnable() {
