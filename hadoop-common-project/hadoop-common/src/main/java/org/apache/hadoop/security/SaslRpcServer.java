@@ -237,7 +237,7 @@ public class SaslRpcServer {
   }
 
   private static void initTauthSecureService(AuthMethod authMethod, UserGroupInformation ugi) throws IOException{
-    if(authMethod == AuthMethod.TAUTH && secureServiceV2 == null) {
+    if(AuthConfigureHolder.isAuthEnable() && authMethod == AuthMethod.TAUTH && secureServiceV2 == null) {
       synchronized(SaslRpcServer.class) {
         if(secureServiceV2 == null) {
           //Load smk first, otherwise using current login user
