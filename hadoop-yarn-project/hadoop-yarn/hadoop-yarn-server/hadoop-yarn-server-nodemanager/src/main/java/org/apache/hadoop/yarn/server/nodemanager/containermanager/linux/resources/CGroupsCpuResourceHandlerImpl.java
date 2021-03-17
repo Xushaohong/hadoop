@@ -67,6 +67,8 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
   private float yarnProcessors;
   private int nodeVCores;
   private boolean cpusetEnabled = false;
+  private int overCores;
+  private int overTimes;
   private static int cpu_cfs_period_us;
   private static final CGroupsHandler.CGroupController CPU =
       CGroupsHandler.CGroupController.CPU;
@@ -100,6 +102,12 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
     this.cpusetEnabled = conf.getBoolean(
             YarnConfiguration.NM_RESOURCE_LIMITED_PHYSICAL_CPU_SET,
             YarnConfiguration.DEFAULT_NM_RESOURCE_LIMITED_PHYSICAL_CPU_SET);
+    this.overCores = conf.getInt(
+            YarnConfiguration.NM_RESOURCE_CPU_OVER_USAGE_CORES,
+            YarnConfiguration.DEFAULT_NM_RESOURCE_CPU_OVER_USAGE_CORES);
+    this.overTimes = conf.getInt(
+            YarnConfiguration.NM_RESOURCE_CPU_OVER_USAGE_TIMES,
+            YarnConfiguration.DEFAULT_NM_RESOURCE_CPU_OVER_USAGE_TIMES);
     this.cGroupsHandler.initializeCGroupController(CPU);
     nodeVCores = NodeManagerHardwareUtils.getVCores(plugin, conf);
 
@@ -251,6 +259,26 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
             cGroupsHandler.updateCGroupParam(CPU, cgroupId,
                 CGroupsHandler.CGROUP_CPU_QUOTA_US, String.valueOf(limits[1]));
           }
+        } else if (this.overTimes >= 0 || this.overCores >= 0) {
+          // overCores choose the min value between cores and times
+          int overCpuCores;
+          if (this.overTimes < 0) {
+            overCpuCores = this.overCores;
+          } else if (this.overCores < 0) {
+            overCpuCores = containerVCores * this.overTimes;
+          } else {
+            overCpuCores = containerVCores * this.overTimes;
+            if (this.overCores < overCpuCores) {
+              overCpuCores = this.overCores;
+            }
+          }
+          LOG.info("set cpu over usage for " + cgroupId + " : " + overCpuCores);
+
+          int[] limits = getOverallLimits(containerVCores + overCpuCores);
+          cGroupsHandler.updateCGroupParam(CPU, cgroupId,
+              CGroupsHandler.CGROUP_CPU_PERIOD_US, String.valueOf(limits[0]));
+          cGroupsHandler.updateCGroupParam(CPU, cgroupId,
+              CGroupsHandler.CGROUP_CPU_QUOTA_US, String.valueOf(limits[1]));
         }
       } catch (ResourceHandlerException re) {
         cGroupsHandler.deleteCGroup(CPU, cgroupId);

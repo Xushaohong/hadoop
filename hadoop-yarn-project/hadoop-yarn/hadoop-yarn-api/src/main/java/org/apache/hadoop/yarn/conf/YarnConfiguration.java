@@ -1601,6 +1601,28 @@ public class YarnConfiguration extends Configuration {
       DEFAULT_NM_MEMORY_RESOURCE_CGROUPS_SOFT_LIMIT_PERCENTAGE =
       90.0f;
 
+  /**
+   * Over usage will limit cpu or memory resource by setting the max over usage number or times,
+   * it will choose the min value between over usage number and times value.
+   * the function is disabled by setting the negative value, and zero value means strict limit.
+   * This function is conflicted with resource.memory.enforced.
+   */
+  public static final String NM_RESOURCE_CPU_OVER_USAGE_CORES =
+      NM_PREFIX + "resource.cpu-over-usage-cores";
+  public static final Integer DEFAULT_NM_RESOURCE_CPU_OVER_USAGE_CORES = -1;
+
+  public static final String NM_RESOURCE_CPU_OVER_USAGE_TIMES =
+      NM_PREFIX + "resource.cpu-over-usage-times";
+  public static final Integer DEFAULT_NM_RESOURCE_CPU_OVER_USAGE_TIMES = -1;
+
+  public static final String NM_RESOURCE_MEM_OVER_USAGE_MB =
+      NM_PREFIX + "resource.mem-over-usage-mb";
+  public static final Integer DEFAULT_NM_RESOURCE_MEM_OVER_USAGE_MB = -1;
+
+  public static final String NM_RESOURCE_MEM_OVER_USAGE_TIMES =
+      NM_PREFIX + "resource.mem-over-usage-times";
+  public static final Integer DEFAULT_NM_RESOURCE_MEM_OVER_USAGE_TIMES = -1;
+
   @Private
   public static final String NM_CPU_RESOURCE_PREFIX = NM_PREFIX
       + "resource.cpu.";
