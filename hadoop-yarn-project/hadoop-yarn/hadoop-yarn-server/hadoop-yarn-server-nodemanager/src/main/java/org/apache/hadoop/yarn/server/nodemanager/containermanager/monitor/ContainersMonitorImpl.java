@@ -94,6 +94,7 @@ public class ContainersMonitorImpl extends AbstractService implements
   private boolean elasticMemoryEnforcement;
   private boolean strictMemoryEnforcement;
   private boolean containersMonitorEnabled;
+  private boolean elasticMemoryCgroupOOMEanbled;
 
   private long maxVCoresAllottedForContainers;
 
@@ -187,10 +188,15 @@ public class ContainersMonitorImpl extends AbstractService implements
     strictMemoryEnforcement = conf.getBoolean(
         YarnConfiguration.NM_MEMORY_RESOURCE_ENFORCED,
         YarnConfiguration.DEFAULT_NM_MEMORY_RESOURCE_ENFORCED);
+    elasticMemoryCgroupOOMEanbled = this.conf.getBoolean(
+        YarnConfiguration.NM_ELASTIC_MEMORY_CGROUP_OOM_ENABLE,
+        YarnConfiguration.DEFAULT_NM_ELASTIC_MEMORY_CGROUP_OOM_ENABLE
+    );
     LOG.info("Physical memory check enabled: " + pmemCheckEnabled);
     LOG.info("Virtual memory check enabled: " + vmemCheckEnabled);
     LOG.info("Elastic memory control enabled: " + elasticMemoryEnforcement);
     LOG.info("Strict memory control enabled: " + strictMemoryEnforcement);
+    LOG.info("Elastic memory cgroup oom control enabled: " + elasticMemoryCgroupOOMEanbled);
 
     if (elasticMemoryEnforcement) {
       if (!CGroupElasticMemoryController.isAvailable()) {
@@ -210,6 +216,15 @@ public class ContainersMonitorImpl extends AbstractService implements
             pmemCheckEnabled ?
                 maxPmemAllottedForContainers : maxVmemAllottedForContainers
         );
+
+	// if cgroup oom is enabled, no need to start cgroup oom event listening
+        if (elasticMemoryCgroupOOMEanbled) {
+          this.oomListenerThread.openCgroupOOMKiller(
+              pmemCheckEnabled ?
+                  maxPmemAllottedForContainers : maxVmemAllottedForContainers
+          );
+          this.oomListenerThread = null;
+        }
       }
     }
 

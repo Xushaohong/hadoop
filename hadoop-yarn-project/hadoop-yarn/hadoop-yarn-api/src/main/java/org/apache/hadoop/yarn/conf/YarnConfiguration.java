@@ -1522,6 +1522,11 @@ public class YarnConfiguration extends Configuration {
       + "elastic-memory-control.enabled";
   public static final boolean DEFAULT_NM_ELASTIC_MEMORY_CONTROL_ENABLED = false;
 
+  /** enable killing task by cgroup oom with elastic memory enabled */
+  public static final String NM_ELASTIC_MEMORY_CGROUP_OOM_ENABLE =
+    NM_PREFIX + "elastic-memory-cgroup-oom-enable";
+  public static final boolean DEFAULT_NM_ELASTIC_MEMORY_CGROUP_OOM_ENABLE = false;
+
   /** Specifies the OOM handler code. */
   public static final String NM_ELASTIC_MEMORY_CONTROL_OOM_HANDLER = NM_PREFIX
       + "elastic-memory-control.oom-handler";
