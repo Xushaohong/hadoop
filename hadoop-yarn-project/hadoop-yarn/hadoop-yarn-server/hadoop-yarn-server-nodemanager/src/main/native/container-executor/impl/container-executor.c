@@ -253,6 +253,119 @@ cleanup:
 
   return rc;
 }
+
+// read_memory_value_from_cgroup read memory value from cgroup
+static unsigned long long read_memory_value_from_cgroup(const char* cgroup_file) {
+  unsigned long long mem_value = 0;
+  const unsigned long long mem_max = 102400000000000;
+
+  FILE *cgroup_fd = fopen(cgroup_file, "r");
+  if (cgroup_fd == NULL ) {
+    fprintf(LOGFILE, "Can't open file %s as root - %s\n", cgroup_file,
+           strerror(errno));
+    goto cleanup;
+  }
+  int length = fscanf(cgroup_fd, "%llu\n", &mem_value);
+  if (length != 1) {
+    fprintf(LOGFILE, "Read file %s as root fail - %s\n", cgroup_file,
+           strerror(errno));
+    fclose(cgroup_fd);
+    mem_value = 0;
+    goto cleanup;
+  }
+  if (mem_value > mem_max) {
+      fprintf(LOGFILE, "Memory value not set %s - %s\n", cgroup_file,
+             strerror(errno));
+      fclose(cgroup_fd);
+      mem_value = 0;
+      goto cleanup;
+  }
+  fclose(cgroup_fd);
+
+cleanup:
+  return mem_value;
+}
+
+/**
+ * Change oom score adj for pid based on request memory and total limit quantity.
+ * cgroup_file: container memory task file, such as /cgroup/memory/hadoop-yarn/container_xx/tasks.
+ */
+static int change_pid_oom_score_as_root(const char* cgroup_file, pid_t pid) {
+  int rc = 0;
+  uid_t user = geteuid();
+  gid_t group = getegid();
+  if (change_effective_user(0, 0) != 0) {
+    rc = -1;
+    goto cleanup;
+  }
+
+  // get container cgroup soft limit file and hadoop-yarn cgroup limit file
+  char container_soft_limit_file[1024];
+  char hadoop_yarn_limit_file[1024];
+  char *p = strstr(cgroup_file, "tasks");
+  if (p == NULL) {
+    fprintf(LOGFILE, "Can't find tasks flag from cgroup file %s - %s\n", cgroup_file,
+           strerror(errno));
+    rc = -1;
+    goto cleanup;
+  }
+  *container_soft_limit_file = '\0';
+  strncat(container_soft_limit_file, cgroup_file, p - cgroup_file);
+  strcat(container_soft_limit_file, "memory.soft_limit_in_bytes");
+  p = strstr(cgroup_file, "container");
+  if (p == NULL) {
+    fprintf(LOGFILE, "Can't find container flag from cgroup file %s - %s\n", cgroup_file,
+           strerror(errno));
+    rc = -1;
+    goto cleanup;
+  }
+  *hadoop_yarn_limit_file = '\0';
+  strncat(hadoop_yarn_limit_file, cgroup_file, p - cgroup_file);
+  strcat(hadoop_yarn_limit_file, "memory.limit_in_bytes");
+
+  // read container memory request from memory.soft_limit_in_bytes
+  unsigned long long mem_request = read_memory_value_from_cgroup(container_soft_limit_file);
+  if (mem_request == 0) {
+    fprintf(LOGFILE, "Container cgroup can't get request memory %s - %s \n", container_soft_limit_file,
+           strerror(errno));
+    rc = -1;
+    goto cleanup;
+  }
+
+  // read nm total memory request from memory.limit_in_bytes
+  unsigned long long mem_total = read_memory_value_from_cgroup(hadoop_yarn_limit_file);
+  if (mem_total == 0 ) {
+    fprintf(LOGFILE, "Can't get total memory limit %s - %s\n", hadoop_yarn_limit_file,
+           strerror(errno));
+    rc = -1;
+    goto cleanup;
+  }
+
+  // write oom_score_adj for pid
+  int oomscore = 1000*((long double)(mem_total - mem_request)/mem_total);
+  char oom_score_path[32];
+  sprintf(oom_score_path, "/proc/%ld/oom_score_adj", (int64_t)pid);
+  FILE *oom_score_file = fopen(oom_score_path, "w+");
+  if (oom_score_file == NULL) {
+    fprintf(LOGFILE, "Can't open file %s as root - %s\n", oom_score_path,
+           strerror(errno));
+    rc = -1;
+    goto cleanup;
+  }
+
+  fprintf(LOGFILE, "Writing oom score %d to %s for container cgroup file %s.\n",
+        oomscore, oom_score_path, cgroup_file);
+  fprintf(oom_score_file, "%d\n", oomscore);
+  fclose(oom_score_file);
+
+cleanup:
+  // Revert back to the calling user.
+  if (change_effective_user(user, group)) {
+    rc = -1;
+  }
+
+  return rc;
+}
 #endif
 
 /**
@@ -1988,6 +2101,13 @@ int launch_container_as_user(const char *user, const char *app_id,
             write_pid_to_cgroup_as_root(*cgroup_ptr, pid) != 0) {
         exit_code = WRITE_CGROUP_FAILED;
         goto cleanup;
+      }
+
+      // adapt oom score for pid
+      if (strstr(*cgroup_ptr, "memory") != NULL &&
+            change_pid_oom_score_as_root(*cgroup_ptr, pid) != 0) {
+            // just print error message
+            fprintf(LOGFILE, "Changing oom score for pid failed...\n");
       }
     }
   }
