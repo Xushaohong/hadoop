@@ -2974,6 +2974,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     if (success) {
       NameNode.stateChangeLog.info("DIR* completeFile: " + src
           + " is closed by " + holder);
+      logAuditEvent(true, "close", src);
     }
     return success;
   }
