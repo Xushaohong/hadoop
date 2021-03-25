@@ -60,6 +60,8 @@ public class CGroupsMemoryResourceHandlerImpl implements MemoryResourceHandler {
   private int swappiness = 0;
   // multiplier to set the soft limit - value should be between 0 and 1
   private float softLimit = 0.0f;
+  private int overMb;
+  private int overTimes;
 
   CGroupsMemoryResourceHandlerImpl(CGroupsHandler cGroupsHandler) {
     this.cGroupsHandler = cGroupsHandler;
@@ -93,6 +95,13 @@ public class CGroupsMemoryResourceHandlerImpl implements MemoryResourceHandler {
                 NM_MEMORY_RESOURCE_CGROUPS_SOFT_LIMIT_PERCENTAGE
               + ". Value must be between 0 and 100.");
     }
+
+    overTimes = conf.getInt(
+            YarnConfiguration.NM_RESOURCE_MEM_OVER_USAGE_TIMES,
+            YarnConfiguration.DEFAULT_NM_RESOURCE_MEM_OVER_USAGE_TIMES);
+    overMb = conf.getInt(
+            YarnConfiguration.NM_RESOURCE_MEM_OVER_USAGE_MB,
+            YarnConfiguration.DEFAULT_NM_RESOURCE_MEM_OVER_USAGE_MB);
     return null;
   }
 
@@ -117,8 +126,8 @@ public class CGroupsMemoryResourceHandlerImpl implements MemoryResourceHandler {
       long containerSoftLimit =
           (long) (container.getResource().getMemorySize() * this.softLimit);
       long containerHardLimit = container.getResource().getMemorySize();
-      if (enforce) {
-        try {
+      try {
+        if (enforce) {
           cGroupsHandler.updateCGroupParam(MEMORY, cgroupId,
               CGroupsHandler.CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES,
               String.valueOf(containerHardLimit) + "M");
@@ -139,11 +148,34 @@ public class CGroupsMemoryResourceHandlerImpl implements MemoryResourceHandler {
                 CGroupsHandler.CGROUP_PARAM_MEMORY_SWAPPINESS,
                 String.valueOf(swappiness));
           }
-        } catch (ResourceHandlerException re) {
-          cGroupsHandler.deleteCGroup(MEMORY, cgroupId);
-          LOG.warn("Could not update cgroup for container", re);
-          throw re;
+        } else if (this.overMb >= 0 || this.overTimes >= 0) {
+          int containerMem = container.getResource().getMemory();
+          // overMemMb choose the min value between memMb and times
+          int overMemMb;
+          if (this.overTimes < 0) {
+            overMemMb = this.overMb;
+          } else if (this.overMb < 0) {
+            overMemMb = containerMem * this.overTimes;
+          } else {
+            overMemMb = containerMem * this.overTimes;
+            if (this.overMb < overMemMb) {
+              overMemMb = this.overMb;
+            }
+          }
+          LOG.info("set memory over usage for " + cgroupId + " : " + overMemMb);
+          cGroupsHandler.updateCGroupParam(MEMORY, cgroupId,
+                  CGroupsHandler.CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES,
+                  String.valueOf(containerMem + overMemMb) + "M");
+
+          // must enable container cgroup oom when limit is set
+          cGroupsHandler.updateCGroupParam(MEMORY, cgroupId,
+                  CGroupsHandler.CGROUP_PARAM_MEMORY_OOM_CONTROL,
+                  String.valueOf("0"));
         }
+      } catch (ResourceHandlerException re) {
+        cGroupsHandler.deleteCGroup(MEMORY, cgroupId);
+        LOG.warn("Could not update cgroup for container", re);
+        throw re;
       }
     }
     return null;
