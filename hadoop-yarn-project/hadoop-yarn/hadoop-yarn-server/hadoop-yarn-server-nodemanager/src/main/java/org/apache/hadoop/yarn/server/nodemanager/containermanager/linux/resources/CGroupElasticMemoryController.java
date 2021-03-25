@@ -232,6 +232,29 @@ public class CGroupElasticMemoryController extends Thread {
   }
 
   /**
+   * Open Cgroup oom killer, killing container just by cgoup oom, not by listening oom event.
+   * This will kill task immediately in case the machine is hang.
+   */
+  public void openCgroupOOMKiller(long limit) {
+      try {
+        // Set memory limits
+        cgroups.updateCGroupParam(
+                CGroupsHandler.CGroupController.MEMORY, "",
+                CGROUP_PARAM_MEMORY_SWAP_HARD_LIMIT_BYTES, CGROUP_NO_LIMIT);
+        cgroups.updateCGroupParam(
+                CGroupsHandler.CGroupController.MEMORY, "",
+                CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES, Long.toString(limit));
+
+        // Enable the OOM killer
+        cgroups.updateCGroupParam(
+                CGroupsHandler.CGroupController.MEMORY, "",
+                CGROUP_PARAM_MEMORY_OOM_CONTROL, "0");
+      } catch (ResourceHandlerException ex) {
+        LOG.error("open cgroup oom kill failed: " + ex);
+      }
+  }
+
+  /**
    * Main OOM listening thread. It uses an external process to listen to
    * Linux events. The external process does not need to run as root, so
    * it is not related to container-executor. We do not use JNI for security
