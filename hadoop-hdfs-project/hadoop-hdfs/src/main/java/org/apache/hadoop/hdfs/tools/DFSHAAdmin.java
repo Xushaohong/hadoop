@@ -23,28 +23,30 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSortedMap;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
-import org.apache.hadoop.ha.FailoverController;
-import org.apache.hadoop.ha.FailoverFailedException;
-import org.apache.hadoop.ha.HAServiceProtocol;
-import org.apache.hadoop.ha.HAServiceProtocolHelper;
-import org.apache.hadoop.ha.ServiceFailedException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ha.FailoverController;
+import org.apache.hadoop.ha.FailoverFailedException;
 import org.apache.hadoop.ha.HAAdmin;
+import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.RequestSource;
+import org.apache.hadoop.ha.HAServiceProtocolHelper;
 import org.apache.hadoop.ha.HAServiceTarget;
+import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.util.ToolRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSortedMap;
 
 /**
  * Class to extend HAAdmin to do a little bit of HDFS-specific configuration.
@@ -164,6 +166,12 @@ public class DFSHAAdmin extends HAAdmin {
         printUsage(errOut, USAGE_DFS_MERGED);
         return -1;
       }
+
+      // set global conf to the final composite distributed configuration.
+      Configuration distConf = new Path("hdfs://" + nameserviceId + "/")
+          .getFileSystem(getConf()).getConf();
+      setConf(distConf);
+
       argv = Arrays.copyOfRange(argv, i, argv.length);
       cmd = argv[0];
     }
