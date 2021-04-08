@@ -19,6 +19,7 @@ package org.apache.hadoop.tools;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.tools.ECConverter.ECEonverterCopyFilter;
 
 /**
  * Interface for excluding files from DistCp.
@@ -47,13 +48,15 @@ public abstract class CopyFilter {
    * @return An instance of the appropriate CopyFilter
    */
   public static CopyFilter getCopyFilter(Configuration conf) {
-    String filtersFilename = conf.get(DistCpConstants.CONF_LABEL_FILTERS_FILE);
+    String cls = conf.get(DistCpConstants.CONF_LABEL_FILTERS_CLASS);
 
-    if (filtersFilename == null) {
+    if (cls == null) {
       return new TrueCopyFilter();
+    } else if (cls.equals(ECEonverterCopyFilter.class.getName())) {
+      return new ECEonverterCopyFilter(conf);
     } else {
-      String filterFilename = conf.get(
-          DistCpConstants.CONF_LABEL_FILTERS_FILE);
+      // regex filter
+      String filterFilename = conf.get(DistCpConstants.CONF_LABEL_FILTERS_FILE);
       return new RegexCopyFilter(filterFilename);
     }
   }

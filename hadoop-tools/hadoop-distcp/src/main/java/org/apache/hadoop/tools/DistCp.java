@@ -45,6 +45,7 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.mapreduce.Mapper;
 
 /**
  * DistCp is the main driver-class for DistCpV2.
@@ -292,7 +293,9 @@ public class DistCp extends Configured implements Tool {
     job.setJarByClass(CopyMapper.class);
     configureOutputFormat(job);
 
-    job.setMapperClass(CopyMapper.class);
+    job.setMapperClass(getConf().getClass(
+        DistCpConstants.CONF_LABEL_MAPPER_CLASS,
+        CopyMapper.class, Mapper.class));
     job.setNumReduceTasks(0);
     job.setMapOutputKeyClass(Text.class);
     job.setMapOutputValueClass(Text.class);
@@ -460,7 +463,7 @@ public class DistCp extends Configured implements Tool {
     return config;
   }
 
-  private synchronized void cleanup() {
+  protected synchronized void cleanup() {
     try {
       if (metaFolder != null) {
         if (jobFS != null) {

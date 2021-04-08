@@ -67,6 +67,7 @@ function hadoop_usage
   hadoop_add_subcommand "sps" daemon "run external storagepolicysatisfier"
   hadoop_add_subcommand "version" client "print the version"
   hadoop_add_subcommand "zkfc" daemon "run the ZK Failover Controller daemon"
+  hadoop_add_subcommand "ecconverter" daemon "run the ECConverter"
   hadoop_generate_usage "${HADOOP_SHELL_EXECNAME}" false
 }
 
@@ -216,6 +217,11 @@ function hdfscmd_case
     zkfc)
       HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
       HADOOP_CLASSNAME='org.apache.hadoop.hdfs.tools.DFSZKFailoverController'
+    ;;
+    ecconverter)
+      HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
+      HADOOP_CLASSNAME='org.apache.hadoop.tools.ECConverter'
+      CLASSPATH=${CLASSPATH}:${HADOOP_TOOLS_LIB_JARS_DIR}/*
     ;;
     *)
       HADOOP_CLASSNAME="${subcmd}"

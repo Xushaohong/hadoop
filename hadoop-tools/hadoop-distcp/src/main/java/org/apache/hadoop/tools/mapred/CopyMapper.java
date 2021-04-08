@@ -20,6 +20,7 @@ package org.apache.hadoop.tools.mapred;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.EnumSet;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -268,11 +269,14 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
     totalBytesCopied += bytesCopied;
 
     if (verboseLog) {
+      targrtFileStatus = target.getFileSystem(conf).getFileStatus(target);
+      String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS")
+          .format(System.currentTimeMillis());
       context.write(null,
           new Text("FILE_COPIED: source=" + sourceFileStatus.getPath() + ","
           + " size=" + sourceFileStatus.getLen() + " --> "
           + "target=" + target + ", size=" + (targrtFileStatus == null ?
-              0 : targrtFileStatus.getLen())));
+              0 : targrtFileStatus.getLen()) + ", date: " + date));
     }
   }
 
