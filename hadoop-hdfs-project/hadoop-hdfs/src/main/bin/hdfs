@@ -221,7 +221,7 @@ function hdfscmd_case
     ecconverter)
       HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
       HADOOP_CLASSNAME='org.apache.hadoop.tools.ECConverter'
-      CLASSPATH=${CLASSPATH}:${HADOOP_TOOLS_LIB_JARS_DIR}/*
+      CLASSPATH=${CLASSPATH}:${HADOOP_HOME}/${HADOOP_TOOLS_LIB_JARS_DIR}/*
     ;;
     *)
       HADOOP_CLASSNAME="${subcmd}"

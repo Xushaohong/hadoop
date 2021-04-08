@@ -19,12 +19,14 @@
 package org.apache.hadoop.tools;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -58,6 +60,9 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Charsets;
+import com.google.common.io.Files;
 
 
 /**
@@ -271,26 +276,42 @@ public class ECConverter extends DistCp {
     public void map(Text relPath, CopyListingFileStatus sourceFileStatus,
         Mapper<Text, CopyListingFileStatus, Text, Text>.Context context)
             throws IOException, InterruptedException {
-      // copy
-      super.map(relPath, sourceFileStatus, context);
-
-      // rename to original
+      // omit directory
       if (sourceFileStatus.isDirectory()) {
         return;
       }
+
+      // copy to tmp ec directory
+      super.map(relPath, sourceFileStatus, context);
+
+      // manually retrieve all original file attributes
       Configuration conf = context.getConfiguration();
       Path sourcePath = sourceFileStatus.getPath();
       DistributedFileSystem dfs =
           (DistributedFileSystem)(sourcePath.getFileSystem(conf));
+      FileStatus status = dfs.getFileStatus(sourcePath);
+      boolean preserveAcls = status.hasAcl();
+      CopyListingFileStatus originalSourceStatus =
+          DistCpUtils.toCopyListingFileStatusHelper(dfs,
+            status,
+            preserveAcls,
+            true, true,
+            sourceFileStatus.getChunkOffset(),
+            sourceFileStatus.getChunkLength());
+
+      // rename to origin
       Path targetWorkPath =
           new Path(conf.get(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH));
       Path target = new Path(targetWorkPath.makeQualified(dfs.getUri(),
           dfs.getWorkingDirectory()) + relPath.toString());
       dfs.rename(target, sourcePath, Rename.OVERWRITE);
 
-      // preserve attrs
-      DistCpUtils.preserve(dfs, sourcePath,
-          sourceFileStatus, EnumSet.allOf(FileAttribute.class), true);
+      // preserve all original file attributes
+      EnumSet<FileAttribute> attrs = EnumSet.allOf(FileAttribute.class);
+      if (!preserveAcls) {
+        attrs.remove(FileAttribute.ACL);
+      }
+      DistCpUtils.preserve(dfs, sourcePath, originalSourceStatus, attrs, true);
 
       // write log
       String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS")
@@ -504,6 +525,37 @@ public class ECConverter extends DistCp {
   }
 
   /**
+   * Because there are possible many ec paths, allow them to be indirected
+   * through a file by specifying the configuration as "@/path/to/local/file".
+   * If this syntax is used, this function will return the contents of the file
+   * as a String[].
+   */
+  public String[] resolveEcPathsIndirection()
+      throws IOException {
+    LinkedList<String> ret = new LinkedList<>();
+    String[] ecPaths = conf.getTrimmedStrings(DFS_EC_CONVERT_PATHS);
+    for (String p : ecPaths) {
+      // direct HDFS path
+      if (!p.startsWith("@")) {
+        ret.add(p);
+        continue;
+      }
+
+      // indirect local FileSystem file
+      String localFile = p.substring(1).trim();
+      File file = new File(localFile);
+      if (file.exists()) {
+        String content =
+            Files.asCharSource(file, Charsets.UTF_8).read().trim();
+        ret.addAll(Arrays.asList(content.split("\\n+")));
+      } else {
+        LOG.warn("Local ec paths file " + file + " does not exist, ingore it!");
+      }
+    }
+    return ret.toArray(new String[0]);
+  }
+
+  /**
    * validate user config, now just check src ec paths
    */
   private void validateConvertConfig() throws IOException {
@@ -542,7 +594,7 @@ public class ECConverter extends DistCp {
     }
 
     // validate src ec paths
-    String[] srcEcPaths = conf.getTrimmedStrings(DFS_EC_CONVERT_PATHS);
+    String[] srcEcPaths = resolveEcPathsIndirection();
     List<Path> list = new LinkedList<Path>();
     for (int i = 0; i < srcEcPaths.length; i++) {
       Path p = new Path(srcEcPaths[i]);
