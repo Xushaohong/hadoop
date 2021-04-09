@@ -18,9 +18,18 @@
 
 package org.apache.hadoop.yarn.server.federation.utils;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import javax.cache.Cache;
@@ -38,6 +47,8 @@ import javax.cache.spi.CachingProvider;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryProxy;
@@ -66,6 +77,8 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterInfo;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterPolicyConfiguration;
 import org.apache.hadoop.yarn.server.federation.store.records.UpdateApplicationHomeSubClusterRequest;
+import org.apache.hadoop.yarn.util.Clock;
+import org.apache.hadoop.yarn.util.SystemClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,6 +109,27 @@ public final class FederationStateStoreFacade {
   private Cache<Object, Object> cache;
   private SubClusterResolver subclusterResolver;
 
+  private boolean queueMappingEnable;
+
+  private Map<String, Set<SubClusterId>> queueToSubClusters =
+          new ConcurrentHashMap<String, Set<SubClusterId>>();
+  //Index of the queue name in the queue info file.
+  private static final int QUEUE_NAME_INDEX = 0;
+  // Index of the sub-cluster ID in the machine info file.
+  private static final int SUBCLUSTER_ID_INDEX = 1;
+  private String queueFileName;
+
+  // Last time we successfully reloaded queues
+  private volatile long lastSuccessfulReload;
+  private volatile boolean lastReloadAttemptFailed = false;
+
+  private FileSystem fs;
+  private Clock clock;
+  public static final long ALLOC_RELOAD_WAIT_MS = 5 * 1000;
+  /** Time to wait between checks of the allocation file */
+  public static final long ALLOC_RELOAD_INTERVAL_MS = 10 * 1000;
+  private long reloadIntervalMs = ALLOC_RELOAD_INTERVAL_MS;
+
   private FederationStateStoreFacade() {
     initializeFacadeInternal(new Configuration());
   }
@@ -115,9 +149,17 @@ public final class FederationStateStoreFacade {
           SubClusterResolver.class);
       this.subclusterResolver.load();
 
+      //turn on the Router by queue mapping feature
+      this.queueMappingEnable = this.conf.getBoolean(YarnConfiguration.FEDERATION_ROUTER_QUEUE_SUBCLUSTER_MAPPING_ENABLE,
+              YarnConfiguration.DEFAULT_FEDERATION_ROUTER_QUEUE_SUBCLUSTER_MAPPING_ENABLE);
+      this.queueFileName = this.conf.get(YarnConfiguration.FEDERATION_QUEUE_LIST, "");
+      if(queueMappingEnable){
+        this.triggerOfRefreshQueueSubclusterMapping();
+      }
+
       initCache();
 
-    } catch (YarnException ex) {
+    } catch (YarnException | IOException ex) {
       LOG.error("Failed to initialize the FederationStateStoreFacade object",
           ex);
       throw new RuntimeException(ex);
@@ -607,5 +649,139 @@ public final class FederationStateStoreFacade {
    */
   protected interface Func<T, TResult> {
     TResult invoke(T input) throws Exception;
+  }
+
+  /**
+   * refresh queue-subcluster-mapping, base on file change
+   * @throws IOException
+   */
+  private void triggerOfRefreshQueueSubclusterMapping() throws IOException {
+    this.clock = SystemClock.getInstance();
+    org.apache.hadoop.fs.Path queueFileNamePath = new org.apache.hadoop.fs.Path("file", null, queueFileName);
+    if (queueFileNamePath != null) {
+      this.fs = queueFileNamePath.getFileSystem(conf);
+      Thread refreshQueueSubclusterMappingThread = new Thread(() -> {
+        while (true) {
+          try {
+            long time = clock.getTime();
+            long lastModified = fs.getFileStatus(queueFileNamePath).getModificationTime();
+            if (lastModified > lastSuccessfulReload &&
+                    time > lastModified + ALLOC_RELOAD_WAIT_MS) {
+              try {
+                refreshQueueSubclusterMapping();
+              } catch (Exception ex) {
+                if (!lastReloadAttemptFailed) {
+                  LOG.error("Failed to reload queue-subcluster mapping file - " +
+                          "will use existing queue-subcluster mappings.", ex);
+                }
+                lastReloadAttemptFailed = true;
+              }
+            } else if (lastModified == 0L) {
+              if (!lastReloadAttemptFailed) {
+                LOG.warn("Failed to reload queue-subcluster mapping file because" +
+                        " last modified returned 0. File exists: "
+                        + fs.exists(queueFileNamePath));
+              }
+              lastReloadAttemptFailed = true;
+            }
+          } catch (IOException e) {
+            LOG.error("Exception while loading queue-subcluster mapping file: " + e);
+          }
+          try {
+            Thread.sleep(reloadIntervalMs);
+          } catch (InterruptedException ex) {
+            LOG.info("Interrupted while waiting to reload queue-subcluster mapping file");
+          }
+        }
+      });
+      refreshQueueSubclusterMappingThread.setName("refresh-queue-subcluster-mapping");
+      refreshQueueSubclusterMappingThread.setDaemon(true);
+      refreshQueueSubclusterMappingThread.start();
+    }
+  }
+
+  private void refreshQueueSubclusterMapping(){
+    try {
+      Path file = null;
+      BufferedReader reader = null;
+
+      try {
+        file = Paths.get(queueFileName);
+      } catch (InvalidPathException e) {
+        LOG.error("The configured queue list file path {} does not exist",
+                queueFileName);
+        return;
+      }
+
+      Map<String, Set<SubClusterId>> tmpQueueToSubClusters =
+              new ConcurrentHashMap<String, Set<SubClusterId>>();
+      try {
+        reader = Files.newBufferedReader(file, Charset.defaultCharset());
+        String line = null;
+        Set<String> newQueueSet = new HashSet<>();
+        while ((line = reader.readLine()) != null) {
+          String[] tokens = line.split(",");
+          if (tokens.length == 2) {
+            String queueName = tokens[QUEUE_NAME_INDEX].trim().toUpperCase();
+            String[] subClusterIdList = tokens[SUBCLUSTER_ID_INDEX].trim().split(":");
+            for (String subClusterIdStr : subClusterIdList) {
+              SubClusterId subClusterId =
+                      SubClusterId.newInstance(subClusterIdStr.trim());
+
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Loading node into resolver: {} --> {}", queueName,
+                        subClusterId);
+              }
+              loadQueueToSubCluster(queueName, subClusterId, tmpQueueToSubClusters);
+            }
+
+          } else {
+            LOG.warn("Skipping malformed line in queue list: " + line);
+          }
+        }
+        //process queue update condition
+        synchronized (queueToSubClusters){
+          queueToSubClusters = tmpQueueToSubClusters;
+        }
+        lastSuccessfulReload = clock.getTime();
+
+      } finally {
+        if (reader != null) {
+          reader.close();
+        }
+      }
+      LOG.info("Successfully loaded file {}", queueFileName);
+    } catch (Exception e) {
+      LOG.error("Failed to parse file " + queueFileName, e);
+    }
+  }
+
+  private void loadQueueToSubCluster(String queueName, SubClusterId subClusterId,
+                                     Map<String, Set<SubClusterId>> tmpQueueToSubClusters) {
+    String queueNameUpper = queueName.toUpperCase();
+
+    if (!tmpQueueToSubClusters.containsKey(queueNameUpper)) {
+      tmpQueueToSubClusters.put(queueNameUpper,
+              new HashSet<SubClusterId>());
+    }
+
+    tmpQueueToSubClusters.get(queueNameUpper).add(subClusterId);
+  }
+
+  /**
+   * Obtain the sub-cluster that a specified queue belongs to.
+   *
+   * @param queuename the name of the queue
+   * @return the sub-cluster as identified by the {@link SubClusterId} that the
+   *          queue belongs to
+   */
+  public Set<SubClusterId> getSubClustersForQueue(String queuename) {
+    Set<SubClusterId> subClusterIdSet = queueToSubClusters.get(
+            queuename.toUpperCase());
+    //avoid npe
+    if(null == subClusterIdSet){
+      subClusterIdSet = new HashSet<SubClusterId>();
+    }
+    return subClusterIdSet;
   }
 }

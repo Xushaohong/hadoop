@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.yarn.server.federation.policies;
 
+import java.util.Iterator;
 import java.util.Map;
-
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.federation.policies.dao.WeightedPolicyInfo;
 import org.apache.hadoop.yarn.server.federation.policies.exceptions.FederationPolicyInitializationException;
@@ -150,6 +152,41 @@ public abstract class AbstractConfigurableFederationPolicy
           "Zero active subclusters, cannot pick where to send job.");
     }
     return activeSubclusters;
+  }
+
+  /**
+   * This methods gets active subclusters map from the {@code
+   * FederationStateStoreFacade} and validate it not being null/empty.
+   *
+   * @return the map of ids to info for all active subclusters filter by queue.
+   * @param queueName queue name
+   * @throws YarnException if we can't get the list.
+   */
+  protected Map<SubClusterId, SubClusterInfo> getActiveSubclustersByQueue(String queueName)
+          throws YarnException {
+
+    Map<SubClusterId, SubClusterInfo> activeSubclusters =
+            getPolicyContext().getFederationStateStoreFacade().getSubClusters(true);
+    //deep copy
+    ConcurrentHashMap<SubClusterId, SubClusterInfo> activeSubclustersCopy = new ConcurrentHashMap<>();
+    activeSubclustersCopy.putAll(activeSubclusters);
+
+    Set<SubClusterId> subClustersForQueueSet = policyContext.getFederationStateStoreFacade().
+            getSubClustersForQueue(queueName);
+    Iterator<Map.Entry<SubClusterId, SubClusterInfo>> iterator = activeSubclustersCopy.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<SubClusterId, SubClusterInfo> next = iterator.next();
+      SubClusterId subClusterId = next.getKey();
+      if(subClustersForQueueSet.size()>0 && !subClustersForQueueSet.contains(subClusterId)){
+        iterator.remove();
+      }
+    }
+    // TODO: return a default sub cluster
+    if (activeSubclustersCopy == null || activeSubclustersCopy.size() < 1) {
+      throw new NoActiveSubclustersException(
+          "Zero active subclusters, cannot pick where to send job.");
+    }
+    return activeSubclustersCopy;
   }
 
 }

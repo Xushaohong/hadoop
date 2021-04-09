@@ -3406,6 +3406,13 @@ public class YarnConfiguration extends Configuration {
   public static final String FEDERATION_MACHINE_LIST =
       FEDERATION_PREFIX + "machine-list";
 
+  public static final String FEDERATION_ROUTER_QUEUE_SUBCLUSTER_MAPPING_ENABLE =
+      FEDERATION_PREFIX + "router-queue-subcluster-mapping.enable";
+  public static final boolean DEFAULT_FEDERATION_ROUTER_QUEUE_SUBCLUSTER_MAPPING_ENABLE = false;
+
+  public static final String FEDERATION_QUEUE_LIST =
+      FEDERATION_PREFIX + "queue-list";
+
   public static final String FEDERATION_CLUSTER_RESOLVER_CLASS =
       FEDERATION_PREFIX + "subcluster-resolver.class";
   public static final String DEFAULT_FEDERATION_CLUSTER_RESOLVER_CLASS =
