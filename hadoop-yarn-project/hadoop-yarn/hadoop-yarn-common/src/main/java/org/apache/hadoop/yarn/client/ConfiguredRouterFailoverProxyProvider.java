@@ -66,7 +66,8 @@ public class ConfiguredRouterFailoverProxyProvider<T>
     Collection<String> rmIds = HAUtil.getRMHAIds(conf);
     this.rmServiceIds = rmIds.toArray(new String[rmIds.size()]);
     rand = new Random(System.currentTimeMillis());
-    conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds[rand.nextInt(rmIds.size())]);
+    currentProxyIndex = rand.nextInt(rmIds.size());
+    conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds[currentProxyIndex]);
 
     conf.setInt(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
         conf.getInt(YarnConfiguration.CLIENT_FAILOVER_RETRIES,
