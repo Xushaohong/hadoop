@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.nodemanager;
 
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.nodemanager.nodelabels.NodeAttributesProvider;
 import org.apache.hadoop.yarn.server.nodemanager.nodelabels.NodeLabelsProvider;
 
@@ -73,4 +74,6 @@ public interface NodeStatusUpdater extends Service {
    * @param provider
    */
   void setNodeLabelsProvider(NodeLabelsProvider provider);
+
+  public Resource outerUpdateNMResource();
 }

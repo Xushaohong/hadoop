@@ -748,6 +748,22 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     }
   }
 
+  @Override
+  public Resource outerUpdateNMResource() {
+    // reload from local config file
+    YarnConfiguration newConf = new YarnConfiguration(getConfig());
+    newConf.reloadConfiguration();
+    long memoryMb = NodeManagerHardwareUtils.getContainerMemoryMB(newConf);
+    int virtualCores = NodeManagerHardwareUtils.getVCores(newConf);
+    LOG.info("Nodemanager resources: memory re-set to " + memoryMb + "MB, by reset api");
+    LOG.info("Nodemanager resources: vcores re-set to " + virtualCores + " , by reset api.");
+    Resource resource = Resource.newInstance(memoryMb, virtualCores);
+
+    metrics.addResource(Resources.subtract(resource, totalResource));
+    this.totalResource = resource;
+    return this.totalResource;
+  }
+
   @VisibleForTesting
   Thread.State getStatusUpdaterThreadState() {
     return statusUpdater.getState();
