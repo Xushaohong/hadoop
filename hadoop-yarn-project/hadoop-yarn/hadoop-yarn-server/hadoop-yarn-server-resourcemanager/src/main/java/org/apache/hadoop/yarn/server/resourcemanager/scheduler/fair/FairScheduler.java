@@ -109,10 +109,15 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.Map.Entry;
+import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.tencent.tdw.security.utils.StringUtils;
+import org.apache.commons.collections.CollectionUtils;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -170,6 +175,10 @@ public class FairScheduler extends
   @VisibleForTesting
   Thread schedulingThread;
 
+  @VisibleForTesting
+  Thread prioritySchedulingThread;
+  protected int prioritySchedulingSleepMs;
+
   Thread preemptionThread;
 
   // Aggregate metrics
@@ -184,6 +193,8 @@ public class FairScheduler extends
   @Deprecated
   protected boolean continuousSchedulingEnabled;
   // Sleep time for each pass in continuous scheduling
+  protected boolean prioritySchedulingEnable;
+  protected boolean nodeUpdateTriggerPrioritySchedulingEnable;
   @Deprecated
   protected volatile int continuousSchedulingSleepMs;
   // Node available resource comparator
@@ -340,6 +351,26 @@ public class FairScheduler extends
   }
 
   /**
+   * Thread which attempts scheduling resources continuously for Priority Nodes,
+   * asynchronous to the node heartbeats.
+   */
+  private class PrioritySchedulingThread extends Thread {
+
+    @Override
+    public void run() {
+      while (!Thread.currentThread().isInterrupted()) {
+        try {
+          prioritySchedulingAttempt();
+          Thread.sleep(getPrioritySchedulingSleepMs());
+        } catch (InterruptedException e) {
+          LOG.warn("Continuous scheduling thread interrupted. Exiting.", e);
+          return;
+        }
+      }
+    }
+  }
+
+  /**
    * Recompute the internal variables used by the scheduler - per-job weights,
    * fair shares, deficits, minimum slot allocations, and amount of used and
    * required resources per job.
@@ -452,6 +483,11 @@ public class FairScheduler extends
   @Deprecated
   public int getContinuousSchedulingSleepMs() {
     return continuousSchedulingSleepMs;
+  }
+
+
+  public int getPrioritySchedulingSleepMs() {
+    return prioritySchedulingSleepMs;
   }
 
   /**
@@ -1048,6 +1084,14 @@ public class FairScheduler extends
       FSSchedulerNode fsNode = getFSSchedulerNode(nm.getNodeID());
       attemptScheduling(fsNode);
 
+      if(nodeUpdateTriggerPrioritySchedulingEnable) {
+        try {
+          prioritySchedulingAttempt();
+        } catch (InterruptedException e) {
+          LOG.error("nodeupdate trigger priority Scheduling error： " + e.getMessage());
+        }
+      }
+
       long duration = getClock().getTime() - start;
       fsOpDurations.addNodeUpdateDuration(duration);
     } finally {
@@ -1081,6 +1125,56 @@ public class FairScheduler extends
     }
     continuousSchedulingIterator(nodeIdSet, start);
   }
+
+  void prioritySchedulingAttempt() throws InterruptedException {
+    long start = getClock().getTime();
+    Collection<FSSchedulerNode> nodeIdSet;
+    if (getConf().isSortNodesEnabled()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("isSortNodesEnabled: " + getConf().isSortNodesEnabled());
+      }
+      // Hold a lock to prevent node changes as much as possible.
+      readLock.lock();
+      try {
+        nodeIdSet = nodeTracker.sortedNodeSet(nodeAvailableResourceComparator);
+      } finally {
+        readLock.unlock();
+      }
+    }else {
+      // Hold a lock to prevent node changes as much as possible.
+      readLock.lock();
+      try {
+        nodeIdSet = nodeTracker.getAllNodes();
+      } finally {
+        readLock.unlock();
+      }
+    }
+
+    Set<String> prioritySchedulingRMNodes = rmContext.getPrioritySchedulingRMNodes();
+    //priority schedulering nodes
+    Collection<FSSchedulerNode>  newNodeIdSet = new LinkedList<FSSchedulerNode>();
+
+    if(CollectionUtils.isEmpty(prioritySchedulingRMNodes)){
+      return;
+    }
+    //think about node removeed
+    Iterator<FSSchedulerNode> iterator = nodeIdSet.iterator();
+    while(iterator.hasNext()){
+      FSSchedulerNode fsSchedulerNode = iterator.next();
+      String nodeHost = fsSchedulerNode.getNodeID().getHost();
+      if(!StringUtils.isBlank(nodeHost)){
+        if(prioritySchedulingRMNodes.contains(nodeHost)){
+          newNodeIdSet.add(fsSchedulerNode);
+        }
+      }
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Priority Scheduling Nodes Size: " + newNodeIdSet.size());
+    }
+    continuousSchedulingIterator(newNodeIdSet, start);
+  }
+
 
   void continuousSchedulingIterator(Collection<FSSchedulerNode> nodeIdSet, long start) throws InterruptedException {
     // iterate all nodes
@@ -1462,6 +1556,10 @@ public class FairScheduler extends
       updateReservationThreshold();
       continuousSchedulingEnabled = this.conf.isContinuousSchedulingEnabled();
       continuousSchedulingSleepMs = this.conf.getContinuousSchedulingSleepMs();
+      prioritySchedulingEnable = this.conf.isPrioritySchedulingEnable();
+      nodeUpdateTriggerPrioritySchedulingEnable =
+          this.conf.isNodeUpdateTrigerPrioritySchedulingEnable();
+      prioritySchedulingSleepMs = this.conf.getPrioritySchedulingSleepMs();
       nodeLocalityThreshold = this.conf.getLocalityThresholdNode();
       loadSchedulingThresholdCpuUtil = this.conf.getLoadSchedulingThresholdNodeCpuUtil();
       loadSchedulingThresholdMemoryUtil = this.conf.getLoadSchedulingThresholdNodeMemoryUtil();
@@ -1510,6 +1608,15 @@ public class FairScheduler extends
         schedulingThread.setDaemon(true);
       }
 
+      if (prioritySchedulingEnable) {
+        // start priority scheduling thread
+        prioritySchedulingThread = new PrioritySchedulingThread();
+        prioritySchedulingThread.setName("FairSchedulerPriorityScheduling");
+        prioritySchedulingThread.setUncaughtExceptionHandler(
+            new RMCriticalThreadUncaughtExceptionHandler(rmContext));
+        prioritySchedulingThread.setDaemon(true);
+      }
+
       if (this.conf.getPreemptionEnabled()) {
         createPreemptionThread();
       }
@@ -1553,6 +1660,11 @@ public class FairScheduler extends
             "schedulingThread is null");
         schedulingThread.start();
       }
+      if (prioritySchedulingEnable) {
+        Preconditions.checkNotNull(prioritySchedulingThread,
+            "prioritySchedulingEnable is null");
+        prioritySchedulingThread.start();
+      }
       if (preemptionThread != null) {
         preemptionThread.start();
       }
@@ -1591,6 +1703,12 @@ public class FairScheduler extends
       if (preemptionThread != null) {
         preemptionThread.interrupt();
         preemptionThread.join(THREAD_JOIN_TIMEOUT_MS);
+      }
+      if (prioritySchedulingEnable) {
+        if (prioritySchedulingThread != null) {
+          prioritySchedulingThread.interrupt();
+          prioritySchedulingThread.join(THREAD_JOIN_TIMEOUT_MS);
+        }
       }
       if (allocsLoader != null) {
         allocsLoader.stop();

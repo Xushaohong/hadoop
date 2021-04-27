@@ -119,6 +119,7 @@ public class NodesListManager extends CompositeService implements
       setDecomissionedNMs();
       setDisableSchedulingNMs();
       printConfiguredHosts(false);
+      enablePrioritySchedulingNMsWithPrecheck();
     } catch (YarnException ex) {
       disableHostsFileReader(ex);
     } catch (IOException ioe) {
@@ -365,6 +366,16 @@ public class NodesListManager extends CompositeService implements
 
     updateInactiveNodes();
     setDisableSchedulingNMs();
+    enablePrioritySchedulingNMsWithPrecheck();
+  }
+
+  private void enablePrioritySchedulingNMsWithPrecheck() throws IOException{
+    boolean prioritySchedulingEnable =
+        conf.getBoolean(YarnConfiguration.RM_NODES_PRIORITY_SCHEDULING_ENABLE,
+            YarnConfiguration.DEFAULT_RM_NODES_PRIORITY_SCHEDULING_ENABLE);
+    if(prioritySchedulingEnable){
+      setPrioritySchedulingNMs();
+    }
   }
 
   private void setDisableSchedulingNMs() throws IOException {
@@ -380,6 +391,22 @@ public class NodesListManager extends CompositeService implements
       }
     }
     rmContext.setDisabledSchedulingRMNodes(set);
+  }
+
+  private void setPrioritySchedulingNMs() throws IOException {
+    String prioritySchedulingFile = conf.get(
+        YarnConfiguration.RM_NODES_PRIORITY_SCHEDULING_FILE_PATH,
+        YarnConfiguration.DEFAULT_RM_NODES_PRIORITY_SCHEDULING_FILE_PATH);
+    Set<String> set = new HashSet<>();
+    if(!org.apache.commons.lang3.StringUtils.isBlank(prioritySchedulingFile)){
+      HostsFileReader.readFileToSet("prioritySchedulingFile", prioritySchedulingFile, set);
+    }
+    if (LOG.isDebugEnabled()) {
+      for (String host : set) {
+        LOG.info("Add " + host + " to priority scheduling list");
+      }
+    }
+    rmContext.setPrioritySchedulingRMNodes(set);
   }
 
   @VisibleForTesting

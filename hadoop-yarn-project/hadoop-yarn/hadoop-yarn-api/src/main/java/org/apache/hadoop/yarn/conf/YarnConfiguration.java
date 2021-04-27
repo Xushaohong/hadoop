@@ -583,6 +583,20 @@ public class YarnConfiguration extends Configuration {
     RM_PREFIX + "nodes.disable-scheduling-path";
   public static final String DEFAULT_RM_NODES_DISABLE_SCHEDULING_FILE_PATH = "";
 
+  /** Path to file with nodes to priority scheduling.*/
+  public static final String RM_NODES_PRIORITY_SCHEDULING_FILE_PATH =
+      RM_PREFIX + "nodes.priority-scheduling-path";
+  public static final String DEFAULT_RM_NODES_PRIORITY_SCHEDULING_FILE_PATH = "";
+
+  public static final String RM_NODES_PRIORITY_SCHEDULING_ENABLE =
+      RM_PREFIX + "nodes.priority-scheduling.enable";
+  public static final boolean DEFAULT_RM_NODES_PRIORITY_SCHEDULING_ENABLE = false;
+
+  public static final String RM_NODES_NODEUPDATE_TRIGGER_PRIORITY_SCHEDULING_ENABLE =
+      RM_PREFIX + "nodes.nodeupdate-trigger-priority-scheduling.enable";
+  public static final boolean DEFAULT_RM_NODES_NODEUPDATE_TRIGGER_PRIORITY_SCHEDULING_ENABLE =
+      false;
+
   /** Number of threads to handle resource tracker calls.*/
   public static final String RM_RESOURCE_TRACKER_CLIENT_THREAD_COUNT =
     RM_PREFIX + "resource-tracker.client.thread-count";

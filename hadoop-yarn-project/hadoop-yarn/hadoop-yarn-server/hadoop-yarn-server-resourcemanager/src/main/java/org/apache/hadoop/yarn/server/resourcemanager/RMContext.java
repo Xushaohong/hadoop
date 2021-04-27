@@ -80,6 +80,10 @@ public interface RMContext extends ApplicationMasterServiceContext {
 
   void setDisabledSchedulingRMNodes(Set<String> set);
 
+  Set<String> getPrioritySchedulingRMNodes();
+
+  void setPrioritySchedulingRMNodes(Set<String> set);
+
   ConcurrentMap<NodeId, RMNode> getRMNodes();
 
   AMLivelinessMonitor getAMLivelinessMonitor();

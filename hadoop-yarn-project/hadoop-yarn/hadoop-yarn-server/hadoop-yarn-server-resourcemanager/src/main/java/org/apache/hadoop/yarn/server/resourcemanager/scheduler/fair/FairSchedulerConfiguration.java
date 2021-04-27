@@ -162,6 +162,10 @@ public class FairSchedulerConfiguration extends Configuration {
   @Deprecated
   protected static final int DEFAULT_CONTINUOUS_SCHEDULING_SLEEP_MS = 5;
 
+
+  protected static final String PRIORITY_SCHEDULING_SLEEP_MS = CONF_PREFIX + "priority-scheduling-sleep-ms";
+  protected static final int DEFAULT_PRIORITY_SCHEDULING_SLEEP_MS = 1;
+
   /** Whether preemption is enabled. */
   protected static final String  PREEMPTION = CONF_PREFIX + "preemption";
   protected static final boolean DEFAULT_PREEMPTION = false;
@@ -381,6 +385,26 @@ public class FairSchedulerConfiguration extends Configuration {
     return getInt(CONTINUOUS_SCHEDULING_SLEEP_MS,
         DEFAULT_CONTINUOUS_SCHEDULING_SLEEP_MS);
   }
+
+
+  public boolean isPrioritySchedulingEnable() {
+    boolean prioritySchedulingEnable =
+        getBoolean(YarnConfiguration.RM_NODES_PRIORITY_SCHEDULING_ENABLE,
+             YarnConfiguration.DEFAULT_RM_NODES_PRIORITY_SCHEDULING_ENABLE);
+    return prioritySchedulingEnable;
+  }
+
+  public boolean isNodeUpdateTrigerPrioritySchedulingEnable() {
+    boolean nodeUpdateTrigerPrioritySchedulingEnable =
+        getBoolean(YarnConfiguration.RM_NODES_NODEUPDATE_TRIGGER_PRIORITY_SCHEDULING_ENABLE,
+            YarnConfiguration.DEFAULT_RM_NODES_NODEUPDATE_TRIGGER_PRIORITY_SCHEDULING_ENABLE);
+    return nodeUpdateTrigerPrioritySchedulingEnable;
+  }
+
+  public int getPrioritySchedulingSleepMs() {
+    return getInt(PRIORITY_SCHEDULING_SLEEP_MS, DEFAULT_PRIORITY_SCHEDULING_SLEEP_MS);
+  }
+
 
   /**
    * Delay in milliseconds for locality fallback node to rack.

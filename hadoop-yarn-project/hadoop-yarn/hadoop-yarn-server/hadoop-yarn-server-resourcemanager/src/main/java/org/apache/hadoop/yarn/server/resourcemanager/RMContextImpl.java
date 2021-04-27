@@ -337,6 +337,16 @@ public class RMContextImpl implements RMContext {
   }
 
   @Override
+  public Set<String> getPrioritySchedulingRMNodes() {
+    return activeServiceContext.getPrioritySchedulingRMNodes();
+  }
+
+  @Override
+  public void setPrioritySchedulingRMNodes(Set<String> set) {
+    activeServiceContext.setPrioritySchedulingRMNodes(set);
+  }
+
+  @Override
   public ContainerAllocationExpirer getContainerAllocationExpirer() {
     return activeServiceContext.getContainerAllocationExpirer();
   }

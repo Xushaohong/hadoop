@@ -84,6 +84,9 @@ public class RMActiveServiceContext {
   private Set<String> disabledSchedulingNodes =
       new HashSet<>();
 
+  private Set<String> prioritySchedulingNodes =
+      new HashSet<>();
+
   private final ConcurrentMap<ApplicationId, ByteBuffer> systemCredentials =
       new ConcurrentHashMap<ApplicationId, ByteBuffer>();
 
@@ -219,6 +222,18 @@ public class RMActiveServiceContext {
   @Unstable
   public synchronized void setDisabledSchedulingRMNodes(Set<String> set) {
     this.disabledSchedulingNodes = set;
+  }
+
+  @Private
+  @Unstable
+  public synchronized Set<String> getPrioritySchedulingRMNodes() {
+    return this.prioritySchedulingNodes;
+  }
+
+  @Private
+  @Unstable
+  public synchronized void setPrioritySchedulingRMNodes(Set<String> set) {
+    this.prioritySchedulingNodes = set;
   }
 
   @Private
