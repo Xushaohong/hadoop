@@ -1172,7 +1172,15 @@ public class QueueMetrics implements MetricsSource {
   public int getActiveApps() {
     return activeApplications.value();
   }
-  
+
+  public int getAvgScheduleDelay() {
+    return -1;
+  }
+
+  public int getMaxScheduleDelay() {
+    return -1;
+  }
+
   public MetricsSystem getMetricsSystem() {
     return metricsSystem;
   }

@@ -150,6 +150,29 @@ public class MetricsOverviewTable extends HtmlBlock {
         __().
         __().__();
 
+
+    div.table("#performace").
+    thead().$class("ui-widget-header").
+      tr().
+      th().$class("ui-state-default").__("ContainersAssignedPerSec").__().
+      th().$class("ui-state-default").__("pending container").__().
+      th().$class("ui-state-default").__("allocated container").__().
+      th().$class("ui-state-default").__("reserved container").__().
+      th().$class("ui-state-default").__("RMEventQueueSize").__().
+      th().$class("ui-state-default").__("SchedulerEventQueueSize").__().
+      __().
+      __().
+      tbody().$class("ui-widget-content").
+      tr().
+      td(String.valueOf(clusterMetrics.getContainerAssignedPerSecond())).
+      td(String.valueOf(clusterMetrics.getPendingContainers())).
+      td(String.valueOf(clusterMetrics.getContainersAllocated())).
+      td(String.valueOf(clusterMetrics.getReservedContainers())).
+      td(String.valueOf(clusterMetrics.getRmEventQueueSize())).
+      td(String.valueOf(clusterMetrics.getSchedulerQueueSize())).
+      __().
+      __().__().br();
+
     String user = request().getRemoteUser();
     if (user != null) {
       UserMetricsInfo userMetrics = new UserMetricsInfo(this.rm, user);

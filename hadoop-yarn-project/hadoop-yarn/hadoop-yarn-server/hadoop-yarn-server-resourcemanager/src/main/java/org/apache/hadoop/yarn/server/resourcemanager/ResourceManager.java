@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.sun.jersey.spi.container.servlet.ServletContainer;
 
 import org.slf4j.Logger;
@@ -142,7 +143,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 
 /**
  * The ResourceManager is the main class that is a set of components.
@@ -647,6 +651,7 @@ public class ResourceManager extends CompositeService
     private boolean fromActive = false;
     private StandByTransitionRunnable standByTransitionRunnable;
     private RMNMInfo rmnmInfo;
+    private ScheduledThreadPoolExecutor eventQueueMetricExecutor;
 
     RMActiveServices(ResourceManager rm) {
       super("RMActiveServices");
@@ -855,6 +860,20 @@ public class ResourceManager extends CompositeService
         addIfService(systemServiceManager);
       }
 
+      eventQueueMetricExecutor = new ScheduledThreadPoolExecutor(1,
+              new ThreadFactoryBuilder().
+                      setDaemon(true).setNameFormat("EventQueueSizeMetricThread").
+                      build());
+      eventQueueMetricExecutor.scheduleAtFixedRate(new Runnable() {
+        @Override
+        public void run() {
+          int rmEventQueueSize = ((AsyncDispatcher)getRMContext().getDispatcher()).getEventQueueSize();
+          ClusterMetrics.getMetrics().setRmQueueSize(rmEventQueueSize);
+          int schedulerEventQueueSize = ((EventDispatcher)schedulerDispatcher).getEventQueueSize();
+          ClusterMetrics.getMetrics().setSchedulerQueueSize(schedulerEventQueueSize);
+        }
+      }, 1, 1, TimeUnit.SECONDS);
+
       super.serviceInit(conf);
     }
 
@@ -930,7 +949,9 @@ public class ResourceManager extends CompositeService
           LOG.error("Error closing store.", e);
         }
       }
-
+      if (eventQueueMetricExecutor != null) {
+        eventQueueMetricExecutor.shutdownNow();
+      }
     }
   }
 

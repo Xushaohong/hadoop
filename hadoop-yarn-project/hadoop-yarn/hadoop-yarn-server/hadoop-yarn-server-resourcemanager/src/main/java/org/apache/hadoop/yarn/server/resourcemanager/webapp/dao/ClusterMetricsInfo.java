@@ -76,6 +76,12 @@ public class ClusterMetricsInfo {
 
   private boolean crossPartitionMetricsAvailable = false;
 
+  protected int containerAssignedPerSecond;
+  protected int avgSchedulerDelayMs;
+  protected int maxSchedulerDelayMs;
+  protected int rmQueueSize;
+  protected int schedulerQueueSize;
+
   public ClusterMetricsInfo() {
   } // JAXB needs this
 
@@ -139,6 +145,11 @@ public class ClusterMetricsInfo {
     this.shutdownNodes = clusterMetrics.getNumShutdownNMs();
     this.totalNodes = activeNodes + lostNodes + decommissionedNodes
         + rebootedNodes + unhealthyNodes + decommissioningNodes + shutdownNodes;
+    this.containerAssignedPerSecond = clusterMetrics.getnumContainerAssignedPerSecond();
+    this.rmQueueSize = clusterMetrics.getRmQueueSize();
+    this.schedulerQueueSize = clusterMetrics.getSchedulerQueueSize();
+    this.avgSchedulerDelayMs = metrics.getAvgScheduleDelay();
+    this.maxSchedulerDelayMs = metrics.getMaxScheduleDelay();
   }
 
   public int getAppsSubmitted() {
@@ -359,5 +370,17 @@ public class ClusterMetricsInfo {
 
   public boolean getCrossPartitionMetricsAvailable() {
     return crossPartitionMetricsAvailable;
+  }
+
+  public int getContainerAssignedPerSecond() {
+    return this.containerAssignedPerSecond;
+  }
+
+  public int getRmEventQueueSize() {
+    return rmQueueSize;
+  }
+
+  public int getSchedulerQueueSize() {
+    return schedulerQueueSize;
   }
 }
