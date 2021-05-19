@@ -21,9 +21,6 @@ package org.apache.hadoop.tools;
 import java.io.IOException;
 import java.util.Random;
 
-import com.google.common.base.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -36,16 +33,22 @@ import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobSubmissionFiles;
-import org.apache.hadoop.tools.CopyListing.*;
+import org.apache.hadoop.mapreduce.OutputFormat;
+import org.apache.hadoop.tools.CopyListing.AclsNotSupportedException;
+import org.apache.hadoop.tools.CopyListing.DuplicateFileException;
+import org.apache.hadoop.tools.CopyListing.InvalidInputException;
+import org.apache.hadoop.tools.CopyListing.XAttrsNotSupportedException;
 import org.apache.hadoop.tools.mapred.CopyMapper;
 import org.apache.hadoop.tools.mapred.CopyOutputFormat;
 import org.apache.hadoop.tools.util.DistCpUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.mapreduce.Mapper;
+import com.google.common.base.Preconditions;
 
 /**
  * DistCp is the main driver-class for DistCpV2.
@@ -293,13 +296,13 @@ public class DistCp extends Configured implements Tool {
     job.setJarByClass(CopyMapper.class);
     configureOutputFormat(job);
 
-    job.setMapperClass(getConf().getClass(
-        DistCpConstants.CONF_LABEL_MAPPER_CLASS,
-        CopyMapper.class, Mapper.class));
+    job.setMapperClass(CopyMapper.class);
     job.setNumReduceTasks(0);
     job.setMapOutputKeyClass(Text.class);
     job.setMapOutputValueClass(Text.class);
-    job.setOutputFormatClass(CopyOutputFormat.class);
+    job.setOutputFormatClass(getConf().getClass(
+        DistCpConstants.CONF_LABEL_OUTPUT_FORMAT_CLASS,
+        CopyOutputFormat.class, OutputFormat.class));
     job.getConfiguration().set(JobContext.MAP_SPECULATIVE, "false");
     job.getConfiguration().set(JobContext.NUM_MAPS,
                   String.valueOf(context.getMaxMaps()));

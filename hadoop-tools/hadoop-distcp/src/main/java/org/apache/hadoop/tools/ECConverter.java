@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -49,11 +50,16 @@ import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.OutputCommitter;
+import org.apache.hadoop.mapreduce.OutputFormat;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.tools.DistCpOptions.FileAttribute;
-import org.apache.hadoop.tools.mapred.CopyMapper;
+import org.apache.hadoop.tools.mapred.CopyCommitter;
+import org.apache.hadoop.tools.mapred.CopyOutputFormat;
 import org.apache.hadoop.tools.util.DistCpUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
@@ -104,9 +110,21 @@ public class ECConverter extends DistCp {
       "dfs.ec.convert.atime.threshold.days";
   public static final long DFS_EC_CONVERT_ATIME_THRESHOLD_DAYS_DEFAULT = 0;
 
+  public static final String DFS_EC_CONVERT_LENGTH_THRESHOLD_BYTES =
+      "dfs.ec.convert.length.threshold.bytes";
+  public static final long DFS_EC_CONVERT_LENGTH_THRESHOLD_BYTES_DEFAULT = 0;
+
+  public static final String DFS_EC_CONVERT_NUM_LISTSTATUS_THREADS =
+      "dfs.ec.convert.num.liststatus.threads";
+  public static final int DFS_EC_CONVERT_NUM_LISTSTATUS_THREADS_DEFAULT = 1;
+
   public static final String DFS_EC_CONVERT_MAX_MAP_TASKS =
       "dfs.ec.convert.max.map.tasks";
   public static final int DFS_EC_CONVERT_MAX_MAP_TASKS_DEFAULT  = 20;
+
+  public static final String DFS_EC_CONVERT_BLOCKS_PER_CHUNK =
+      "dfs.ec.convert.blocks.per.chunk";
+  public static final int DFS_EC_CONVERT_BLOCKS_PER_CHUNK_DEFAULT = 0;
 
   public static final String DFS_EC_CONVERT_SKIPCRC = "dfs.ec.convert.skipcrc";
   public static final boolean DFS_EC_CONVERT_SKIPCRC_DEFAULT = false;
@@ -128,7 +146,9 @@ public class ECConverter extends DistCp {
   private Path[] ecPaths = new Path[0];;
   private long sleepIntervalMills;
   private boolean skipCrcCheck;
+  private int listStatusThreads;
   private int ecMaxTasks;
+  private int blocksPerChunk;
   private final Timer ecWorkTimer;
   private TimerTask timerTask;
   private final List<Path> markedRunningClusters = new ArrayList<Path>();
@@ -179,9 +199,17 @@ public class ECConverter extends DistCp {
       conf.set("dfs.checksum.combine.mode", "COMPOSITE_CRC");
     }
 
+    // listStatus threads
+    args.add("-numListstatusThreads");
+    args.add(String.valueOf(listStatusThreads));
+
     // max tasks
     args.add("-m");
     args.add(String.valueOf(ecMaxTasks));
+
+    // blocks per chunk
+    args.add("-blocksperchunk");
+    args.add(String.valueOf(blocksPerChunk));
 
     // log dir
     Path ecLogDir = getEcLogDir(ecPath);
@@ -207,8 +235,21 @@ public class ECConverter extends DistCp {
    */
   static class ECEonverterCopyFilter extends CopyFilter {
     private Configuration conf;
+    private long lengthThreshold;
+    private long mtimeThreshold;
+    private long atimeThreshold;
+
     public ECEonverterCopyFilter(Configuration conf) {
       this.conf = conf;
+      this.lengthThreshold = conf.getLong(
+          DFS_EC_CONVERT_LENGTH_THRESHOLD_BYTES,
+          DFS_EC_CONVERT_LENGTH_THRESHOLD_BYTES_DEFAULT);
+      this.mtimeThreshold = TimeUnit.DAYS.toMillis(
+          conf.getLong(DFS_EC_CONVERT_MTIME_THRESHOLD_DAYS,
+              DFS_EC_CONVERT_MTIME_THRESHOLD_DAYS_DEFAULT));
+      this.atimeThreshold = TimeUnit.DAYS.toMillis(
+          conf.getLong(DFS_EC_CONVERT_ATIME_THRESHOLD_DAYS,
+              DFS_EC_CONVERT_ATIME_THRESHOLD_DAYS_DEFAULT));
     }
 
     @Override
@@ -231,29 +272,28 @@ public class ECConverter extends DistCp {
           return false;
         }
 
-        // filter out opening-for-write files
-        DFSClient dfsClient = ((DistributedFileSystem)fs).getClient();
-        LocatedBlocks lbs = dfsClient
-            .getLocatedBlocks(absPath.toString(), 0L, 1L);
-        if (lbs.isUnderConstruction()) {
+        // filter length
+        if (status.getLen() < lengthThreshold) {
           return false;
         }
 
         // filter mtime
-        long ecThresholdMtimeMills = TimeUnit.DAYS.toMillis(
-            conf.getLong(DFS_EC_CONVERT_MTIME_THRESHOLD_DAYS,
-                DFS_EC_CONVERT_MTIME_THRESHOLD_DAYS_DEFAULT));
-        if (status.getModificationTime() + ecThresholdMtimeMills
+        if (status.getModificationTime() + mtimeThreshold
             > System.currentTimeMillis()) {
           return false;
         }
 
         // filter atime
-        long ecThresholdAtimeMills = TimeUnit.DAYS.toMillis(
-            conf.getLong(DFS_EC_CONVERT_ATIME_THRESHOLD_DAYS,
-                DFS_EC_CONVERT_ATIME_THRESHOLD_DAYS_DEFAULT));
-        if (status.getAccessTime() + ecThresholdAtimeMills
+        if (status.getAccessTime() + atimeThreshold
             > System.currentTimeMillis()) {
+          return false;
+        }
+
+        // filter out opening-for-write files
+        DFSClient dfsClient = ((DistributedFileSystem)fs).getClient();
+        LocatedBlocks lbs = dfsClient
+            .getLocatedBlocks(absPath.toString(), 0L, 1L);
+        if (lbs.isUnderConstruction()) {
           return false;
         }
       } catch (IOException e) {
@@ -265,60 +305,120 @@ public class ECConverter extends DistCp {
   }
 
   /*
-   * ECConverter mapper, a 4-stages working:
-   * 1. copy using distcp.
-   * 2. rename to original position.
-   * 3. preserve original file attributes.
-   * 4. write renaming log
+   * ECConverter output format
    */
-  static class ECConverterMapper extends CopyMapper {
+  static class ECConverterOutputFormat<K, V> extends CopyOutputFormat<K, V> {
+   @Override
+   public OutputCommitter getOutputCommitter(TaskAttemptContext context)
+      throws IOException {
+     return new ECConverterCopyCommitter(getOutputPath(context), context);
+   }
+  }
+
+  /*
+   * ECConverter copy commiter, a 3-stages commit working:
+   * 1. rename to original position.
+   * 2. preserve original file attributes.
+   * 3. write renaming log
+   */
+  static class ECConverterCopyCommitter extends CopyCommitter {
+    public static final String RENAMED_FILES_LOG = "renamedFiles.txt";
+    private Configuration conf;
+
+    public ECConverterCopyCommitter(Path outputPath, TaskAttemptContext context)
+        throws IOException {
+      super(outputPath, context);
+      this.conf = context.getConfiguration();
+    }
+
     @Override
-    public void map(Text relPath, CopyListingFileStatus sourceFileStatus,
-        Mapper<Text, CopyListingFileStatus, Text, Text>.Context context)
-            throws IOException, InterruptedException {
-      // omit directory
-      if (sourceFileStatus.isDirectory()) {
-        return;
-      }
+    public void commitJob(JobContext jobContext) throws IOException {
+      // backup source listing file
+      Path sourceListing =
+          new Path(conf.get(DistCpConstants.CONF_LABEL_LISTING_FILE_PATH));
+      URI sourceListingURI = sourceListing.toUri();
+      Path backupPath =
+          Path.mergePaths(DFS_EC_CONVERT_TMP_DIR, sourceListing);
+      Path sourceListingBackup = new Path(sourceListingURI.getScheme(),
+          sourceListingURI.getAuthority(), backupPath.toString());
+      FileSystem clusterFS = sourceListing.getFileSystem(conf);
+      FSDataInputStream in = clusterFS.open(sourceListing);
+      FSDataOutputStream out = clusterFS.create(sourceListingBackup);
+      IOUtils.copyBytes(in, out, conf, true);
 
-      // copy to tmp ec directory
-      super.map(relPath, sourceFileStatus, context);
+      // super commit
+      super.commitJob(jobContext);
 
-      // manually retrieve all original file attributes
-      Configuration conf = context.getConfiguration();
-      Path sourcePath = sourceFileStatus.getPath();
-      DistributedFileSystem dfs =
-          (DistributedFileSystem)(sourcePath.getFileSystem(conf));
-      FileStatus status = dfs.getFileStatus(sourcePath);
-      boolean preserveAcls = status.hasAcl();
-      CopyListingFileStatus originalSourceStatus =
-          DistCpUtils.toCopyListingFileStatusHelper(dfs,
-            status,
-            preserveAcls,
-            true, true,
-            sourceFileStatus.getChunkOffset(),
-            sourceFileStatus.getChunkLength());
-
-      // rename to origin
-      Path targetWorkPath =
+      // rename and preserve
+      Path targetRoot =
           new Path(conf.get(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH));
-      Path target = new Path(targetWorkPath.makeQualified(dfs.getUri(),
-          dfs.getWorkingDirectory()) + relPath.toString());
-      dfs.rename(target, sourcePath, Rename.OVERWRITE);
+      DistributedFileSystem dfs =
+          (DistributedFileSystem)targetRoot.getFileSystem(conf);
+      SequenceFile.Reader sourceReader = new SequenceFile.Reader(
+          conf, SequenceFile.Reader.file(sourceListingBackup));
+      Path outputPath = getOutputPath();
+      FSDataOutputStream renamedFiles =
+          dfs.create(new Path(outputPath, RENAMED_FILES_LOG));
 
-      // preserve all original file attributes
-      EnumSet<FileAttribute> attrs = EnumSet.allOf(FileAttribute.class);
-      if (!preserveAcls) {
-        attrs.remove(FileAttribute.ACL);
+      try {
+        CopyListingFileStatus srcFileStatus = new CopyListingFileStatus();
+        Text srcRelPath = new Text();
+
+        // Iterate over every source path that was copied.
+        while (sourceReader.next(srcRelPath, srcFileStatus)) {
+          // omit directory
+          if (srcFileStatus.isDirectory()) {
+            continue;
+          }
+
+          // only process last chunk file
+          if (srcFileStatus.getChunkOffset() + srcFileStatus.getChunkLength() !=
+              srcFileStatus.getLen()) {
+            continue;
+          }
+
+          Path srcFile = srcFileStatus.getPath();
+          Path targetFile =
+              Path.mergePaths(targetRoot, new Path(srcRelPath.toString()));
+
+          // sanity length and mtime check
+          FileStatus status = dfs.getFileStatus(srcFile);
+          if ((status.getLen() != srcFileStatus.getLen())
+              || (status.getModificationTime() != srcFileStatus.getModificationTime())) {
+            continue;
+          }
+
+          // manually retrieve all original file attributes
+          boolean preserveAcls = status.hasAcl();
+          CopyListingFileStatus originalSourceStatus =
+              DistCpUtils.toCopyListingFileStatusHelper(dfs,
+                status,
+                preserveAcls,
+                true, true,
+                srcFileStatus.getChunkOffset(),
+                srcFileStatus.getChunkLength());
+
+          // rename to origin
+          dfs.rename(targetFile, srcFile, Rename.OVERWRITE);
+
+          // preserve all original file attributes
+          EnumSet<FileAttribute> attrs = EnumSet.allOf(FileAttribute.class);
+          if (!preserveAcls) {
+            attrs.remove(FileAttribute.ACL);
+          }
+          DistCpUtils.preserve(dfs, srcFile, originalSourceStatus, attrs, true);
+
+          // write log
+          String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS")
+              .format(System.currentTimeMillis());
+          renamedFiles.write(new String("FILE_RENAMED: source=" + targetFile +
+                  " --> target=" + srcFile + ", date: " + date).getBytes());
+          renamedFiles.write(System.lineSeparator().getBytes());
+        }
+      } finally {
+        IOUtils.closeStream(sourceReader);
+        IOUtils.closeStream(renamedFiles);
       }
-      DistCpUtils.preserve(dfs, sourcePath, originalSourceStatus, attrs, true);
-
-      // write log
-      String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS")
-          .format(System.currentTimeMillis());
-      context.write(null,
-          new Text("FILE_RENAMED: source=" + target +
-              " --> target=" + sourcePath + ", date: " + date));
     }
   }
 
@@ -389,9 +489,9 @@ public class ECConverter extends DistCp {
    */
   private void customizeDistcp() {
     // mapper
-    conf.setClass(DistCpConstants.CONF_LABEL_MAPPER_CLASS,
-        ECConverterMapper.class,
-        Mapper.class);
+    conf.setClass(DistCpConstants.CONF_LABEL_OUTPUT_FORMAT_CLASS,
+        ECConverterOutputFormat.class,
+        OutputFormat.class);
 
     // filter
     conf.setClass(DistCpConstants.CONF_LABEL_FILTERS_CLASS,
@@ -567,8 +667,13 @@ public class ECConverter extends DistCp {
         DFS_EC_CONVERT_POLICY, DFS_EC_CONVERT_POLICY_DEFAULT);
     skipCrcCheck = conf.getBoolean(
         DFS_EC_CONVERT_SKIPCRC, DFS_EC_CONVERT_SKIPCRC_DEFAULT);
+    listStatusThreads = conf.getInt(
+        DFS_EC_CONVERT_NUM_LISTSTATUS_THREADS,
+        DFS_EC_CONVERT_NUM_LISTSTATUS_THREADS_DEFAULT);
     ecMaxTasks = conf.getInt(
         DFS_EC_CONVERT_MAX_MAP_TASKS, DFS_EC_CONVERT_MAX_MAP_TASKS_DEFAULT);
+    blocksPerChunk = conf.getInt(DFS_EC_CONVERT_BLOCKS_PER_CHUNK,
+        DFS_EC_CONVERT_BLOCKS_PER_CHUNK_DEFAULT);
 
     // refresh convert timer if necessary
     long sleepInterval = TimeUnit.MINUTES.toMillis(conf.getLong(

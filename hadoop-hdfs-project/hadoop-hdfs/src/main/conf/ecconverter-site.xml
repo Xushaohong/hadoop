@@ -29,6 +29,11 @@
 </property>
 
 <property>
+  <name>dfs.ec.convert.length.threshold.bytes</name>
+  <value>0</value>
+</property>
+
+<property>
   <name>dfs.ec.convert.mtime.threshold.days</name>
   <value>30</value>
 </property>
@@ -39,8 +44,18 @@
 </property>
 
 <property>
+  <name>dfs.ec.convert.num.liststatus.threads</name>
+  <value>1</value>
+</property>
+
+<property>
   <name>dfs.ec.convert.max.map.tasks</name>
   <value>20</value>
+</property>
+
+<property>
+  <name>dfs.ec.convert.blocks.per.chunk</name>
+  <value>0</value>
 </property>
 
 <property>

@@ -77,8 +77,8 @@ public final class DistCpConstants {
       "distcp.simplelisting.randomize.files";
   public static final String CONF_LABEL_FILTERS_CLASS =
       "distcp.filters.class";
-  public static final String CONF_LABEL_MAPPER_CLASS =
-      "distcp.mapper.class";
+  public static final String CONF_LABEL_OUTPUT_FORMAT_CLASS =
+      "distcp.output.format.class";
   public static final String CONF_LABEL_FILTERS_FILE =
       "distcp.filters.file";
   public static final String CONF_LABEL_MAX_CHUNKS_TOLERABLE =
