@@ -68,6 +68,13 @@
       <artifactId>hadoop-client-integration-tests</artifactId>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-odfs-client</artifactId>
+      <type>pom</type>
+      <scope>provided</scope>
+      <version>${hadoop.version}</version>
+    </dependency>
 
   </dependencies>
 

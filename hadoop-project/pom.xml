@@ -104,6 +104,8 @@
     <apacheds.version>2.0.0-M21</apacheds.version>
     <ldap-api.version>1.0.0-M33</ldap-api.version>
 
+    <odfs.version>1.0.4</odfs.version>
+
     <!-- Apache Commons dependencies -->
     <commons-beanutils.version>1.9.4</commons-beanutils.version>
     <commons-cli.version>1.2</commons-cli.version>
@@ -639,6 +641,12 @@
         <artifactId>hadoop-kms</artifactId>
         <version>${hadoop.version}</version>
         <type>test-jar</type>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-odfs-client</artifactId>
+        <version>${hadoop.version}</version>
       </dependency>
 
       <dependency>

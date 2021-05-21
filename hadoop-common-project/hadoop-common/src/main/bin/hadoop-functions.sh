@@ -592,6 +592,8 @@ function hadoop_bootstrap
   HADOOP_COMMON_LIB_NATIVE_DIR=${HADOOP_COMMON_LIB_NATIVE_DIR:-"lib/native"}
   HDFS_DIR=${HDFS_DIR:-"share/hadoop/hdfs"}
   HDFS_LIB_JARS_DIR=${HDFS_LIB_JARS_DIR:-"share/hadoop/hdfs/lib"}
+  ODFS_DIR=${ODFS_DIR:-"share/hadoop/odfs"}
+  ODFS_LIB_JARS_DIR=${ODFS_LIB_JARS_DIR:-"share/hadoop/odfs/lib"}
   YARN_DIR=${YARN_DIR:-"share/hadoop/yarn"}
   YARN_LIB_JARS_DIR=${YARN_LIB_JARS_DIR:-"share/hadoop/yarn/lib"}
   MAPRED_DIR=${MAPRED_DIR:-"share/hadoop/mapreduce"}
@@ -858,6 +860,12 @@ function hadoop_basic_init
     export HADOOP_HDFS_HOME="${HADOOP_HOME}"
   fi
 
+  # define HADOOP_ODFS_HOME
+  if [[ -z "${HADOOP_ODFS_HOME}" ]] &&
+     [[ -d "${HADOOP_HOME}/${ODFS_DIR}" ]]; then
+    export HADOOP_ODFS_HOME="${HADOOP_HOME}"
+  fi
+
   # define HADOOP_YARN_HOME
   if [[ -z "${HADOOP_YARN_HOME}" ]] &&
      [[ -d "${HADOOP_HOME}/${YARN_DIR}" ]]; then
@@ -877,6 +885,11 @@ function hadoop_basic_init
 
   if [[ ! -d "${HADOOP_HDFS_HOME}" ]]; then
     hadoop_error "ERROR: Invalid HADOOP_HDFS_HOME"
+    exit 1
+  fi
+
+  if [[ ! -d "${HADOOP_ODFS_HOME}" ]]; then
+    hadoop_error "ERROR: Invalid HADOOP_ODFS_HOME"
     exit 1
   fi
 
@@ -1602,6 +1615,7 @@ function hadoop_finalize
   hadoop_translate_cygwin_path HADOOP_CONF_DIR
   hadoop_translate_cygwin_path HADOOP_COMMON_HOME
   hadoop_translate_cygwin_path HADOOP_HDFS_HOME
+  hadoop_translate_cygwin_path HADOOP_ODFS_HOME
   hadoop_translate_cygwin_path HADOOP_YARN_HOME
   hadoop_translate_cygwin_path HADOOP_MAPRED_HOME
 }
