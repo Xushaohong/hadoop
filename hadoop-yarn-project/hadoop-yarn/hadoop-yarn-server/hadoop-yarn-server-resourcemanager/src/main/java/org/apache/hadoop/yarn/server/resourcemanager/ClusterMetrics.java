@@ -37,6 +37,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.yarn.api.records.Resource;
 
 @InterfaceAudience.Private
 @Metrics(context="yarn")
@@ -61,6 +62,8 @@ public class ClusterMetrics {
   @Metric("# scheduler queue size") MutableGaugeInt schedulerQueueSize;
   @Metric("Memory Utilization") MutableGaugeLong utilizedMB;
   @Metric("Vcore Utilization") MutableGaugeLong utilizedVirtualCores;
+  @Metric("Memory Capability") MutableGaugeLong capabilityMB;
+  @Metric("Vcore Capability") MutableGaugeLong capabilityVirtualCores;
 
   private static final MetricsInfo RECORD_INFO = info("ClusterMetrics",
   "Metrics for the Yarn Cluster");
@@ -280,5 +283,27 @@ public class ClusterMetrics {
 
   public void incrUtilizedVirtualCores(long delta) {
     utilizedVirtualCores.incr(delta);
+  }
+
+  public long getCapabilityMB() {
+    return capabilityMB.value();
+  }
+
+  public long getCapabilityVirtualCores() {
+    return capabilityVirtualCores.value();
+  }
+
+  public void incrCapability(Resource res) {
+    if (res != null) {
+      capabilityMB.incr(res.getMemorySize());
+      capabilityVirtualCores.incr(res.getVirtualCores());
+    }
+  }
+
+  public void decrCapability(Resource res) {
+    if (res != null) {
+      capabilityMB.decr(res.getMemorySize());
+      capabilityVirtualCores.decr(res.getVirtualCores());
+    }
   }
 }
