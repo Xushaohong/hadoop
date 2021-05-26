@@ -103,6 +103,15 @@ public class FairSchedulerConfiguration extends Configuration {
   protected static final float  DEFAULT_LOCALITY_THRESHOLD_NODE =
 		  DEFAULT_LOCALITY_THRESHOLD;
 
+  /** Scheduler threshold for node utils. */
+  protected static final String LOAD_SCHEDULING_THRESHOLD_NODE_CPU_UTIL =
+      CONF_PREFIX + "load.scheduling.threshold.node.cpu.util";
+  protected static final float DEFAULT_LOAD_SCHEDULING_THRESHOLD_NODE_CPU_UTIL = 0.95;
+
+  protected static final String LOAD_SCHEDULING_THRESHOLD_NODE_MEMORY_UTIL =
+      CONF_PREFIX + "load.scheduling.threshold.node.memory.util";
+  protected static final float DEFAULT_LOAD_SCHEDULING_THRESHOLD_NODE_MEMORY_UTIL = 0.95;
+
   /** Cluster threshold for rack locality. */
   protected static final String LOCALITY_THRESHOLD_RACK = CONF_PREFIX + "locality.threshold.rack";
   protected static final float  DEFAULT_LOCALITY_THRESHOLD_RACK =
@@ -319,6 +328,16 @@ public class FairSchedulerConfiguration extends Configuration {
 
   public float getLocalityThresholdNode() {
     return getFloat(LOCALITY_THRESHOLD_NODE, DEFAULT_LOCALITY_THRESHOLD_NODE);
+  }
+
+  public float getLoadSchedulingThresholdNodeCpuUtil() {
+    return getFloat(LOAD_SCHEDULING_THRESHOLD_NODE_CPU_UTIL,
+        DEFAULT_LOAD_SCHEDULING_THRESHOLD_NODE_CPU_UTIL;
+  }
+
+  public float getLoadSchedulingThresholdNodeMemoryUtil() {
+    return getFloat(LOAD_SCHEDULING_THRESHOLD_NODE_MEMORY_UTIL,
+        DEFAULT_LOAD_SCHEDULING_THRESHOLD_NODE_MEMORY_UTIL);
   }
 
   public float getLocalityThresholdRack() {

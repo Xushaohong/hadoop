@@ -190,6 +190,8 @@ public class FairScheduler extends
           new NodeAvailableResourceComparator();
   protected double nodeLocalityThreshold; // Cluster threshold for node locality
   protected double rackLocalityThreshold; // Cluster threshold for rack locality
+  protected double loadSchedulingThresholdCpuUtil;
+  protected double loadSchedulingThresholdMemoryUtil;
   @Deprecated
   protected long nodeLocalityDelayMs; // Delay for node locality
   @Deprecated
@@ -1155,6 +1157,20 @@ public class FairScheduler extends
         return;
       }
 
+      double nodeMemoryUtils = node.getNodeUtilization().getPhysicalMemory()
+              /node.getRMNode().getPhysicalResource().getMemorySize();
+      double nodeCpuUtils = node.getNodeUtilization().getCPU()
+              /node.getRMNode().getPhysicalResource().getVirtualCores();
+      if (nodeMemoryUtils > loadSchedulingThresholdMemoryUtil
+              || nodeCpuUtils > loadSchedulingThresholdCpuUtil){
+        LOG.info(
+            "Skipping scheduling as the node " + nodeID +
+             "has exceeded utilization thresholds."
+             +"Node memory utilization is "+ nodeMemoryUtils
+             +".Node cpu utilization is"+ nodeCpuUtils);
+        return;
+      }
+
       // Assign new containers...
       // 1. Ensure containers are assigned to the apps that preempted
       // 2. Check for reserved applications
@@ -1434,6 +1450,8 @@ public class FairScheduler extends
       continuousSchedulingEnabled = this.conf.isContinuousSchedulingEnabled();
       continuousSchedulingSleepMs = this.conf.getContinuousSchedulingSleepMs();
       nodeLocalityThreshold = this.conf.getLocalityThresholdNode();
+      loadSchedulingThresholdCpuUtil = this.conf.getLoadSchedulingThresholdNodeCpuUtil();
+      loadSchedulingThresholdMemoryUtil = this.conf.getLoadSchedulingThresholdNodeMemoryUtil();
       rackLocalityThreshold = this.conf.getLocalityThresholdRack();
       nodeLocalityDelayMs = this.conf.getLocalityDelayNodeMs();
       rackLocalityDelayMs = this.conf.getLocalityDelayRackMs();
