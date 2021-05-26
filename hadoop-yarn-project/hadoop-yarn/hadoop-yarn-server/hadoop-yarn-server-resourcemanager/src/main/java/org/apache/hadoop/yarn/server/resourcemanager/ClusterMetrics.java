@@ -110,7 +110,7 @@ public class ClusterMetrics {
   }
 
   @VisibleForTesting
-  synchronized static void destroy() {
+  public synchronized static void destroy() {
     isInitialized.set(false);
     INSTANCE = null;
     if (INSTANCE != null && INSTANCE.getAssignCounterExecutor() != null) {
