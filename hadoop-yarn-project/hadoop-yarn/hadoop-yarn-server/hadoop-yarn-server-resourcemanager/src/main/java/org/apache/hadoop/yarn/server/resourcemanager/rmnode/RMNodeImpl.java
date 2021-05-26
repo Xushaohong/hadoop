@@ -700,7 +700,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
   @Override
   public long calculateHeartBeatInterval(long defaultInterval, long minInterval,
-                                         long maxInterval, float speedupFactor, float slowdownFactor) {
+                                         long maxInterval, float speedupFactor,
+                                         float slowdownFactor, boolean speedUpFlag) {
 
     long newInterval = defaultInterval;
 
@@ -725,8 +726,11 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                 * (1.0f + (nodeUtil - clusterUtil) * slowdownFactor));
       } else {
         // Speed up - 20% less CPU utilization means speed up by 20% * factor
-        newInterval = (long) (defaultInterval
-                * (1.0f - (clusterUtil - nodeUtil) * speedupFactor));
+        if (!speedUpFlag) {
+          // Speed up - 20% less CPU utilization means speed up by 20% * factor
+          newInterval = (long) (defaultInterval
+                  * (1.0f - (clusterUtil - nodeUtil) * speedupFactor));
+        }
       }
       newInterval =
               Math.min(maxInterval, Math.max(minInterval, newInterval));

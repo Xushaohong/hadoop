@@ -204,5 +204,5 @@ public interface RMNode {
 
   long calculateHeartBeatInterval(long defaultInterval,
                                   long minInterval, long maxInterval, float speedupFactor,
-                                  float slowdownFactor);
+                                  float slowdownFactor, boolean speedUpFlag);
 }

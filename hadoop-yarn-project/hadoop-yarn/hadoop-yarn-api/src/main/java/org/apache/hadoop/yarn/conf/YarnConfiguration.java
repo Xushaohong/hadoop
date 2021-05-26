@@ -695,6 +695,10 @@ public class YarnConfiguration extends Configuration {
   public static final float
           DEFAULT_RM_NM_HEARTBEAT_INTERVAL_SLOWDOWN_FACTOR = 1.0f;
 
+  public static final String RM_THROTTLE_HEARTBEAT_EVENT_THRESHOLD =
+          RM_PREFIX + "throttle-heartbeat.event-threshold";
+  public static final long DEFAULT_RM_THROTTLE_HEARTBEAT_EVENT_THRESHOLD = 10000;
+
   /** Number of worker threads that write the history data. */
   public static final String RM_HISTORY_WRITER_MULTI_THREADED_DISPATCHER_POOL_SIZE =
       RM_PREFIX + "history-writer.multi-threaded-dispatcher.pool-size";

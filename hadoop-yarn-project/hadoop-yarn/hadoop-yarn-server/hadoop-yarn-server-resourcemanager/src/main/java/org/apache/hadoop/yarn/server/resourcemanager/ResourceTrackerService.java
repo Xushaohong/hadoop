@@ -34,6 +34,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.commons.collections.CollectionUtils;
 import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -119,6 +120,7 @@ public class ResourceTrackerService extends AbstractService implements
   private long heartBeatIntervalMax;
   private float heartBeatIntervalSpeedupFactor;
   private float heartBeatIntervalSlowdownFactor;
+  private long throttleEventThreshold;
 
   private Server server;
   private InetSocketAddress resourceTrackerAddress;
@@ -267,6 +269,9 @@ public class ResourceTrackerService extends AbstractService implements
                       YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_SLOWDOWN_FACTOR,
                       YarnConfiguration.
                               DEFAULT_RM_NM_HEARTBEAT_INTERVAL_SLOWDOWN_FACTOR);
+      throttleEventThreshold =
+              conf.getLong(YarnConfiguration.RM_THROTTLE_HEARTBEAT_EVENT_THRESHOLD,
+                      YarnConfiguration.DEFAULT_RM_THROTTLE_HEARTBEAT_EVENT_THRESHOLD);
 
       if (nextHeartBeatInterval <= 0) {
         LOG.warn("HeartBeat interval: " + nextHeartBeatInterval
@@ -698,10 +703,17 @@ public class ResourceTrackerService extends AbstractService implements
     // Heartbeat response
     long newInterval = nextHeartBeatInterval;
     if (heartBeatIntervalScalingEnable) {
+      int rmQueueSize = ((AsyncDispatcher) rmContext.getDispatcher()).getEventQueueSize();
+      boolean speedUpFlag = rmQueueSize > throttleEventThreshold;
+      if (speedUpFlag) {
+        newInterval = (long)(Math.random() * (heartBeatIntervalMax - heartBeatIntervalMin))
+                + nextHeartBeatInterval;
+        nextHeartBeatInterval = newInterval;
+      }
       newInterval = rmNode.calculateHeartBeatInterval(
               nextHeartBeatInterval, heartBeatIntervalMin,
               heartBeatIntervalMax, heartBeatIntervalSpeedupFactor,
-              heartBeatIntervalSlowdownFactor);
+              heartBeatIntervalSlowdownFactor, speedUpFlag);
     }
 
     // Heartbeat response
