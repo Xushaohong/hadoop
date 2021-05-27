@@ -133,7 +133,7 @@ public class DefaultLinuxContainerRuntime implements LinuxContainerRuntime {
       privilegedOperationExecutor.executePrivilegedOperation(prefixCommands,
             launchOp, null, null, false, false);
     } catch (PrivilegedOperationException e) {
-      throw new ContainerExecutionException("Launch container failed", e
+      throw new ContainerExecutionException("Execute container failed", e
           .getExitCode(), e.getOutput(), e.getErrorOutput());
     }
   }

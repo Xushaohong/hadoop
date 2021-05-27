@@ -1039,7 +1039,7 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
       privilegedOperationExecutor.executePrivilegedOperation(null,
           launchOp, null, null, false, false);
     } catch (PrivilegedOperationException e) {
-      throw new ContainerExecutionException("Launch container failed", e
+      throw new ContainerExecutionException("Execute container failed", e
           .getExitCode(), e.getOutput(), e.getErrorOutput());
     }
   }
@@ -1068,7 +1068,7 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
         privilegedOperationExecutor.executePrivilegedOperation(null,
             launchOp, null, null, false, false);
       } catch (PrivilegedOperationException e) {
-        throw new ContainerExecutionException("Relaunch container failed", e
+        throw new ContainerExecutionException("ReExecute container failed", e
             .getExitCode(), e.getOutput(), e.getErrorOutput());
       }
     } else {
