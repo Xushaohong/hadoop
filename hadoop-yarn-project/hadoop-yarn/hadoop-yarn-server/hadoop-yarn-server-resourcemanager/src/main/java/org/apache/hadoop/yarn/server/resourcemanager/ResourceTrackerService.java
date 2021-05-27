@@ -34,6 +34,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.commons.collections.CollectionUtils;
 import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -114,6 +115,13 @@ public class ResourceTrackerService extends AbstractService implements
   private final WriteLock writeLock;
 
   private long nextHeartBeatInterval;
+  private boolean heartBeatIntervalScalingEnable;
+  private long heartBeatIntervalMin;
+  private long heartBeatIntervalMax;
+  private float heartBeatIntervalSpeedupFactor;
+  private float heartBeatIntervalSlowdownFactor;
+  private long throttleEventThreshold;
+
   private Server server;
   private InetSocketAddress resourceTrackerAddress;
   private String minimumNodeManagerVersion;
@@ -187,6 +195,7 @@ public class ResourceTrackerService extends AbstractService implements
 
     loadDynamicResourceConfiguration(conf);
     decommissioningWatcher.init(conf);
+    updateHeartBeatConfiguration(conf);
     super.serviceInit(conf);
   }
 
@@ -224,6 +233,87 @@ public class ResourceTrackerService extends AbstractService implements
     this.writeLock.lock();
     try {
       this.drConf = conf;
+    } finally {
+      this.writeLock.unlock();
+    }
+  }
+
+  /**
+   * Update HearBeatConfiguration with new configuration.
+   * @param conf Yarn Configuration
+   */
+  public void updateHeartBeatConfiguration(Configuration conf) {
+    this.writeLock.lock();
+    try {
+      nextHeartBeatInterval =
+              conf.getLong(YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_MS,
+                      YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_MS);
+      heartBeatIntervalScalingEnable =
+              conf.getBoolean(
+                      YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_SCALING_ENABLE,
+                      YarnConfiguration.
+                              DEFAULT_RM_NM_HEARTBEAT_INTERVAL_SCALING_ENABLE);
+      heartBeatIntervalMin =
+              conf.getLong(YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_MIN_MS,
+                      YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_MIN_MS);
+      heartBeatIntervalMax =
+              conf.getLong(YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_MAX_MS,
+                      YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_MAX_MS);
+      heartBeatIntervalSpeedupFactor =
+              conf.getFloat(
+                      YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_SPEEDUP_FACTOR,
+                      YarnConfiguration.
+                              DEFAULT_RM_NM_HEARTBEAT_INTERVAL_SPEEDUP_FACTOR);
+      heartBeatIntervalSlowdownFactor =
+              conf.getFloat(
+                      YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_SLOWDOWN_FACTOR,
+                      YarnConfiguration.
+                              DEFAULT_RM_NM_HEARTBEAT_INTERVAL_SLOWDOWN_FACTOR);
+      throttleEventThreshold =
+              conf.getLong(YarnConfiguration.RM_THROTTLE_HEARTBEAT_EVENT_THRESHOLD,
+                      YarnConfiguration.DEFAULT_RM_THROTTLE_HEARTBEAT_EVENT_THRESHOLD);
+
+      if (nextHeartBeatInterval <= 0) {
+        LOG.warn("HeartBeat interval: " + nextHeartBeatInterval
+                + " must be greater than 0, using default.");
+        nextHeartBeatInterval =
+                YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_MS;
+      }
+
+      if (heartBeatIntervalScalingEnable) {
+        if (heartBeatIntervalMin <= 0
+                || heartBeatIntervalMin > heartBeatIntervalMax
+                || nextHeartBeatInterval < heartBeatIntervalMin
+                || nextHeartBeatInterval > heartBeatIntervalMax) {
+          LOG.warn("Invalid NM Heartbeat Configuration. "
+                  + "Required: 0 < minimum <= interval <= maximum. Got: 0 < "
+                  + heartBeatIntervalMin + " <= "
+                  + nextHeartBeatInterval + " <= "
+                  + heartBeatIntervalMax
+                  + " Setting min and max to configured interval.");
+          heartBeatIntervalMin = nextHeartBeatInterval;
+          heartBeatIntervalMax = nextHeartBeatInterval;
+        }
+        if (heartBeatIntervalSpeedupFactor < 0
+                || heartBeatIntervalSlowdownFactor < 0) {
+          LOG.warn(
+                  "Heartbeat scaling factors must be >= 0 "
+                          + " SpeedupFactor:" + heartBeatIntervalSpeedupFactor
+                          + " SlowdownFactor:" + heartBeatIntervalSlowdownFactor
+                          + ". Using Defaults");
+          heartBeatIntervalSlowdownFactor =
+                  YarnConfiguration.
+                          DEFAULT_RM_NM_HEARTBEAT_INTERVAL_SLOWDOWN_FACTOR;
+          heartBeatIntervalSpeedupFactor =
+                  YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_SPEEDUP_FACTOR;
+        }
+        LOG.info("Heartbeat Scaling Configuration: "
+                + " defaultInterval:" + nextHeartBeatInterval
+                + " minimumInterval:" + heartBeatIntervalMin
+                + " maximumInterval:" + heartBeatIntervalMax
+                + " speedupFactor:" + heartBeatIntervalSpeedupFactor
+                + " slowdownFactor:" + heartBeatIntervalSlowdownFactor);
+      }
     } finally {
       this.writeLock.unlock();
     }
@@ -611,10 +701,26 @@ public class ResourceTrackerService extends AbstractService implements
     }
 
     // Heartbeat response
+    long newInterval = nextHeartBeatInterval;
+    if (heartBeatIntervalScalingEnable) {
+      int rmQueueSize = ((AsyncDispatcher) rmContext.getDispatcher()).getEventQueueSize();
+      boolean speedUpFlag = rmQueueSize > throttleEventThreshold;
+      if (speedUpFlag) {
+        newInterval = (long)(Math.random() * (heartBeatIntervalMax - heartBeatIntervalMin))
+                + nextHeartBeatInterval;
+        nextHeartBeatInterval = newInterval;
+      }
+      newInterval = rmNode.calculateHeartBeatInterval(
+              nextHeartBeatInterval, heartBeatIntervalMin,
+              heartBeatIntervalMax, heartBeatIntervalSpeedupFactor,
+              heartBeatIntervalSlowdownFactor, speedUpFlag);
+    }
+
+    // Heartbeat response
     NodeHeartbeatResponse nodeHeartBeatResponse =
         YarnServerBuilderUtils.newNodeHeartbeatResponse(
             getNextResponseId(lastNodeHeartbeatResponse.getResponseId()),
-            NodeAction.NORMAL, null, null, null, null, nextHeartBeatInterval);
+            NodeAction.NORMAL, null, null, null, null, newInterval);
     rmNode.setAndUpdateNodeHeartbeatResponse(nodeHeartBeatResponse);
 
     populateKeys(request, nodeHeartBeatResponse);

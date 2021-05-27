@@ -1434,6 +1434,9 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
                 YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_MS :
                 nextHeartBeatInterval;
             try {
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Current heart beat interval for node " + nodeId + " is " + nextHeartBeatInterval);
+              }
               heartbeatMonitor.wait(nextHeartBeatInterval);
             } catch (InterruptedException e) {
               // Do Nothing

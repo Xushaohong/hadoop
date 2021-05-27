@@ -35,7 +35,9 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.yarn.api.records.Resource;
 
 @InterfaceAudience.Private
 @Metrics(context="yarn")
@@ -58,6 +60,10 @@ public class ClusterMetrics {
     MutableGaugeInt numContainerAssignedPerSecond;
   @Metric("# rm queue size") MutableGaugeInt rmQueueSize;
   @Metric("# scheduler queue size") MutableGaugeInt schedulerQueueSize;
+  @Metric("Memory Utilization") MutableGaugeLong utilizedMB;
+  @Metric("Vcore Utilization") MutableGaugeLong utilizedVirtualCores;
+  @Metric("Memory Capability") MutableGaugeLong capabilityMB;
+  @Metric("Vcore Capability") MutableGaugeLong capabilityVirtualCores;
 
   private static final MetricsInfo RECORD_INFO = info("ClusterMetrics",
   "Metrics for the Yarn Cluster");
@@ -104,7 +110,7 @@ public class ClusterMetrics {
   }
 
   @VisibleForTesting
-  synchronized static void destroy() {
+  public synchronized static void destroy() {
     isInitialized.set(false);
     INSTANCE = null;
     if (INSTANCE != null && INSTANCE.getAssignCounterExecutor() != null) {
@@ -253,5 +259,51 @@ public class ClusterMetrics {
 
   private ScheduledThreadPoolExecutor getAssignCounterExecutor(){
     return assignCounterExecutor;
+  }
+
+  public long getUtilizedMB() {
+    return utilizedMB.value();
+  }
+
+  public void incrUtilizedMB(long delta) {
+    utilizedMB.incr(delta);
+  }
+
+  public void decrUtilizedMB(long delta) {
+    utilizedMB.decr(delta);
+  }
+
+  public void decrUtilizedVirtualCores(long delta) {
+    utilizedVirtualCores.decr(delta);
+  }
+
+  public long getUtilizedVirtualCores() {
+    return utilizedVirtualCores.value();
+  }
+
+  public void incrUtilizedVirtualCores(long delta) {
+    utilizedVirtualCores.incr(delta);
+  }
+
+  public long getCapabilityMB() {
+    return capabilityMB.value();
+  }
+
+  public long getCapabilityVirtualCores() {
+    return capabilityVirtualCores.value();
+  }
+
+  public void incrCapability(Resource res) {
+    if (res != null) {
+      capabilityMB.incr(res.getMemorySize());
+      capabilityVirtualCores.incr(res.getVirtualCores());
+    }
+  }
+
+  public void decrCapability(Resource res) {
+    if (res != null) {
+      capabilityMB.decr(res.getMemorySize());
+      capabilityVirtualCores.decr(res.getVirtualCores());
+    }
   }
 }
