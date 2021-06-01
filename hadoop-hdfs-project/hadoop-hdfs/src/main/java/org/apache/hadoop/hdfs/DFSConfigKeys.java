@@ -869,6 +869,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int     DFS_REPLICATION_MAX_DEFAULT = 512;
   public static final String DFS_BLOCK_PLACEMENT_EC_CLASSNAME_KEY = "dfs.block.placement.ec.classname";
   public static final Class<BlockPlacementPolicyRackFaultTolerant> DFS_BLOCK_PLACEMENT_EC_CLASSNAME_DEFAULT = BlockPlacementPolicyRackFaultTolerant.class;
+  public static final String DFS_BLOCK_PLACEMENT_EC_CHOOSE_RANDOM_AMONG_RACKS = "dfs.block.placement.ec.choose.random.among.racks";
+  public static final boolean DFS_BLOCK_PLACEMENT_EC_CHOOSE_RANDOM_AMONG_RACKS_DEFAULT = false;
 
   public static final String  DFS_DF_INTERVAL_KEY = "dfs.df.interval";
   public static final int     DFS_DF_INTERVAL_DEFAULT = 60000;

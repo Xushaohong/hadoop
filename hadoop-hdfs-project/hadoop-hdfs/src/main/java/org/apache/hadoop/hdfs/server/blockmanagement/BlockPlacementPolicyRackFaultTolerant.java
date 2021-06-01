@@ -18,8 +18,11 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.net.NodeBase;
 
@@ -32,6 +35,16 @@ import java.util.*;
  */
 @InterfaceAudience.Private
 public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyDefault {
+  private boolean chooseRandomAmongRacks;
+
+  @Override
+  public void initialize(Configuration conf, FSClusterStats stats,
+      NetworkTopology clusterMap, Host2NodesMap host2datanodeMap) {
+    this.chooseRandomAmongRacks = conf.getBoolean(
+        DFSConfigKeys.DFS_BLOCK_PLACEMENT_EC_CHOOSE_RANDOM_AMONG_RACKS,
+        DFSConfigKeys.DFS_BLOCK_PLACEMENT_EC_CHOOSE_RANDOM_AMONG_RACKS_DEFAULT);
+    super.initialize(conf, stats, clusterMap, host2datanodeMap);
+  }
 
   @Override
   protected int[] getMaxNodesPerRack(int numOfChosen, int numOfReplicas) {
@@ -41,6 +54,12 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
       numOfReplicas -= (totalNumOfReplicas-clusterSize);
       totalNumOfReplicas = clusterSize;
     }
+
+    // if NN was configured that choose nodes randomly among all racks.
+    if (chooseRandomAmongRacks) {
+      return new int[] {numOfReplicas, totalNumOfReplicas};
+    }
+
     // No calculation needed when there is only one rack or picking one node.
     int numOfRacks = clusterMap.getNumOfRacks();
     // HDFS-14527 return default when numOfRacks = 0 to avoid
