@@ -1,9 +1,11 @@
 package org.apache.hadoop.ipc;
 
 import com.google.common.collect.Lists;
+import com.google.protobuf.ServiceException;
 import com.tencent.tdw.security.authentication.LocalKeyManager;
 import com.tencent.tdw.security.authentication.SecretKeyProvider;
 import com.tencent.tdw.security.authentication.SecurityCenterProvider;
+import com.tencent.tdw.security.exceptions.SecureException;
 import com.tencent.tdw.security.minicluster.LocalSecurityCenter;
 import com.tencent.tdw.security.minicluster.SecurityController;
 import com.tencent.tdw.security.netbeans.SecretKey;
@@ -213,6 +215,35 @@ public class TestSaslTAuthRPC extends TestRpcBase {
         stop(server, proxy);
       }
       return null;
+    });
+  }
+
+  @Test
+  public void testFallbackToSimple() throws IOException, ServiceException, SecureException, InterruptedException {
+    final Configuration newConf = new Configuration(conf);
+    newConf.setBoolean("tq.auth.compatible", true);
+
+    String clientName = "client";
+    String serviceName = "hdfs";
+    SecurityController securityController = securityCenter.getController();
+    SecretKey serviceKey = securityController.createService(serviceName, "");
+
+    UserGroupInformation serverUser = UserGroupInformation.createUserByTAuthKey(serviceName, serviceKey.getKey());
+
+    serverUser.doAs( (PrivilegedExceptionAction<Void>) () -> {
+      setupTestServer(newConf, 5);
+      return null;
+    });
+
+    final Configuration clientConf = new Configuration(newConf);
+    clientConf.set("hadoop.security.authentication", "TAUTH");
+    clientConf.setBoolean("tauth.no-key.fallback.allowed", true);
+    clientConf.setBoolean("ipc.client.fallback-to-simple-auth-allowed", true);
+    UserGroupInformation clientUser = UserGroupInformation.createRemoteUser(clientName, SaslRpcServer.AuthMethod.TAUTH);
+    clientUser.doAs((PrivilegedExceptionAction<Object>) () -> {
+      TestRpcService proxy = getClient(addr, clientConf);
+        proxy.ping(null, newEmptyRequest());
+        return null;
     });
   }
 }

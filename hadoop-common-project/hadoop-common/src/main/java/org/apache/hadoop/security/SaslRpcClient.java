@@ -807,7 +807,7 @@ public class SaslRpcClient {
 
     @Override
     protected String getUserName() {
-      return realUser != null? realUser : user;
+      return user;
     }
 
     @Override

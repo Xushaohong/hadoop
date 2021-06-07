@@ -574,7 +574,7 @@ public class SaslRpcServer {
       TAuthAuthentication tAuthAuthentication = new TAuthAuthentication(token.getSmkId(),
           token.getServiceTicket(), token.getAuthenticator());
       Authenticator authenticator = secureService.authenticate(tAuthAuthentication);
-      return Tuple.of(authenticator.getSessionKey(), authenticator.getAuthUser());
+      return Tuple.of(authenticator.getSessionKey(), authenticator.getUser());
     }
 
     @Override
