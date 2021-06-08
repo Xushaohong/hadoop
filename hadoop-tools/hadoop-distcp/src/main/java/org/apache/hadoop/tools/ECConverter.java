@@ -702,6 +702,10 @@ public class ECConverter extends DistCp {
     String[] srcEcPaths = resolveEcPathsIndirection();
     List<Path> list = new LinkedList<Path>();
     for (int i = 0; i < srcEcPaths.length; i++) {
+      if (srcEcPaths[i].isEmpty()) {
+        continue;
+      }
+
       Path p = new Path(srcEcPaths[i]);
       try {
         FileSystem fs = p.getFileSystem(conf);
