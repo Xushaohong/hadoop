@@ -24,7 +24,7 @@ public class DefaultFsUtil {
   }
 
   public static void removeRbfRedirectConf(Configuration conf) {
-    conf.set(RBF_REDIRECT_DEFAULTFS_ENABLE, null);
+    conf.setBoolean(RBF_REDIRECT_DEFAULTFS_ENABLE, false);
   }
 
   private static URI loadRbfDefaultFsUri(Configuration conf) {
