@@ -1108,8 +1108,15 @@ public class ResourceManager extends CompositeService
           // RMStateStore. If the finished container's attempt is deleted, we
           // use the first attempt in app.attempts to deal with these events.
 
-          RMAppAttempt previousFailedAttempt =
-              rmApp.getAppAttempts().values().iterator().next();
+          RMAppAttempt previousFailedAttempt = null;
+          if (!rmApp.getAppAttempts().isEmpty()){
+            previousFailedAttempt =
+                rmApp.getAppAttempts().values().iterator().next();
+          }else {
+            LOG.error("Event " + event.getType()
+                + " not handled, because rmApp.getAppAttempts() is empty,"
+                + " rmApp id is "+ rmApp.getApplicationId().toString());
+          }
           if (previousFailedAttempt != null) {
             try {
               LOG.debug("Event " + event.getType() + " handled by "
