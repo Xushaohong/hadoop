@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.server.router.clientrm;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.CancelDelegationTokenRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.CancelDelegationTokenResponse;
@@ -502,9 +504,14 @@ public class FederationClientInterceptor
         getClientRMProxyForSubCluster(subClusterId);
 
     KillApplicationResponse response = null;
+    InetAddress remoteAddress = Server.getRemoteIp();
+    String remoteAddressStr = null;
+    if (null != remoteAddress) {
+      remoteAddressStr = remoteAddress.getHostAddress();
+    }
     try {
       LOG.info("forceKillApplication " + applicationId + " on SubCluster "
-          + subClusterId);
+          + subClusterId+" ,client at " + remoteAddressStr);
       response = clientRMProxy.forceKillApplication(request);
     } catch (Exception e) {
       routerMetrics.incrAppsFailedKilled();
