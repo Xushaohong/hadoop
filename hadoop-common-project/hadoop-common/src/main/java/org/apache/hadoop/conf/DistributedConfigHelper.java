@@ -133,9 +133,13 @@ public final class DistributedConfigHelper {
   }
 
   public static DistributedConfigHelper get() {
-    // ignore thread unsafe
+    // thread unsafe
     if (instance == null) {
-      instance = new DistributedConfigHelper();
+      synchronized (DistributedConfigHelper.class) {
+        if (instance == null) {
+          instance = new DistributedConfigHelper();
+        }
+      }
     }
     return instance;
   }
