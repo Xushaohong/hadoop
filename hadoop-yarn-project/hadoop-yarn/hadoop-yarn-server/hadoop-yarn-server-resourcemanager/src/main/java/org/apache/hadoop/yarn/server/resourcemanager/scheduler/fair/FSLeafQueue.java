@@ -126,6 +126,7 @@ public class FSLeafQueue extends FSQueue {
     try {
       runnable = runnableApps.remove(app);
       if (!runnable) {
+        app.setRemoved();
         // removeNonRunnableApp acquires the write lock again, which is fine
         if (!removeNonRunnableApp(app)) {
           throw new IllegalStateException("Given app to remove " + app +
