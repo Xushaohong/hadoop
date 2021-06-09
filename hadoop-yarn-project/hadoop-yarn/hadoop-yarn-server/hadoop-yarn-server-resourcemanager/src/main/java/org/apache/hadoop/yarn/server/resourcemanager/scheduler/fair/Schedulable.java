@@ -106,4 +106,8 @@ public interface Schedulable {
    *         <code>false</code> otherwise
    */
   boolean isPreemptable();
+
+  /** update need resource for Scheduable **/
+  void updateNeedResource();
+  boolean isNeedResource();
 }

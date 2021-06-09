@@ -114,6 +114,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 
 /**
@@ -353,6 +354,7 @@ public class FairScheduler extends
     // Update demands and fairshares
     writeLock.lock();
     try {
+      rootQueue.updateNeedResource();
       // Recursively update demands for all queues
       rootQueue.updateDemand();
       rootQueue.update(getClusterResource());
@@ -841,7 +843,7 @@ public class FairScheduler extends
             .createAbnormalContainerStatus(reservedContainer.getContainerId(),
                 SchedulerUtils.LOST_CONTAINER), RMContainerEventType.KILL);
       }
-
+      node.setRemoved(true);
       nodeTracker.removeNode(nodeId);
       Resource clusterResource = getClusterResource();
       queueMgr.getRootQueue().setSteadyFairShare(clusterResource);
@@ -2024,6 +2026,10 @@ public class FairScheduler extends
 
   ReadLock getSchedulerReadLock() {
     return this.readLock;
+  }
+
+  WriteLock getSchedulerWriteLock() {
+    return this.writeLock;
   }
 
   @Override

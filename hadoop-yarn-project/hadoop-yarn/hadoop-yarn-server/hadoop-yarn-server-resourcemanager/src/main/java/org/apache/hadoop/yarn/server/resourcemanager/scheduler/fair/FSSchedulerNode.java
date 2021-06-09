@@ -67,6 +67,8 @@ public class FSSchedulerNode extends SchedulerNode {
   // slated for preemption
   private Resource totalResourcesPreempted = Resource.newInstance(0, 0);
 
+  private boolean isRemoved = false;
+
   public FSSchedulerNode(RMNode node, boolean usePortForNodeName) {
     super(node, usePortForNodeName);
   }
@@ -286,5 +288,13 @@ public class FSSchedulerNode extends SchedulerNode {
     if (container != null) {
       containersForPreemption.remove(container);
     }
+  }
+
+  public void setRemoved(boolean isRemoved) {
+    this.isRemoved = isRemoved;
+  }
+
+  public boolean isRemoved() {
+    return this.isRemoved;
   }
 }

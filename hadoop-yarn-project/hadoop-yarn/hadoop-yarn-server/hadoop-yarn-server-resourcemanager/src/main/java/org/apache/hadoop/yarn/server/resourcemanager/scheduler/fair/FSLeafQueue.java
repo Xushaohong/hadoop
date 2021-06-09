@@ -24,10 +24,11 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.Comparator;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.TreeSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -144,6 +145,7 @@ public class FSLeafQueue extends FSQueue {
   boolean removeNonRunnableApp(FSAppAttempt app) {
     writeLock.lock();
     try {
+      app.setRemoved();
       return nonRunnableApps.remove(app);
     } finally {
       writeLock.unlock();
@@ -347,9 +349,24 @@ public class FSLeafQueue extends FSQueue {
       return assigned;
     }
 
-    for (FSAppAttempt sched : fetchAppsWithDemand(true)) {
+    if (node.isRemoved()) {
+      LOG.debug(node.getNodeName() + " has been removed, skip assign container for it.");
+      return assigned;
+    }
+
+    CuedFloydHeap<FSAppAttempt> heap = fetchAppsByHeapSort();
+    while (heap.size() > 0) {
+      FSAppAttempt sched = heap.poll();
       if (SchedulerAppUtils.isPlaceBlacklisted(sched, node, LOG)) {
         continue;
+      }
+      if (sched.isRemoved()) {
+        LOG.debug(sched.getName() + " has been removed, skip assign container for it.");
+        continue;
+      }
+      if (!sched.isNeedResource()) {
+        LOG.debug(sched.getName() + " does not need resource, skip assign container for it.");
+        break;
       }
       assigned = sched.assignContainer(node);
       if (!assigned.equals(none())) {
@@ -388,6 +405,30 @@ public class FSLeafQueue extends FSQueue {
     }
     return pendingForResourceApps;
   }
+
+  private CuedFloydHeap<FSAppAttempt> fetchAppsByHeapSort() {
+    Comparator<Schedulable> comparator = policy.getComparator();
+    CuedFloydHeap<FSAppAttempt> heap =
+            new CuedFloydHeap<FSAppAttempt>(comparator);
+    readLock.lock();
+    List<FSAppAttempt> apps = new ArrayList<>();
+    for (FSAppAttempt app : runnableApps) {
+      if (app.isNeedResource()) {
+        apps.add(app);
+      }
+    }
+    heap.initElementsFromCollection(apps);
+    readLock.unlock();
+
+    scheduler.getSchedulerWriteLock().unlock();
+    try {
+      heap.heapify();
+    } finally {
+      scheduler.getSchedulerWriteLock().lock();
+    }
+    return heap;
+  }
+
 
   @Override
   public List<FSQueue> getChildQueues() {
@@ -651,5 +692,21 @@ public class FSLeafQueue extends FSQueue {
     } finally {
       writeLock.unlock();
     }
+  }
+
+  @Override
+  public void updateNeedResource() {
+    for (FSAppAttempt sched : runnableApps) {
+      if (sched.isNeedResource()) {
+        needResource = true;
+        return;
+      }
+    }
+    needResource = false;
+  }
+
+  @Override
+  public boolean isNeedResource() {
+    return needResource;
   }
 }
