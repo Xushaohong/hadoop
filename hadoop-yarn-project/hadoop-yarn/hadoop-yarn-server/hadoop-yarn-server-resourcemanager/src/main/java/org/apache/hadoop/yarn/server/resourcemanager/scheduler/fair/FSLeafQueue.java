@@ -22,7 +22,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.Comparator;
@@ -78,6 +80,10 @@ public class FSLeafQueue extends FSQueue {
 
   private final ActiveUsersManager activeUsersManager;
 
+  private String lastScheduledNodeId;
+  private Map<String, Integer> assignedContainersForApp;
+  private int maxAssignForSameApp;
+
   public FSLeafQueue(String name, FairScheduler scheduler,
       FSParentQueue parent) {
     super(name, scheduler, parent);
@@ -86,6 +92,9 @@ public class FSLeafQueue extends FSQueue {
     activeUsersManager = new ActiveUsersManager(getMetrics());
     amResourceUsage = Resource.newInstance(0, 0);
     getMetrics().setAMResourceUsage(amResourceUsage);
+    assignedContainersForApp = new HashMap<>();
+    lastScheduledNodeId = "";
+    maxAssignForSameApp = scheduler.getConf().getMaxAssignForSameApp();
   }
   
   void addApp(FSAppAttempt app, boolean runnable) {
@@ -343,6 +352,8 @@ public class FSLeafQueue extends FSQueue {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Node " + node.getNodeName() + " offered to queue: " +
           getName() + " fairShare: " + getFairShare());
+      LOG.debug("isSortAppsEnabled: " + scheduler.getConf().isSortAppsEnabled());
+      LOG.debug("isAssignAllResourceEnabled: " + scheduler.getConf().isAssignAllResourceEnabled());
     }
 
     if (!assignContainerPreCheck(node)) {
@@ -353,6 +364,15 @@ public class FSLeafQueue extends FSQueue {
       LOG.debug(node.getNodeName() + " has been removed, skip assign container for it.");
       return assigned;
     }
+
+    if (scheduler.getConf().isSortAppsEnabled()) {
+      return assignContainerWithSort(node);
+    } else {
+      return assignContainerWithoutSort(node);
+    }
+  }
+  private Resource assignContainerWithSort(FSSchedulerNode node) {
+    Resource assigned = Resources.none();
 
     CuedFloydHeap<FSAppAttempt> heap = fetchAppsByHeapSort();
     while (heap.size() > 0) {
@@ -378,6 +398,71 @@ public class FSLeafQueue extends FSQueue {
       }
     }
     return assigned;
+  }
+
+  private Resource assignContainerWithoutSort(FSSchedulerNode node) {
+    readLock.lock();
+    List<FSAppAttempt> apps = new ArrayList<>(runnableApps);
+    if (maxAssignForSameApp > 0 && !lastScheduledNodeId.equals(node.getNodeName())) {
+      assignedContainersForApp.clear();
+      lastScheduledNodeId = node.getNodeName();
+    }
+    readLock.unlock();
+
+    Resource totalAssigned = Resources.none();
+    int index = 0;
+    for (FSAppAttempt sched : apps) {
+      index++;
+      if (sched.isRemoved()) {
+        LOG.debug(sched.getName() + " has been removed, skip assign container for it.");
+        continue;
+      }
+      if (!sched.isNeedResource()) {
+        LOG.debug(sched.getName() + " does not need resource, skip assign container for it.");
+        continue;
+      }
+      if (SchedulerAppUtils.isPlaceBlacklisted(sched, node, LOG)) {
+        continue;
+      }
+      if (maxAssignForSameApp > 0) {
+        int max = 0;
+        String name = sched.getName();
+        if (assignedContainersForApp.containsKey(name)) {
+          max = assignedContainersForApp.get(name);
+          if (max > maxAssignForSameApp) {
+            LOG.debug(name + " has been allocated too many containers, skip assign container for it.");
+            continue;
+          }
+        }
+        max += 1;
+        assignedContainersForApp.put(name, max);
+      }
+
+      Resource assigned = sched.assignContainer(node);
+      if (!assigned.equals(Resources.none())) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Assigned container in queue:" + getName() + " " +
+                  "container:" + assigned);
+        }
+        if (scheduler.getConf().isAssignAllResourceEnabled()
+            && !assigned.equals(FairScheduler.CONTAINER_RESERVED)) {
+          totalAssigned = Resources.add(totalAssigned, assigned);
+        } else {
+          totalAssigned = Resources.add(totalAssigned, assigned);
+          break;
+        }
+      }
+    }
+
+    // Put apps those get allocated containers to the end, so as to allocate apps for rest apps firstly
+    // in the following assign circle.
+    writeLock.lock();
+    if (index > 0 && index < runnableApps.size() - 1) {
+      Collections.rotate(runnableApps, runnableApps.size() - index);
+    }
+    writeLock.unlock();
+
+    return totalAssigned;
   }
 
   /**
