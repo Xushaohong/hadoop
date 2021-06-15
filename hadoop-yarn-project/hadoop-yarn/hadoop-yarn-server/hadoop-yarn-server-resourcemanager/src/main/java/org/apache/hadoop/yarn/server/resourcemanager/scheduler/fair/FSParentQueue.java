@@ -362,4 +362,16 @@ public class FSParentQueue extends FSQueue {
   public boolean isNeedResource() {
     return needResource;
   }
+
+  @Override
+  public List<Schedulable> simulateSchedule() {
+    List<FSQueue> queues;
+    readLock.lock();
+    try {
+      queues = new ArrayList<>(childQueues);
+    } finally {
+      readLock.unlock();
+    }
+    return simulateSchedule(queues);
+  }
 }

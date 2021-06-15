@@ -146,6 +146,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.Schedulable;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ActivitiesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppActivitiesInfo;
@@ -2630,5 +2631,41 @@ public class RMWebServices extends WebServices implements RMWebServiceProtocol {
     }
     queue.setDemandWeights((float) dweight);
     return "";
+  }
+
+  private String resourceBriefString(Resource r) {
+    return String.format("(%d,%d)", r.getMemory(), r.getVirtualCores());
+  }
+
+  @GET
+  @Path("/diag/schedule/{queue}")
+  @Produces({MediaType.TEXT_PLAIN})
+  public String simulateSchedule(@Context HttpServletRequest hsr,
+                                 @PathParam("queue") String queueName) {
+    initForReadableEndpoints();
+    if (!(rm.getResourceScheduler() instanceof FairScheduler)) {
+      return "only supportted for SFairScheduler";
+    }
+    FairScheduler sfair = (FairScheduler) rm.getResourceScheduler();
+    FSQueue queue = sfair.getQueueManager().getQueue(queueName);
+    if (queue == null) {
+      return "queue not found: " + queueName;
+    }
+
+    StringBuilder sb = new StringBuilder("");
+    List<Schedulable> schedulableList = queue.simulateSchedule();
+    int i = 0;
+    for (Schedulable schedulable : schedulableList) {
+      i++;
+      sb.append(String.format("%04d %s min%s max%s dem%s use%s dweight=%d weight=%d\n",
+              i, schedulable.getName(),
+              resourceBriefString(schedulable.getMinShare()),
+              resourceBriefString(schedulable.getMaxShare()),
+              resourceBriefString(schedulable.getDemand()),
+              resourceBriefString(schedulable.getResourceUsage()),
+              (int) schedulable.getDemandWeights(),
+              (int) schedulable.getWeight()));
+    }
+    return sb.toString();
   }
 }

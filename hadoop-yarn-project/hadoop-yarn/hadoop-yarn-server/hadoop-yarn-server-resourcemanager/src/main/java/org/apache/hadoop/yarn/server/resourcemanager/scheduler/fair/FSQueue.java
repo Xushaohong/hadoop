@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.Comparator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -628,5 +630,28 @@ public abstract class FSQueue implements Queue, Schedulable {
   @Override
   public boolean isNeedResource() {
     return needResource;
+  }
+
+  public abstract List<Schedulable> simulateSchedule();
+
+  protected List<Schedulable> simulateSchedule(Collection<? extends Schedulable> schedulables) {
+    Comparator<Schedulable> comparator = policy.getComparator();
+    TreeSet<Schedulable> appSets = new TreeSet<>(comparator);
+    appSets.addAll(schedulables);
+
+    List<Schedulable> schedulableList = new ArrayList<Schedulable>(appSets.size());
+    Schedulable child = null;
+    while (appSets.size() > 0) {
+      child = appSets.pollFirst();
+      schedulableList.add(child);
+    }
+    return schedulableList;
+  }
+
+  protected List<Schedulable> simulateScheduleWithoutSort(
+      Collection<? extends Schedulable> schedulables) {
+    List<Schedulable> schedulableList = new ArrayList<>();
+    schedulableList.addAll(schedulables);
+    return schedulableList;
   }
 }
