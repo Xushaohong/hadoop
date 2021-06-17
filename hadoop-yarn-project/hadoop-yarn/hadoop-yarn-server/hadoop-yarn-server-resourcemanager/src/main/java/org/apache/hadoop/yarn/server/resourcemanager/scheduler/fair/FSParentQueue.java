@@ -54,7 +54,8 @@ public class FSParentQueue extends FSQueue {
 
   private ReadWriteLock rwLock = new ReentrantReadWriteLock();
   private Lock readLock = rwLock.readLock();
-  private Lock writeLock = rwLock.writeLock();
+  // TODO: fix me, change it to a readlock to resolve deadlock problem temporarily.
+  private Lock writeLock = rwLock.readLock();
 
   private Resource minResource;
 
