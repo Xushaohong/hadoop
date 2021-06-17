@@ -1175,20 +1175,6 @@ public class FairScheduler extends
         return;
       }
 
-      double nodeMemoryUtils = node.getNodeUtilization().getPhysicalMemory()
-              /node.getRMNode().getPhysicalResource().getMemorySize();
-      double nodeCpuUtils = node.getNodeUtilization().getCPU()
-              /node.getRMNode().getPhysicalResource().getVirtualCores();
-      if (nodeMemoryUtils > loadSchedulingThresholdMemoryUtil
-              || nodeCpuUtils > loadSchedulingThresholdCpuUtil){
-        LOG.info(
-            "Skipping scheduling as the node " + nodeID +
-             "has exceeded utilization thresholds."
-             +"Node memory utilization is "+ nodeMemoryUtils
-             +".Node cpu utilization is"+ nodeCpuUtils);
-        return;
-      }
-
       // Assign new containers...
       // 1. Ensure containers are assigned to the apps that preempted
       // 2. Check for reserved applications
