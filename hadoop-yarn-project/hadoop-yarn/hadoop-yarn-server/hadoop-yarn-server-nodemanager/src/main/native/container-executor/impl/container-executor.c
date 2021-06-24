@@ -1469,18 +1469,21 @@ int initialize_app(const char *user, const char *app_id,
   if (result != 0) {
     return result;
   }
+  // when yarn.nodemanager.log-dirs.create-all.disable=true
+  // the log_roots will be NULL
+  if (log_roots != NULL){
+    // create the log directories for the app on all disks
+    int log_create_result = create_log_dirs(app_id, log_roots);
+    if (log_create_result != 0) {
+      return log_create_result;
+    }
 
-  // create the log directories for the app on all disks
-  int log_create_result = create_log_dirs(app_id, log_roots);
-  if (log_create_result != 0) {
-    return log_create_result;
-  }
-
-  // create the log directories for the container on all disks
-  int container_log_create_result = create_container_log_dirs(container_id,
-                                    app_id, log_roots);
-  if (container_log_create_result != 0) {
-    return container_log_create_result;
+    // create the log directories for the container on all disks
+    int container_log_create_result = create_container_log_dirs(container_id,
+                                      app_id, log_roots);
+    if (container_log_create_result != 0) {
+      return container_log_create_result;
+    }
   }
 
   // open up the credentials file

@@ -139,6 +139,8 @@ public class ContainerLaunch implements Callable<Integer> {
 
   private final Lock launchLock = new ReentrantLock();
 
+  private boolean logDirsCreateAllDisable = false;
+
   public ContainerLaunch(Context context, Configuration configuration,
       Dispatcher dispatcher, ContainerExecutor exec, Application app,
       Container container, LocalDirsHandlerService dirsHandler,
@@ -154,6 +156,9 @@ public class ContainerLaunch implements Callable<Integer> {
     this.maxKillWaitTime =
         conf.getLong(YarnConfiguration.NM_PROCESS_KILL_WAIT_MS,
             YarnConfiguration.DEFAULT_NM_PROCESS_KILL_WAIT_MS);
+    this.logDirsCreateAllDisable =
+        conf.getBoolean(YarnConfiguration.NM_LOG_DIRS_CREATE_ALL_DISABLE,
+            YarnConfiguration.DEFAULT_NM_LOG_DIRS_CREATE_ALL_DISABLE);
   }
 
   @VisibleForTesting
@@ -260,6 +265,16 @@ public class ContainerLaunch implements Callable<Integer> {
         throw new IOException("Most of the disks failed. "
             + dirsHandler.getDisksHealthReport(false));
       }
+
+      if(logDirsCreateAllDisable){
+        containerLogDirs = new ArrayList<>();
+        containerLogDirs.add(containerLogDir.toString());
+        logDirs = new ArrayList<>();
+        //will create the single logDir
+        //in container-executor.c by launch_container_as_user method
+        logDirs.add(containerLogDir.getParent().getParent().toString());
+      }
+
       List<Path> appDirs = new ArrayList<Path>(localDirs.size());
       for (String localDir : localDirs) {
         Path usersdir = new Path(localDir, ContainerLocalizer.USERCACHE);

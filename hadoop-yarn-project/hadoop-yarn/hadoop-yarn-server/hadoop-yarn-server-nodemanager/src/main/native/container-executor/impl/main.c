@@ -427,6 +427,9 @@ static int validate_run_as_user_commands(int argc, char **argv, int *operation) 
     cmd_input.local_dirs = argv[optind++];// good local dirs as a comma separated list
     cmd_input.log_dirs = argv[optind++];// good log dirs as a comma separated list
 
+    if (strlen(cmd_input.log_dirs) == 0){
+      cmd_input.log_dirs = NULL;
+    }
     *operation = RUN_AS_USER_INITIALIZE_CONTAINER;
     return 0;
  case LAUNCH_DOCKER_CONTAINER:

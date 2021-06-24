@@ -1335,6 +1335,9 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_LOG_DIRS = NM_PREFIX + "log-dirs";
   public static final String DEFAULT_NM_LOG_DIRS = "/tmp/logs";
 
+  public static final String NM_LOG_DIRS_CREATE_ALL_DISABLE = NM_LOG_DIRS + ".create-all.disable";
+  public static final boolean DEFAULT_NM_LOG_DIRS_CREATE_ALL_DISABLE = false;
+
   /** The number of threads to handle log aggregation in node manager. */
   public static final String NM_LOG_AGGREGATION_THREAD_POOL_SIZE =
       NM_PREFIX + "logaggregation.threadpool-size-max";

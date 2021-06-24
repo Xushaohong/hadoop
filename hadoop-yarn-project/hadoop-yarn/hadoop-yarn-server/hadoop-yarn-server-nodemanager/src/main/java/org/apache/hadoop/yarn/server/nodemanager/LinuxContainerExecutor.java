@@ -115,6 +115,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
   private LinuxContainerRuntime linuxContainerRuntime;
   private Context nmContext;
 
+  private boolean logDirsCreateAllDisable = false;
+
   /**
    * The container exit code.
    */
@@ -210,6 +212,9 @@ public class LinuxContainerExecutor extends ContainerExecutor {
       LOG.warn(YarnConfiguration.NM_NONSECURE_MODE_LIMIT_USERS +
           ": impersonation without authentication enabled");
     }
+    this.logDirsCreateAllDisable =
+        conf.getBoolean(YarnConfiguration.NM_LOG_DIRS_CREATE_ALL_DISABLE,
+            YarnConfiguration.DEFAULT_NM_LOG_DIRS_CREATE_ALL_DISABLE);
   }
 
   private LCEResourcesHandler getResourcesHandler(Configuration conf) {
@@ -351,7 +356,13 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     String locId = ctx.getLocId();
     LocalDirsHandlerService dirsHandler = ctx.getDirsHandler();
     List<String> localDirs = dirsHandler.getLocalDirs();
-    List<String> logDirs = dirsHandler.getLogDirs();
+
+    List<String> logDirs;
+    if(logDirsCreateAllDisable){
+      logDirs = new ArrayList<>();
+    }else {
+      logDirs = dirsHandler.getLogDirs();
+    }
 
     verifyUsernamePattern(user);
     String runAsUser = getRunAsUser(user);
