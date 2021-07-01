@@ -20,8 +20,10 @@ package org.apache.hadoop.yarn.server.nodemanager.webapp;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.factories.RecordFactory;
@@ -98,5 +100,20 @@ public class MockApp implements Application {
 
   public long getFlowRunId() {
     return flowRunId;
+  }
+
+  @Override
+  public Path getLuckyLogdir() {
+    return null;
+  }
+
+  @Override
+  public void setLuckyLogdir(Path luckyLogdir) {
+
+  }
+
+  @Override
+  public ReentrantReadWriteLock.WriteLock getWriteLock() {
+    return null;
   }
 }

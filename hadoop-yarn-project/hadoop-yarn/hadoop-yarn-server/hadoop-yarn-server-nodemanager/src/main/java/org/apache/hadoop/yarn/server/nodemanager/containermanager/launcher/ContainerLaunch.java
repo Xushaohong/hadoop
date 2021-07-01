@@ -22,6 +22,8 @@ import static org.apache.hadoop.fs.CreateFlag.CREATE;
 import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 import static org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor.TOKEN_FILE_NAME_FMT;
 
+import org.apache.hadoop.util.DiskChecker;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationImpl;
 import org.apache.hadoop.yarn.server.nodemanager.executor.DeletionAsUserContext;
 
 import java.io.DataOutputStream;
@@ -214,8 +216,33 @@ public class ContainerLaunch implements Callable<Integer> {
       String appIdStr = app.getAppId().toString();
       String relativeContainerLogDir = ContainerLaunch
           .getRelativeContainerLogDir(appIdStr, containerIdStr);
-      containerLogDir =
-          dirsHandler.getLogPathForWrite(relativeContainerLogDir, false);
+      if(logDirsCreateAllDisable){
+        app.getWriteLock().lock();
+        try{
+          if(app.getLuckyLogdir() == null){
+            containerLogDir =
+                dirsHandler.getLogPathForWrite(relativeContainerLogDir, false);
+            app.setLuckyLogdir(containerLogDir.getParent());
+          }else {
+            Path luckyLogdir = app.getLuckyLogdir();
+            containerLogDir = new Path(luckyLogdir, containerID.toString());
+            try {
+              DiskChecker.checkDir(new File(luckyLogdir.getParent().toUri().getPath()));
+            }catch (DiskChecker.DiskErrorException e){
+              // TODO: Check dirs multiple
+              LOG.error(containerLogDir+" is ioError, and retry a new path, Error:"+e.getMessage());
+              containerLogDir =
+                  dirsHandler.getLogPathForWrite(relativeContainerLogDir, false);
+              app.setLuckyLogdir(containerLogDir.getParent());
+            }
+          }
+        }finally {
+          app.getWriteLock().unlock();
+        }
+      }else {
+        containerLogDir =
+            dirsHandler.getLogPathForWrite(relativeContainerLogDir, false);
+      }
       recordContainerLogDir(containerID, containerLogDir.toString());
       for (String str : command) {
         // TODO: Should we instead work via symlinks without this grammar?

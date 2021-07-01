@@ -19,7 +19,9 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.application;
 
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -40,4 +42,11 @@ public interface Application extends EventHandler<ApplicationEvent> {
   String getFlowVersion();
 
   long getFlowRunId();
+
+  Path getLuckyLogdir();
+
+  void setLuckyLogdir(Path luckyLogdir);
+
+  ReentrantReadWriteLock.WriteLock getWriteLock();
+
 }

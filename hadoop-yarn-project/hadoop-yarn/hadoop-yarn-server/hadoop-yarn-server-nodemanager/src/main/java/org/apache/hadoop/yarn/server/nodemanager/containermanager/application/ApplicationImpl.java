@@ -27,6 +27,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +87,7 @@ public class ApplicationImpl implements Application {
   private final ReadLock readLock;
   private final WriteLock writeLock;
   private final Context context;
+  private volatile Path luckyLogdir = null;
 
   private static final Logger LOG =
        LoggerFactory.getLogger(ApplicationImpl.class);
@@ -692,5 +694,17 @@ public class ApplicationImpl implements Application {
 
   public void setFlowContext(FlowContext fc) {
     this.flowContext = fc;
+  }
+
+  public Path getLuckyLogdir() {
+    return this.luckyLogdir;
+  }
+
+  public void setLuckyLogdir(Path luckyLogdir) {
+    this.luckyLogdir = luckyLogdir;
+  }
+
+  public WriteLock getWriteLock() {
+    return this.writeLock;
   }
 }
