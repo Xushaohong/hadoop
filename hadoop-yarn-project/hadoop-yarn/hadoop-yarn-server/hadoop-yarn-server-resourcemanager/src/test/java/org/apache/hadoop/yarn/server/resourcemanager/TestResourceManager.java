@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -69,6 +70,7 @@ public class TestResourceManager {
   public void setUp() throws Exception {
     Configuration conf = new YarnConfiguration();
     UserGroupInformation.setConfiguration(conf);
+    DefaultMetricsSystem.setMiniClusterMode(true);
     resourceManager = new ResourceManager();
     resourceManager.init(conf);
     resourceManager.getRMContext().getContainerTokenSecretManager().rollMasterKey();

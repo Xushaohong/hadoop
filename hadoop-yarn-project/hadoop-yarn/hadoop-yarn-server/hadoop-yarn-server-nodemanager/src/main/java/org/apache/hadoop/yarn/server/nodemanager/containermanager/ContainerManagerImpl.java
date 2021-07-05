@@ -21,7 +21,9 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.yarn.metrics.GenericEventTypeMetrics;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.UpdateContainerTokenEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.LocalizerEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerTokenUpdatedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.scheduler.ContainerSchedulerEvent;
 import org.apache.hadoop.yarn.server.nodemanager.recovery.RecoveryIterator;
@@ -102,6 +104,7 @@ import org.apache.hadoop.yarn.server.api.ContainerType;
 import org.apache.hadoop.yarn.server.api.records.ContainerQueuingLimit;
 import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedAppsEvent;
+import org.apache.hadoop.yarn.server.nodemanager.GenericEventTypeMetricsManager;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrCompletedContainersEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrUpdateContainersEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrSignalContainersEvent;
@@ -215,7 +218,7 @@ public class ContainerManagerImpl extends CompositeService implements
   protected final NodeStatusUpdater nodeStatusUpdater;
 
   protected LocalDirsHandlerService dirsHandler;
-  protected final AsyncDispatcher dispatcher;
+  protected AsyncDispatcher dispatcher;
 
   private final DeletionService deletionService;
   private LogHandler logHandler;
@@ -240,7 +243,7 @@ public class ContainerManagerImpl extends CompositeService implements
     this.dirsHandler = dirsHandler;
 
     // ContainerManager level dispatcher.
-    dispatcher = new AsyncDispatcher("NM ContainerManager dispatcher");
+    dispatcher = createContainerManagerDispatcher();
     this.deletionService = deletionContext;
     this.metrics = metrics;
 
@@ -323,6 +326,75 @@ public class ContainerManagerImpl extends CompositeService implements
 
     super.serviceInit(conf);
     recover();
+  }
+
+  protected AsyncDispatcher createContainerManagerDispatcher() {
+    dispatcher = new AsyncDispatcher("NM ContainerManager dispatcher");
+
+    GenericEventTypeMetrics
+        containerEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), ContainerEventType.class);
+    dispatcher.addMetrics(containerEventTypeMetrics,
+        containerEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        localizationEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), LocalizationEventType.class);
+    dispatcher.addMetrics(localizationEventTypeMetrics,
+        localizationEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        applicationEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), ApplicationEventType.class);
+    dispatcher.addMetrics(applicationEventTypeMetrics,
+        applicationEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        containersLauncherEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), ContainersLauncherEventType.class);
+    dispatcher.addMetrics(containersLauncherEventTypeMetrics,
+        containersLauncherEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        containerSchedulerEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), ContainerSchedulerEventType.class);
+    dispatcher.addMetrics(containerSchedulerEventTypeMetrics,
+            containerSchedulerEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        containersMonitorEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), ContainersMonitorEventType.class);
+    dispatcher.addMetrics(containersMonitorEventTypeMetrics,
+        containersMonitorEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        auxServicesEventTypeTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), AuxServicesEventType.class);
+    dispatcher.addMetrics(auxServicesEventTypeTypeMetrics,
+        auxServicesEventTypeTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        localizerEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), LocalizerEventType.class);
+    dispatcher.addMetrics(localizerEventTypeMetrics,
+        localizerEventTypeMetrics
+            .getEnumClass());
+    return dispatcher;
   }
 
   protected void createAMRMProxyService(Configuration conf) {

@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.sun.jersey.spi.container.servlet.ServletContainer;
 
+import org.apache.hadoop.yarn.metrics.GenericEventTypeMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
@@ -443,11 +444,51 @@ public class ResourceManager extends CompositeService
   }
 
   protected EventHandler<SchedulerEvent> createSchedulerEventDispatcher() {
-    return new EventDispatcher(this.scheduler, "SchedulerEventDispatcher");
+    EventDispatcher dispatcher = new
+        EventDispatcher(this.scheduler, "SchedulerEventDispatcher");
+    dispatcher.
+        setMetrics(GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), SchedulerEventType.class));
+    return dispatcher;
   }
 
   protected Dispatcher createDispatcher() {
-    return new AsyncDispatcher("RM Event dispatcher");
+    AsyncDispatcher dispatcher = new AsyncDispatcher("RM Event dispatcher");
+
+    // Add 4 busy event types.
+    GenericEventTypeMetrics
+        nodesListManagerEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), NodesListManagerEventType.class);
+    dispatcher.addMetrics(nodesListManagerEventTypeMetrics,
+        nodesListManagerEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        rmNodeEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), RMNodeEventType.class);
+    dispatcher.addMetrics(rmNodeEventTypeMetrics,
+        rmNodeEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        rmAppEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), RMAppEventType.class);
+    dispatcher.addMetrics(rmAppEventTypeMetrics,
+        rmAppEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        rmAppAttemptEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), RMAppAttemptEventType.class);
+    dispatcher.addMetrics(rmAppAttemptEventTypeMetrics,
+        rmAppAttemptEventTypeMetrics
+            .getEnumClass());
+
+    return dispatcher;
   }
 
   protected ResourceScheduler createScheduler() {

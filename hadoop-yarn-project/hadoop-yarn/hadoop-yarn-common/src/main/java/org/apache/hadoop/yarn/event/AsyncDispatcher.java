@@ -28,6 +28,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.yarn.metrics.EventTypeMetrics;
+import org.apache.hadoop.yarn.util.Clock;
+import org.apache.hadoop.yarn.util.MonotonicClock;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
@@ -80,6 +83,11 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   protected final Map<Class<? extends Enum>, EventHandler> eventDispatchers;
   private boolean exitOnDispatchException = true;
 
+  private Map<Class<? extends Enum>,
+      EventTypeMetrics> eventTypeMetricsMap;
+
+  private Clock clock = new MonotonicClock();
+
   /**
    * The thread name for dispatcher.
    */
@@ -93,6 +101,8 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
     super("Dispatcher");
     this.eventQueue = eventQueue;
     this.eventDispatchers = new HashMap<Class<? extends Enum>, EventHandler>();
+    this.eventTypeMetricsMap = new HashMap<Class<? extends Enum>,
+        EventTypeMetrics>();
   }
 
   /**
@@ -130,7 +140,16 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
             return;
           }
           if (event != null) {
-            dispatch(event);
+            if (eventTypeMetricsMap.
+                get(event.getType().getDeclaringClass()) != null) {
+              long startTime = clock.getTime();
+              dispatch(event);
+              eventTypeMetricsMap.get(event.getType().getDeclaringClass())
+                  .increment(event.getType(),
+                      clock.getTime() - startTime);
+            } else {
+              dispatch(event);
+            }
             if (printTrigger) {
               //Log the latest dispatch event type
               // may cause the too many events queued
@@ -370,4 +389,10 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   public int getEventQueueSize() {
     return eventQueue.size();
   }
+
+  public void addMetrics(EventTypeMetrics metrics,
+      Class<? extends Enum> eventClass) {
+    eventTypeMetricsMap.put(eventClass, metrics);
+  }
+
 }

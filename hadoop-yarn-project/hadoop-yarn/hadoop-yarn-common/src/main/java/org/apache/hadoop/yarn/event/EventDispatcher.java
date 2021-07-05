@@ -21,6 +21,9 @@ package org.apache.hadoop.yarn.event;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.yarn.metrics.EventTypeMetrics;
+import org.apache.hadoop.yarn.util.Clock;
+import org.apache.hadoop.yarn.util.MonotonicClock;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
@@ -45,8 +48,11 @@ public class EventDispatcher<T extends Event> extends
   private final Thread eventProcessor;
   private volatile boolean stopped = false;
   private boolean shouldExitOnError = true;
+  private EventTypeMetrics metrics;
 
   private static final Log LOG = LogFactory.getLog(EventDispatcher.class);
+
+  private Clock clock = new MonotonicClock();
 
   private final class EventProcessor implements Runnable {
     @Override
@@ -63,7 +69,14 @@ public class EventDispatcher<T extends Event> extends
         }
 
         try {
-          handler.handle(event);
+          if (metrics != null) {
+            long startTime = clock.getTime();
+            handler.handle(event);
+            metrics.increment(event.getType(),
+                clock.getTime() - startTime);
+          } else {
+            handler.handle(event);
+          }
         } catch (Throwable t) {
           // An error occurred, but we are shutting down anyway.
           // If it was an InterruptedException, the very act of
@@ -135,4 +148,8 @@ public class EventDispatcher<T extends Event> extends
   public int getEventQueueSize() {
     return eventQueue.size();
   }
+  public void setMetrics(EventTypeMetrics metrics) {
+    this.metrics = metrics;
+  }
+
 }

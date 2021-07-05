@@ -48,6 +48,7 @@ import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.metrics.GenericEventTypeMetrics;
 import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.api.records.AppCollectorData;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
@@ -60,6 +61,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerImpl;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerState;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.ContainersLauncherEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.ResourcePluginManager;
 import org.apache.hadoop.yarn.server.nodemanager.logaggregation.tracker.NMLogAggregationStatusTracker;
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
@@ -1019,7 +1021,15 @@ public class NodeManager extends CompositeService
    * Unit test friendly.
    */
   protected AsyncDispatcher createNMDispatcher() {
-    return new AsyncDispatcher("NM Event dispatcher");
+    dispatcher = new AsyncDispatcher("NM Event dispatcher");
+    GenericEventTypeMetrics
+            containerManagerEventTypeMetrics =
+            GenericEventTypeMetricsManager.
+                    create(dispatcher.getName(), ContainerManagerEventType.class);
+    dispatcher.addMetrics(containerManagerEventTypeMetrics,
+            containerManagerEventTypeMetrics
+                    .getEnumClass());
+    return dispatcher;
   }
 
   //For testing
