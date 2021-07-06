@@ -611,6 +611,7 @@ public class ResourceLocalizationService extends CompositeService
   }
   
   private void submitDirForDeletion(String userName, Path dir) {
+    /**
     try {
       lfs.getFileStatus(dir);
       FileDeletionTask deletionTask = new FileDeletionTask(delService, userName,
@@ -622,6 +623,10 @@ public class ResourceLocalizationService extends CompositeService
       // ignore
       return;
     }
+     **/
+    FileDeletionTask deletionTask = new FileDeletionTask(delService, userName,
+            dir, null);
+    delService.delete(deletionTask);
   }
 
 
