@@ -361,7 +361,9 @@ public class FSLeafQueue extends FSQueue {
     }
 
     if (node.isRemoved()) {
-      LOG.debug(node.getNodeName() + " has been removed, skip assign container for it.");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(node.getNodeName() + " has been removed, skip assign container for it.");
+      }
       return assigned;
     }
 
@@ -381,11 +383,15 @@ public class FSLeafQueue extends FSQueue {
         continue;
       }
       if (sched.isRemoved()) {
-        LOG.debug(sched.getName() + " has been removed, skip assign container for it.");
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(sched.getName() + " has been removed, skip assign container for it.");
+        }
         continue;
       }
       if (!sched.isNeedResource()) {
-        LOG.debug(sched.getName() + " does not need resource, skip assign container for it.");
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(sched.getName() + " does not need resource, skip assign container for it.");
+        }
         break;
       }
       assigned = sched.assignContainer(node);
@@ -414,11 +420,15 @@ public class FSLeafQueue extends FSQueue {
     for (FSAppAttempt sched : apps) {
       index++;
       if (sched.isRemoved()) {
-        LOG.debug(sched.getName() + " has been removed, skip assign container for it.");
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(sched.getName() + " has been removed, skip assign container for it.");
+        }
         continue;
       }
       if (!sched.isNeedResource()) {
-        LOG.debug(sched.getName() + " does not need resource, skip assign container for it.");
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(sched.getName() + " does not need resource, skip assign container for it.");
+        }
         continue;
       }
       if (SchedulerAppUtils.isPlaceBlacklisted(sched, node, LOG)) {
@@ -430,7 +440,9 @@ public class FSLeafQueue extends FSQueue {
         if (assignedContainersForApp.containsKey(name)) {
           max = assignedContainersForApp.get(name);
           if (max > maxAssignForSameApp) {
-            LOG.debug(name + " has been allocated too many containers, skip assign container for it.");
+            if (LOG.isDebugEnabled()){
+              LOG.debug(name + " has been allocated too many containers, skip assign container for it.");
+            }
             continue;
           }
         }
