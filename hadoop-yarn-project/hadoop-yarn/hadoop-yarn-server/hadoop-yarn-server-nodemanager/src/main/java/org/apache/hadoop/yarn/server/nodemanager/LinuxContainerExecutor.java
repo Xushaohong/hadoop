@@ -356,10 +356,12 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     String locId = ctx.getLocId();
     LocalDirsHandlerService dirsHandler = ctx.getDirsHandler();
     List<String> localDirs = dirsHandler.getLocalDirs();
+    Path containerLogDir = getContainerLogDir(dirsHandler, appId, locId);
 
     List<String> logDirs;
     if(logDirsCreateAllDisable){
       logDirs = new ArrayList<>();
+      logDirs.add(containerLogDir.getParent().getParent().toString());
     }else {
       logDirs = dirsHandler.getLogDirs();
     }
@@ -401,7 +403,6 @@ public class LinuxContainerExecutor extends ContainerExecutor {
 
     buildMainArgs(localizerArgs, user, appId, locId, nmAddr,
         nmPrivateContainerTokensPath.getName(), localDirs);
-    Path containerLogDir = getContainerLogDir(dirsHandler, appId, locId);
     localizerArgs = replaceWithContainerLogDir(localizerArgs, containerLogDir);
 
     initializeContainerOp.appendArgs(localizerArgs);
