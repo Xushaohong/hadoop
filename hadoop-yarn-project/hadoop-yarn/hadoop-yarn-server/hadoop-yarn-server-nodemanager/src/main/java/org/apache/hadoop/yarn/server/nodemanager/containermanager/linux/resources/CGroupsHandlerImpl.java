@@ -285,9 +285,11 @@ class CGroupsHandlerImpl implements CGroupsHandler {
     String requestedMountPath =
         new File(cGroupsMountConfig.getMountPath(),
             controller.getName()).getAbsolutePath();
+    File yarnHierarchy = new File(requestedMountPath, cGroupPrefix);
 
     if (existingMountPath == null ||
-        !requestedMountPath.equals(existingMountPath)) {
+        !requestedMountPath.equals(existingMountPath) ||
+        !yarnHierarchy.exists()) {
       try {
         //lock out other readers/writers till we are done
         rwLock.writeLock().lock();

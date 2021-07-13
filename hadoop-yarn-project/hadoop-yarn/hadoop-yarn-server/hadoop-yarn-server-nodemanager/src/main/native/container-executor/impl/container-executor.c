@@ -2657,6 +2657,7 @@ int mount_cgroup(const char *pair, const char *hierarchy) {
     fprintf(LOGFILE, "Failed to mount cgroup controller; invalid option: %s\n",
               pair);
     result = -1;
+    goto cleanup;
   } else {
     if (strstr(mount_path, "..") != NULL) {
       fprintf(LOGFILE, "Unsupported cgroup mount path detected. %s\n",
@@ -2664,24 +2665,14 @@ int mount_cgroup(const char *pair, const char *hierarchy) {
       result = INVALID_COMMAND_PROVIDED;
       goto cleanup;
     }
-    if (mount("none", mount_path, "cgroup", 0, controller) == 0) {
-      char *buf = stpncpy(hier_path, mount_path, strlen(mount_path));
-      *buf++ = '/';
-      snprintf(buf, EXECUTOR_PATH_MAX - (buf - hier_path), "%s", hierarchy);
 
-      // create hierarchy as 0750 and chown to Hadoop NM user
-      const mode_t perms = S_IRWXU | S_IRGRP | S_IXGRP;
-      struct stat sb;
-      if (stat(hier_path, &sb) == 0 &&
-          (sb.st_uid != nm_uid || sb.st_gid != nm_gid)) {
-        fprintf(LOGFILE, "cgroup hierarchy %s already owned by another user %d\n", hier_path, sb.st_uid);
-        result = INVALID_COMMAND_PROVIDED;
-        goto cleanup;
-      }
-      if (mkdirs(hier_path, perms) == 0) {
-        change_owner(hier_path, nm_uid, nm_gid);
-        chown_dir_contents(hier_path, nm_uid, nm_gid);
-      }
+    // The mount path "/sys/fs/cgroup" will be mounted by systemd at boot time, no need to mount manually.
+    if (strstr(mount_path, "/sys") != NULL) {
+      goto create;
+    }
+
+    if (mount("none", mount_path, "cgroup", 0, controller) == 0) {
+      goto create;
     } else {
       fprintf(LOGFILE, "Failed to mount cgroup controller %s at %s - %s\n",
               controller, mount_path, strerror(errno));
@@ -2689,6 +2680,30 @@ int mount_cgroup(const char *pair, const char *hierarchy) {
       if (errno != EBUSY) {
         result = -1;
       }
+      goto cleanup;
+    }
+  }
+
+create:
+  {
+    char *buf = stpncpy(hier_path, mount_path, strlen(mount_path));
+    *buf++ = '/';
+    snprintf(buf, EXECUTOR_PATH_MAX - (buf - hier_path), "%s", hierarchy);
+
+    // create hierarchy as 0750 and chown to Hadoop NM user
+    const mode_t perms = S_IRWXU | S_IRGRP | S_IXGRP;
+    struct stat sb;
+    if (stat(hier_path, &sb) == 0 &&
+        (sb.st_uid != nm_uid || sb.st_gid != nm_gid)) {
+      fprintf(LOGFILE, "cgroup hierarchy %s already owned by another user %d\n", hier_path, sb.st_uid);
+      result = INVALID_COMMAND_PROVIDED;
+      goto cleanup;
+    }
+    if (mkdirs(hier_path, perms) == 0) {
+      change_owner(hier_path, nm_uid, nm_gid);
+      chown_dir_contents(hier_path, nm_uid, nm_gid);
+    } else {
+      fprintf(LOGFILE, "cgroup hierarchy %s create failed\n", hier_path);
     }
   }
 
