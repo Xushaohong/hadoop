@@ -33,6 +33,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+
+import org.apache.hadoop.util.DiskChecker;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ContainerLocalizer;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceLocalizationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +120,8 @@ public class DirectoryCollection {
   private int goodDirsDiskUtilizationPercentage;
 
   private Set<DirsChangeListener> dirsChangeListeners;
+
+  private boolean isLocalDir = false;
 
   /**
    * Create collection for the directories specified. No check for free space.
@@ -229,10 +235,43 @@ public class DirectoryCollection {
       float utilizationPercentageCutOffLow,
       long utilizationSpaceCutOffLow,
       long utilizationSpaceCutOffHigh) {
+    this(dirs, utilizationPercentageCutOffHigh,
+        utilizationPercentageCutOffLow, utilizationSpaceCutOffLow,
+        utilizationSpaceCutOffHigh, false);
+  }
+
+  /**
+   * Create collection for the directories specified. Users must specify the
+   * maximum percentage of disk utilization allowed and the minimum amount of
+   * free space that must be available for the dir to be used. If either check
+   * fails the dir is removed from the good dirs list.
+   *
+   * @param dirs
+   *          directories to be monitored
+   * @param utilizationPercentageCutOffHigh
+   *          percentage of disk that can be used before the dir is taken out
+   *          of the good dirs list
+   * @param utilizationPercentageCutOffLow
+   *          percentage of disk that can be used when the dir is moved from
+   *          the bad dirs list to the good dirs list
+   * @param utilizationSpaceCutOffLow
+   *          minimum space, in MB, that must be available on the disk for the
+   *          dir to be taken out of the good dirs list
+   * @param utilizationSpaceCutOffHigh
+   *          minimum space, in MB, that must be available on the disk for the
+   *          dir to be moved from the bad dirs list to the good dirs list
+   * @param isLocalDir true stands for the local directory, false for not
+   */
+  public DirectoryCollection(String[] dirs,
+      float utilizationPercentageCutOffHigh,
+      float utilizationPercentageCutOffLow,
+      long utilizationSpaceCutOffLow,
+      long utilizationSpaceCutOffHigh,
+      boolean isLocalDir) {
     conf = new YarnConfiguration();
     try {
       String diskValidatorName = conf.get(YarnConfiguration.DISK_VALIDATOR,
-          YarnConfiguration.DEFAULT_DISK_VALIDATOR);
+              YarnConfiguration.DEFAULT_DISK_VALIDATOR);
       diskValidator = DiskValidatorFactory.getInstance(diskValidatorName);
       LOG.info("Disk Validator '" + diskValidatorName + "' is loaded.");
     } catch (Exception e) {
@@ -249,12 +288,13 @@ public class DirectoryCollection {
     this.writeLock = lock.writeLock();
 
     setDiskUtilizationPercentageCutoff(utilizationPercentageCutOffHigh,
-        utilizationPercentageCutOffLow);
+            utilizationPercentageCutOffLow);
     setDiskUtilizationSpaceCutoff(utilizationSpaceCutOffLow,
-        utilizationSpaceCutOffHigh);
+            utilizationSpaceCutOffHigh);
 
     dirsChangeListeners = Collections.newSetFromMap(
-        new ConcurrentHashMap<DirsChangeListener, Boolean>());
+            new ConcurrentHashMap<DirsChangeListener, Boolean>());
+    this.isLocalDir = isLocalDir;
   }
 
   void registerDirsChangeListener(
@@ -516,6 +556,10 @@ public class DirectoryCollection {
       try {
         File testDir = new File(dir);
         diskValidator.checkStatus(testDir);
+        if(isLocalDir){
+          checkSubdirsOfLocalDirs(dir);
+        }
+
         float diskUtilizationPercentageCutoff = goodDirs.contains(dir) ?
             diskUtilizationPercentageCutoffHigh : diskUtilizationPercentageCutoffLow;
         long diskFreeSpaceCutoff = goodDirs.contains(dir) ?
@@ -543,6 +587,32 @@ public class DirectoryCollection {
       }
     }
     return ret;
+  }
+
+  void checkSubdirsOfLocalDirs(String localdir) throws DiskChecker.DiskErrorException {
+
+    if(!localdir.endsWith(Path.SEPARATOR)){
+      localdir = localdir+Path.SEPARATOR;
+    }
+
+    File testFileCacheDir = new File(localdir + ContainerLocalizer.FILECACHE);
+    if(!testFileCacheDir.exists()) {
+      LOG.error("Directory " + testFileCacheDir.toString() + " is not exits");
+      throw new DiskChecker.DiskErrorException("filecache path is not exits"
+          + testFileCacheDir.toString());
+    }
+    File testUserCacheDir = new File(localdir + ContainerLocalizer.USERCACHE);
+    if(!testFileCacheDir.exists()) {
+      LOG.error("Directory " + testUserCacheDir.toString() + " is not exits");
+      throw new DiskChecker.DiskErrorException("usercache path is not exits"
+              + testUserCacheDir.toString());
+    }
+    File testNMPrivateDir = new File(localdir + ResourceLocalizationService.NM_PRIVATE_DIR);
+    if(!testNMPrivateDir.exists()) {
+      LOG.error("Directory " + testNMPrivateDir.toString() + " is not exits.");
+      throw new DiskChecker.DiskErrorException("nmPrivate path is not exits, "
+              + testNMPrivateDir.toString());
+    }
   }
 
   private boolean isDiskUsageOverPercentageLimit(File dir,

@@ -160,7 +160,7 @@ public class LocalDirsHandlerService extends AbstractService {
               highUsableSpacePercentagePerDisk,
               lowUsableSpacePercentagePerDisk,
               lowMinFreeSpacePerDiskMB,
-              highMinFreeSpacePerDiskMB);
+              highMinFreeSpacePerDiskMB, true);
       logDirs =
           new DirectoryCollection(
               validatePaths(conf
@@ -168,7 +168,7 @@ public class LocalDirsHandlerService extends AbstractService {
               highUsableSpacePercentagePerDisk,
               lowUsableSpacePercentagePerDisk,
               lowMinFreeSpacePerDiskMB,
-              highMinFreeSpacePerDiskMB);
+              highMinFreeSpacePerDiskMB, false);
 
       String local = conf.get(YarnConfiguration.NM_LOCAL_DIRS);
       conf.set(NM_GOOD_LOCAL_DIRS,
