@@ -364,6 +364,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   public static final org.slf4j.Logger LOG = LoggerFactory
       .getLogger(FSNamesystem.class.getName());
+  public static final org.slf4j.Logger RenewLeaseLOG = LoggerFactory
+      .getLogger("RenewLease");
   private final MetricsRegistry registry = new MetricsRegistry("FSNamesystem");
   @Metric final MutableRatesWithAggregation detailedLockHoldTimeMetrics =
       registry.newRatesWithAggregation("detailedLockHoldTimeMetrics");
@@ -3888,6 +3890,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       leaseManager.renewLease(holder);
     } finally {
       readUnlock("renewLease");
+    }
+    if (RenewLeaseLOG.isDebugEnabled()) {
+      logAuditEvent(true, "renewLease", holder);
     }
   }
 
