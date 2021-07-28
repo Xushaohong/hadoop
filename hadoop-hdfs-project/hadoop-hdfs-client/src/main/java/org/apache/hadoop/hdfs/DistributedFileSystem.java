@@ -179,6 +179,16 @@ public class DistributedFileSystem extends FileSystem
       throw new IOException("Incomplete HDFS URI, no host: "+ uri);
     }
 
+    // check forbidden clusters
+    String[] forbiddenClusters = conf.getTrimmedStrings(
+        HdfsClientConfigKeys.DFS_CLIENT_FORBIDDEN_CLUSTERS, new String[0]);
+    for (String cluster : forbiddenClusters) {
+      if (cluster.equalsIgnoreCase(host)) {
+        throw new IOException("Cluster " + cluster + " is forbidden to access"
+            + " according to current configuration.");
+      }
+    }
+
     this.dfs = new DFSClient(uri, conf, statistics);
     this.uri = URI.create(uri.getScheme()+"://"+uri.getAuthority());
     this.workingDir = getHomeDirectory();

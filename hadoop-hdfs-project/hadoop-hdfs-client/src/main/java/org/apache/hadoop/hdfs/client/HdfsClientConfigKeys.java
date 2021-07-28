@@ -209,6 +209,8 @@ public interface HdfsClientConfigKeys {
   String DFS_LEASE_HARDLIMIT_KEY = "dfs.namenode.lease-hard-limit-sec";
   long DFS_LEASE_HARDLIMIT_DEFAULT = 20 * 60;
 
+  String DFS_CLIENT_FORBIDDEN_CLUSTERS = "dfs.client.forbidden.clusters";
+
   /**
    * These are deprecated config keys to client code.
    */
