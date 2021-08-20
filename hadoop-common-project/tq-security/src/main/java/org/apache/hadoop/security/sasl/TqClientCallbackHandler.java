@@ -28,6 +28,11 @@ public abstract class TqClientCallbackHandler implements CallbackHandler {
     }
   }
 
+  public void handleWithAuthUser(UserClientCallback callback) {
+    callback.setUserName(getAuthUserName());
+    callback.setExtraId(getExtraId());
+  }
+
   public void handle(UserClientCallback callback) {
     callback.setUserName(getUserName());
     callback.setExtraId(getExtraId());
@@ -52,6 +57,10 @@ public abstract class TqClientCallbackHandler implements CallbackHandler {
   }
 
   protected String getUserName(){
+    return null;
+  }
+
+  protected String getAuthUserName() {
     return null;
   }
 

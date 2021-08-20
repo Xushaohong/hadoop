@@ -4,6 +4,7 @@ package org.apache.hadoop.security.sasl;
 import com.google.common.base.Preconditions;
 import com.tencent.tdw.security.Tuple;
 import com.tencent.tdw.security.utils.StringUtils;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.sasl.callback.ForwardResponseCallback;
@@ -22,6 +23,10 @@ public class TqSaslClient extends TqSaslBase implements javax.security.sasl.Sasl
   private String authUser;
   private byte[] extraId;
   private TqClientCallbackHandler ccbh;
+
+  // whether using authenticated user as init user in proxy mode, default is false,
+  // if server cannot match init user, set it to true and use auth user as init user instead.
+  public static final AtomicBoolean USING_AUTH_USER_WHEN_PROXY = new AtomicBoolean(false);
 
   public TqSaslClient(String authId, String protocol, String serverName, Map<String, ?> props, CallbackHandler cbh) {
     super(protocol, serverName, props, cbh);
@@ -140,14 +145,16 @@ public class TqSaslClient extends TqSaslBase implements javax.security.sasl.Sasl
   }
 
   private TqInitToken buildInitToken() throws Exception {
-    if (authUser == null) {
-      UserClientCallback userClientCallback = new UserClientCallback();
+    UserClientCallback userClientCallback = new UserClientCallback();
+    if (USING_AUTH_USER_WHEN_PROXY.get()) {
+      ccbh.handleWithAuthUser(userClientCallback);
+    } else {
       ccbh.handle(userClientCallback);
-      authUser = userClientCallback.getUserName();
-      if (authUser == null) {
-        authUser = authId;
-      }
-      extraId = userClientCallback.getExtraId();
+    }
+    authUser = userClientCallback.getUserName();
+    extraId = userClientCallback.getExtraId();
+    if (authUser == null) {
+      authUser = authId;
     }
     Preconditions.checkArgument(authUser != null, "Not found auth user");
     if (LOG.isDebugEnabled()) {

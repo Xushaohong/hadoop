@@ -811,6 +811,11 @@ public class SaslRpcClient {
     }
 
     @Override
+    protected String getAuthUserName() {
+      return realUser != null ? realUser : user;
+    }
+
+    @Override
     protected byte[] getExtraId() {
       return protocolName.getBytes();
     }

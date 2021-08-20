@@ -49,6 +49,7 @@ import org.apache.hadoop.security.SaslRpcClient;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.sasl.TqSaslClient;
 import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
@@ -73,6 +74,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_AUTH_USER;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_AUTH_USER_DEFAULT;
 import static org.apache.hadoop.ipc.RpcConstants.CONNECTION_CONTEXT_CALL_ID;
 import static org.apache.hadoop.ipc.RpcConstants.PING_CALL_ID;
 
@@ -103,6 +106,8 @@ public class Client implements AutoCloseable {
           return false;
         }
       };
+
+  private static final String INIT_AUTH_FAILED_MESSAGE = "Init authorizationID is not match";
 
   @SuppressWarnings("unchecked")
   @Unstable
@@ -138,6 +143,7 @@ public class Client implements AutoCloseable {
   private final int connectionTimeout;
 
   private final boolean fallbackAllowed;
+  private final boolean fallbackUsingAuthUser;
   private final boolean bindToWildCardAddress;
   private final byte[] clientId;
   private final int maxAsyncCalls;
@@ -695,7 +701,7 @@ public class Client implements AutoCloseable {
               }
             }
           }
-          
+
           NetUtils.connect(this.socket, server, bindAddr, connectionTimeout);
           this.socket.setSoTimeout(soTimeout);
           return;
@@ -786,7 +792,7 @@ public class Client implements AutoCloseable {
      * the connection thread that waits for responses.
      */
     private synchronized void setupIOstreams(
-        AtomicBoolean fallbackToSimpleAuth) {
+        AtomicBoolean fallbackToSimpleAuth, boolean firstConnect) {
       if (socket != null || shouldCloseConnection.get()) {
         return;
       }
@@ -878,12 +884,19 @@ public class Client implements AutoCloseable {
           return;
         }
       } catch (Throwable t) {
-        if (t instanceof IOException) {
-          markClosed((IOException)t);
+        if (firstConnect && AuthMethod.TAUTH.equals(authMethod) && fallbackUsingAuthUser
+                && t.getMessage() != null && t.getMessage().contains(INIT_AUTH_FAILED_MESSAGE)) {
+          LOG.warn("got " + t.getMessage() + ", fallback using auth user instead");
+          TqSaslClient.USING_AUTH_USER_WHEN_PROXY.set(true);
+          setupIOstreams(fallbackToSimpleAuth, false);
         } else {
-          markClosed(new IOException("Couldn't set up IO streams: " + t, t));
+          if (t instanceof IOException) {
+            markClosed((IOException) t);
+          } else {
+            markClosed(new IOException("Couldn't set up IO streams: " + t, t));
+          }
+          close();
         }
-        close();
       } finally {
         connectingThread.set(null);
       }
@@ -1249,7 +1262,7 @@ public class Client implements AutoCloseable {
         connThread.interrupt();
       }
     }
-    
+
     /** Close the connection. */
     private synchronized void close() {
       if (!shouldCloseConnection.get()) {
@@ -1316,7 +1329,8 @@ public class Client implements AutoCloseable {
     this.bindToWildCardAddress = conf
         .getBoolean(CommonConfigurationKeys.IPC_CLIENT_BIND_WILDCARD_ADDR_KEY,
             CommonConfigurationKeys.IPC_CLIENT_BIND_WILDCARD_ADDR_DEFAULT);
-
+    this.fallbackUsingAuthUser = conf.getBoolean(IPC_CLIENT_FALLBACK_TO_AUTH_USER,
+            IPC_CLIENT_FALLBACK_TO_AUTH_USER_DEFAULT);
     this.clientId = ClientId.getClientId();
     this.sendParamsExecutor = clientExcecutorFactory.refAndGetInstance();
     this.maxAsyncCalls = conf.getInt(
@@ -1633,7 +1647,7 @@ public class Client implements AutoCloseable {
 
     // If the server happens to be slow, the method below will take longer to
     // establish a connection.
-    connection.setupIOstreams(fallbackToSimpleAuth);
+    connection.setupIOstreams(fallbackToSimpleAuth, true);
     return connection;
   }
   
