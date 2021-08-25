@@ -301,7 +301,9 @@ public class DirectoryScanner implements Runnable {
    * Clear the current cache of diffs and statistics.
    */
   private void clear() {
-    diffs.clear();
+    synchronized (diffs) {
+      diffs.clear();
+    }
     stats.clear();
   }
 
@@ -379,22 +381,24 @@ public class DirectoryScanner implements Runnable {
     // HDFS-14476: run checkAndUpadte with batch to avoid holding the lock too
     // long
     int loopCount = 0;
-    for (Entry<String, LinkedList<ScanInfo>> entry : diffs.entrySet()) {
-      String bpid = entry.getKey();
-      LinkedList<ScanInfo> diff = entry.getValue();
-      
-      for (ScanInfo info : diff) {
-        dataset.checkAndUpdate(bpid, info);
-      }
+    synchronized (diffs) {
+      for (Entry<String, LinkedList<ScanInfo>> entry : diffs.entrySet()) {
+        String bpid = entry.getKey();
+        LinkedList<ScanInfo> diff = entry.getValue();
 
-      if (loopCount % RECONCILE_BLOCKS_BATCH_SIZE == 0) {
-        try {
-          Thread.sleep(2000);
-        } catch (InterruptedException e) {
-          // do nothing
+        for (ScanInfo info : diff) {
+          dataset.checkAndUpdate(bpid, info);
         }
+
+        if (loopCount % RECONCILE_BLOCKS_BATCH_SIZE == 0) {
+          try {
+            Thread.sleep(2000);
+          } catch (InterruptedException e) {
+            // do nothing
+          }
+        }
+        loopCount++;
       }
-      loopCount++;
     }
     if (!retainDiffs) clear();
   }
@@ -416,7 +420,9 @@ public class DirectoryScanner implements Runnable {
         Stats statsRecord = new Stats(bpid);
         stats.put(bpid, statsRecord);
         LinkedList<ScanInfo> diffRecord = new LinkedList<ScanInfo>();
-        diffs.put(bpid, diffRecord);
+        synchronized (diffs) {
+          diffs.put(bpid, diffRecord);
+        }
         
         statsRecord.totalBlocks = blockpoolReport.length;
         final List<ReplicaInfo> bl = dataset.getFinalizedBlocks(bpid);
