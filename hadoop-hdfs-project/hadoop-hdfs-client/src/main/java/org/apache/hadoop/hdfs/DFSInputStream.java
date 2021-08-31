@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_CHOOSE_BLOCK_BY_STORAGE_TYPE;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_CHOOSE_BLOCK_BY_STORAGE_TYPE_DEFAULT;
+
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -27,6 +30,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -45,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.ByteBufferUtil;
@@ -108,6 +113,9 @@ public class DFSInputStream extends FSInputStream
   protected AtomicBoolean closed = new AtomicBoolean(false);
   protected final String src;
   protected final boolean verifyChecksum;
+  // choose block according to its storage type, the priority is
+  // RAM_DISK > SSD > DISK > ARCHIVE
+  private final boolean chooseBlockByPriority;
 
   // state by stateful read only:
   // (protected by lock on this)
@@ -189,6 +197,8 @@ public class DFSInputStream extends FSInputStream
         this.dfsClient.getRefreshReadBlkLocationsInterval();
     setLocatedBlocksTimeStamp();
     this.verifyChecksum = verifyChecksum;
+    this.chooseBlockByPriority = dfsClient.getConfiguration().getBoolean(IPC_CLIENT_CHOOSE_BLOCK_BY_STORAGE_TYPE,
+            IPC_CLIENT_CHOOSE_BLOCK_BY_STORAGE_TYPE_DEFAULT);
     this.src = src;
     synchronized (infoLock) {
       this.cachingStrategy = dfsClient.getDefaultReadCachingStrategy();
@@ -1010,6 +1020,39 @@ public class DFSInputStream extends FSInputStream
   }
 
   /**
+   * Sort nodes by storage type
+   * @return - sorted nodes
+   */
+  private void sortNodesByStorageType(List<Pair<StorageType, DatanodeInfo>> nodes) {
+    nodes.sort(new Comparator<Pair<StorageType, DatanodeInfo>>() {
+      private int getPriorityByStorageType(StorageType type) {
+        if (type == null) {
+          return 5;
+        }
+        switch (type) {
+          case RAM_DISK:
+            return 1;
+          case SSD:
+            return 2;
+          case DISK:
+            return 3;
+          case ARCHIVE:
+            return 4;
+          default:
+            return 5;
+        }
+      }
+
+      @Override
+      public int compare(Pair<StorageType, DatanodeInfo> a, Pair<StorageType, DatanodeInfo> b) {
+        int priorityA = getPriorityByStorageType(a.getFirst());
+        int priorityB = getPriorityByStorageType(b.getFirst());
+        return priorityA - priorityB;
+      }
+    });
+  }
+
+  /**
    * Get the best node from which to stream the data.
    * @param block LocatedBlock, containing nodes in priority order.
    * @param ignoredNodes Do not choose nodes in this array (may be null)
@@ -1022,26 +1065,34 @@ public class DFSInputStream extends FSInputStream
     DatanodeInfo chosenNode = null;
     StorageType storageType = null;
     if (nodes != null) {
+      List<Pair<StorageType, DatanodeInfo>> pendingSelectNodes = new ArrayList<>();
       for (int i = 0; i < nodes.length; i++) {
         if (!deadNodes.containsKey(nodes[i])
             && (ignoredNodes == null || !ignoredNodes.contains(nodes[i]))) {
-          chosenNode = nodes[i];
           // Storage types are ordered to correspond with nodes, so use the same
           // index to get storage type.
-          if (storageTypes != null && i < storageTypes.length) {
-            storageType = storageTypes[i];
-          }
-          break;
+          StorageType currentType = storageTypes != null && i < storageTypes.length ? storageTypes[i] : null;
+          pendingSelectNodes.add(new Pair<>(currentType, nodes[i]));
         }
       }
+      if (chooseBlockByPriority) {
+        DFSClient.LOG.debug("choose block by storage type priority enabled, sort nodes size {}",
+                pendingSelectNodes.size());
+        sortNodesByStorageType(pendingSelectNodes);
+      }
+      if (pendingSelectNodes.size() > 0) {
+        chosenNode = pendingSelectNodes.get(0).getValue();
+        storageType = pendingSelectNodes.get(0).getFirst();
+      }
     }
+
     if (chosenNode == null) {
       reportLostBlock(block, ignoredNodes);
       return null;
     }
     final String dnAddr =
         chosenNode.getXferAddr(dfsClient.getConf().isConnectToDnViaHostname());
-    DFSClient.LOG.debug("Connecting to datanode {}", dnAddr);
+    DFSClient.LOG.debug("Connecting to datanode {}, {}", dnAddr, storageType);
     InetSocketAddress targetAddr = NetUtils.createSocketAddr(dnAddr);
     return new DNAddrPair(chosenNode, targetAddr, storageType, block);
   }

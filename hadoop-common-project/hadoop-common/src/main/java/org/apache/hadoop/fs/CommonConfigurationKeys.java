@@ -344,6 +344,10 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String  IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY = "ipc.client.fallback-to-simple-auth-allowed";
   public static final boolean IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT = false;
 
+
+  public static final String IPC_CLIENT_CHOOSE_BLOCK_BY_STORAGE_TYPE = "ipc.client.choose-block-by-storage-type";
+  public static final boolean IPC_CLIENT_CHOOSE_BLOCK_BY_STORAGE_TYPE_DEFAULT = false;
+
   public static final String IPC_CLIENT_FALLBACK_TO_AUTH_USER = "ipc.client.fallback-to-auth-user";
   public static final boolean IPC_CLIENT_FALLBACK_TO_AUTH_USER_DEFAULT = true;
   public static final String  IPC_CLIENT_BIND_WILDCARD_ADDR_KEY = "ipc.client"
