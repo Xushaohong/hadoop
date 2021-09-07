@@ -2309,7 +2309,11 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
           @Override public void setStdErr(Path stdout)
               throws IOException {};
           @Override public void echo(String echoStr)
-              throws IOException {};
+              throws IOException {}
+          @Override
+          public void fdLimit(int fdLimit)
+              throws IOException {}
+          ;
         };
 
     try {

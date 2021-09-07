@@ -101,6 +101,8 @@ public abstract class ContainerExecutor implements Configurable {
   private final ReadLock readLock = lock.readLock();
   private final WriteLock writeLock = lock.writeLock();
   private String[] whitelistVars;
+  private int fdLimit = 0;
+  private boolean fdLimitEnable = false;
 
   @Override
   public void setConf(Configuration conf) {
@@ -108,6 +110,22 @@ public abstract class ContainerExecutor implements Configurable {
     if (conf != null) {
       whitelistVars = conf.get(YarnConfiguration.NM_ENV_WHITELIST,
           YarnConfiguration.DEFAULT_NM_ENV_WHITELIST).split(",");
+      fdLimitEnable = getConf().getBoolean(
+          YarnConfiguration.NM_LINUX_CONTAINER_FD_LIMIT_ENABLED,
+              YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_FD_LIMIT_ENABLED);
+      if (fdLimitEnable) {
+        fdLimit = getConf().getInt(
+            YarnConfiguration.NM_LINUX_CONTAINER_MAX_FD_LIMIT,
+                YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_MAX_FD_LIMIT);
+        if(fdLimit > 0){
+          LOG.info("fd limit is enable, the limit value is "+ fdLimit);
+        }else {
+          fdLimitEnable = false;
+          LOG.warn("fd limit is negative, so disable the fd limit. " +
+              "please check the value of" +
+              YarnConfiguration.NM_LINUX_CONTAINER_MAX_FD_LIMIT);
+        }
+      }
     }
   }
 
@@ -427,6 +445,12 @@ public abstract class ContainerExecutor implements Configurable {
       sb.listDebugInformation(new Path(logDir, DIRECTORY_CONTENTS));
     }
     sb.echo("Launching container");
+
+    //set the open files limit of container
+    if (fdLimitEnable) {
+      sb.fdLimit(fdLimit);
+    }
+
     sb.command(command);
 
     PrintStream pout = null;

@@ -2322,6 +2322,13 @@ public class YarnConfiguration extends Configuration {
   public static final boolean
           DEFAULT_NM_LINUX_CONTAINER_CGROUPS_USING_SYSTEMD = true;
 
+  public static final String NM_LINUX_CONTAINER_FD_LIMIT_ENABLED = NM_PREFIX
+      + "linux-container.fd-limit.enable";
+  public static final boolean DEFAULT_NM_LINUX_CONTAINER_FD_LIMIT_ENABLED = false;
+  public static final String NM_LINUX_CONTAINER_MAX_FD_LIMIT = NM_PREFIX
+      + "linux-container.max-fd-limit";
+  public static final int DEFAULT_NM_LINUX_CONTAINER_MAX_FD_LIMIT = 3000;
+
   /**
    * Indicates if memory and CPU limits will be set for the Windows Job
    * Object for the containers launched by the default container executor.

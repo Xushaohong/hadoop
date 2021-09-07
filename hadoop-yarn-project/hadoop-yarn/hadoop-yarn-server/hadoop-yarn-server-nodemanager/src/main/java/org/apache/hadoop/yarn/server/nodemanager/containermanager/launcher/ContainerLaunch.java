@@ -1093,6 +1093,8 @@ public class ContainerLaunch implements Callable<Integer> {
 
     public abstract void echo(String echoStr) throws IOException;
 
+    public abstract void fdLimit(int fdLimit) throws IOException;
+
     public final void symlink(Path src, Path dst) throws IOException {
       if (!src.isAbsolute()) {
         throw new IOException("Source must be absolute");
@@ -1293,6 +1295,11 @@ public class ContainerLaunch implements Callable<Integer> {
     }
 
     @Override
+    public void fdLimit(int fdLimit) throws IOException {
+      line("ulimit -n ", String.valueOf(fdLimit));
+    }
+
+    @Override
     protected void mkdir(Path path) throws IOException {
       line("mkdir -p ", path.toString());
     }
@@ -1453,6 +1460,11 @@ public class ContainerLaunch implements Callable<Integer> {
     @Override
     public void echo(final String echoStr) throws IOException {
       lineWithLenCheck("@echo \"", echoStr, "\"");
+    }
+
+    @Override
+    public void fdLimit(int fdLimit) throws IOException {
+      //do noting
     }
 
     @Override
