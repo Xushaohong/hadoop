@@ -38,8 +38,8 @@ public class TqSaslServer extends TqSaslBase implements javax.security.sasl.Sasl
           .append("}");
       LOG.debug(builder);
     }
-    Preconditions.checkArgument(cbh instanceof TqServerCallbackHandler,
-        "CallbackHandler is not instance of  " + TqServerCallbackHandler.class.getName());
+//    Preconditions.checkArgument(cbh instanceof TqServerCallbackHandler,
+//        "CallbackHandler is not instance of  " + TqServerCallbackHandler.class.getName());
     this.scbh = (TqServerCallbackHandler) cbh;
   }
 
