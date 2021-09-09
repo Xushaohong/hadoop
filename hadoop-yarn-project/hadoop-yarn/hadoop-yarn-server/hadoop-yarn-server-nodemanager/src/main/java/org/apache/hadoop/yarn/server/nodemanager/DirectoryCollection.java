@@ -426,6 +426,25 @@ public class DirectoryCollection {
     for (final String dir : localDirectories) {
       try {
         createDir(localFs, new Path(dir), perm);
+        LOG.info("create dir "+dir);
+        if(isLocalDir) {
+          String localdir;
+          if(!dir.endsWith(Path.SEPARATOR)){
+            localdir = dir+Path.SEPARATOR;
+          }else {
+            localdir = dir;
+          }
+          String fileCacheDir = localdir+ContainerLocalizer.FILECACHE;
+          String userCacheDir = localdir+ContainerLocalizer.USERCACHE;
+          String nmPriavateDir = localdir+ResourceLocalizationService.NM_PRIVATE_DIR;
+
+          createDir(localFs, new Path(fileCacheDir), perm);
+          LOG.info("create fileCacheDir "+fileCacheDir);
+          createDir(localFs, new Path(userCacheDir), perm);
+          LOG.info("create userCacheDir "+userCacheDir);
+          createDir(localFs, new Path(nmPriavateDir), perm);
+          LOG.info("create nmPriavateDir "+nmPriavateDir);
+        }
       } catch (IOException e) {
         LOG.warn("Unable to create directory " + dir + " error " +
             e.getMessage() + ", removing from the list of valid directories.");
