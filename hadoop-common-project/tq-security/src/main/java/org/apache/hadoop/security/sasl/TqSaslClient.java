@@ -24,10 +24,6 @@ public class TqSaslClient extends TqSaslBase implements javax.security.sasl.Sasl
   private byte[] extraId;
   private TqClientCallbackHandler ccbh;
 
-  // whether using authenticated user as init user in proxy mode, default is false,
-  // if server cannot match init user, set it to true and use auth user as init user instead.
-  public static final AtomicBoolean USING_AUTH_USER_WHEN_PROXY = new AtomicBoolean(false);
-
   public TqSaslClient(String authId, String protocol, String serverName, Map<String, ?> props, CallbackHandler cbh) {
     super(protocol, serverName, props, cbh);
     this.authId = authId;
@@ -146,11 +142,7 @@ public class TqSaslClient extends TqSaslBase implements javax.security.sasl.Sasl
 
   private TqInitToken buildInitToken() throws Exception {
     UserClientCallback userClientCallback = new UserClientCallback();
-    if (USING_AUTH_USER_WHEN_PROXY.get()) {
-      ccbh.handleWithAuthUser(userClientCallback);
-    } else {
-      ccbh.handle(userClientCallback);
-    }
+    ccbh.handle(userClientCallback);
     authUser = userClientCallback.getUserName();
     extraId = userClientCallback.getExtraId();
     if (authUser == null) {

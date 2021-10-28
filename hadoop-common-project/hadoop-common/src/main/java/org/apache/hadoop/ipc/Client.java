@@ -618,13 +618,19 @@ public class Client implements AutoCloseable {
       return false;
     }
 
-    private synchronized AuthMethod setupSaslConnection(IpcStreams streams)
+    private synchronized AuthMethod setupSaslConnection(IpcStreams streams, boolean firstConnect)
         throws IOException {
       // Do not use Client.conf here! We must use ConnectionId.conf, since the
       // Client object is cached and shared between all RPC clients, even those
       // for separate services.
       saslRpcClient = new SaslRpcClient(remoteId.getTicket(),
           remoteId.getProtocol(), remoteId.getAddress(), remoteId.conf);
+
+      // first connection failed because of compatible issue
+      // fall back using auth user and retry connecting again.
+      if (!firstConnect) {
+        saslRpcClient.fallbackToAuthUser();
+      }
       return saslRpcClient.saslConnect(streams);
     }
 
@@ -792,7 +798,7 @@ public class Client implements AutoCloseable {
      * the connection thread that waits for responses.
      */
     private synchronized void setupIOstreams(
-        AtomicBoolean fallbackToSimpleAuth, boolean firstConnect) {
+        AtomicBoolean fallbackToSimpleAuth, final boolean firstConnect) {
       if (socket != null || shouldCloseConnection.get()) {
         return;
       }
@@ -825,7 +831,7 @@ public class Client implements AutoCloseable {
                     @Override
                     public AuthMethod run()
                         throws IOException, InterruptedException {
-                      return setupSaslConnection(ipcStreams);
+                      return setupSaslConnection(ipcStreams, firstConnect);
                     }
                   });
             } catch (IOException ex) {
@@ -887,7 +893,6 @@ public class Client implements AutoCloseable {
         if (firstConnect && AuthMethod.TAUTH.equals(authMethod) && fallbackUsingAuthUser
                 && t.getMessage() != null && t.getMessage().contains(INIT_AUTH_FAILED_MESSAGE)) {
           LOG.warn("got " + t.getMessage() + ", fallback using auth user instead");
-          TqSaslClient.USING_AUTH_USER_WHEN_PROXY.set(true);
           setupIOstreams(fallbackToSimpleAuth, false);
         } else {
           if (t instanceof IOException) {

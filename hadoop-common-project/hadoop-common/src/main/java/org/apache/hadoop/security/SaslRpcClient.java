@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
@@ -112,7 +112,9 @@ public class SaslRpcClient {
   private SaslClient saslClient;
   private SaslPropertiesResolver saslPropsResolver;
   private AuthMethod authMethod;
-  
+
+  private AtomicBoolean fallBackAuthUser = new AtomicBoolean(false);
+
   private static final RpcRequestHeaderProto saslHeader = ProtoUtil
       .makeRpcRequestHeader(RpcKind.RPC_PROTOCOL_BUFFER,
           OperationProto.RPC_FINAL_PACKET, AuthProtocol.SASL.callId,
@@ -207,6 +209,15 @@ public class SaslRpcClient {
     }
     return selectedAuthType;
   }
+
+  /**
+   * In order to be compatible with old version of tauth sasl mode,
+   * fallback using auth user instead of ugi user.
+   */
+  public void fallbackToAuthUser() {
+    this.fallBackAuthUser.set(true);
+  }
+
 
   private boolean isValidAuthType(SaslAuth authType) {
     AuthMethod authMethod;
@@ -793,6 +804,7 @@ public class SaslRpcClient {
       if(LOG.isDebugEnabled()) {
         LOG.debug("Service target: " + target);
       }
+      LOG.debug("user " + user + ", realUser " + realUser + " target: " + target);
       ServiceTarget serviceTarget = ServiceTarget.valueOf(target);
       if(target == null || TqSaslServer.DEFAULT_SERVER_NAME.equals(target)) {
         serviceTarget = ServiceTarget.valueOf(serverAddr.getAddress().getHostAddress(),
@@ -807,12 +819,12 @@ public class SaslRpcClient {
 
     @Override
     protected String getUserName() {
+      // using auth user instead.
+      if (fallBackAuthUser.get() && realUser != null) {
+        LOG.debug("using real user " + realUser);
+        return realUser;
+      }
       return user;
-    }
-
-    @Override
-    protected String getAuthUserName() {
-      return realUser != null ? realUser : user;
     }
 
     @Override
