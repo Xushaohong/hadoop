@@ -270,6 +270,11 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final boolean
       DFS_NAMENODE_CORRUPT_BLOCK_DELETE_IMMEDIATELY_ENABLED_DEFAULT = false;
 
+
+  public static final String  DFS_NAMENODE_ASYNC_EDIT_RESPONSE_POOL_ENABLE = "dfs.namenode.async.edit.response.pool.enable";
+  public static final String  DFS_NAMENODE_ASYNC_EDIT_RESPONSE_POOL_SIZE = "dfs.namenode.async.edit.response.pool.size";
+  public static final String  DFS_NAMENODE_ASYNC_EDIT_RESPONSE_PENDING_SIZE = "dfs.namenode.async.edit.response.pending.size";
+
   public static final String  DFS_WEBHDFS_AUTHENTICATION_FILTER_KEY = "dfs.web.authentication.filter";
   /* Phrased as below to avoid javac inlining as a constant, to match the behavior when
      this was AuthFilter.class.getName(). Note that if you change the import for AuthFilter, you

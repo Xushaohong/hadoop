@@ -157,6 +157,9 @@ public class NameNodeMetrics {
   @Metric("GetImageServlet putImage")
   MutableRate putImage;
 
+  @Metric("Number of edit async responses")
+  MutableRate callEditAsyncResponse;
+
   JvmMetrics jvmMetrics = null;
   
   NameNodeMetrics(String processName, String sessionId, int[] intervals,
@@ -231,6 +234,10 @@ public class NameNodeMetrics {
 
   public JvmMetrics getJvmMetrics() {
     return jvmMetrics;
+  }
+
+  public void addEditAsyncResponseTime(long responseTime) {
+    callEditAsyncResponse.add(responseTime);
   }
   
   public void shutdown() {

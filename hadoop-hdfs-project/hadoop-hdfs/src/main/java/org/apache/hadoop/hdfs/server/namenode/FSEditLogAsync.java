@@ -28,6 +28,9 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -43,6 +46,7 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
   private final Object syncThreadLock = new Object();
   private Thread syncThread;
   private static final ThreadLocal<Edit> THREAD_EDIT = new ThreadLocal<Edit>();
+  private static final NameNodeMetrics NAMENODE_METRICS = NameNode.getNameNodeMetrics();
 
   // requires concurrent access from caller threads and syncing thread.
   private final BlockingQueue<Edit> editPendingQ =
@@ -53,10 +57,58 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
   // of the edit log buffer - ie. a sync will eventually be forced.
   private final Deque<Edit> syncWaitQ = new ArrayDeque<Edit>();
 
+  /**
+   * async response worker pool
+   */
+  static int asyncResponsePendingSize = 4096;
+  static BlockingQueue<Server.Call> responsePendingQ =  new ArrayBlockingQueue<>(asyncResponsePendingSize);;
+  private AsyncResponseWorker[] asyncResponseWorkers = null;
+  volatile boolean shouldRunAsyncResponse = true;
+  static boolean asyncResponsePoolEnable = true;
+  private int asyncResponsePoolSize = 50;
+
+  private class AsyncResponseWorker extends Thread {
+    public AsyncResponseWorker(int instanceNumber){
+      this.setDaemon(true);
+      this.setName("Async Response Worker " + instanceNumber  + " for editlog");
+    }
+
+    @Override
+    public void run() {
+      LOG.debug(Thread.currentThread().getName() +  ": starting");
+      while (shouldRunAsyncResponse) {
+        try {
+          Server.Call call = responsePendingQ.take();
+          long startNanos = Time.monotonicNowNanos();
+          call.sendResponse();
+          if (NAMENODE_METRICS != null) {
+            NAMENODE_METRICS.addEditAsyncResponseTime(Time.monotonicNowNanos() - startNanos);
+          }
+        } catch (InterruptedException e) {
+          if (shouldRunAsyncResponse) {                          // unexpected -- log it
+            LOG.info(Thread.currentThread().getName() +  " unexpectedly interrupted", e);
+          }
+        } catch (IOException e) {
+          LOG.info(Thread.currentThread().getName() + " caught an exception", e); // don't care if not sent.
+        }  catch (Throwable t) {
+          String message = "Exception while edit logging: " + t.getMessage();// don't care if not sent.
+          LOG.warn(message, t);
+        }
+      }
+    }
+  }
+
   FSEditLogAsync(Configuration conf, NNStorage storage, List<URI> editsDirs) {
     super(conf, storage, editsDirs);
     // op instances cannot be shared due to queuing for background thread.
     cache.disableCache();
+    // async response worker pool
+    asyncResponsePoolEnable = conf.getBoolean(DFSConfigKeys.DFS_NAMENODE_ASYNC_EDIT_RESPONSE_POOL_ENABLE, true);
+    asyncResponsePoolSize = conf.getInt(DFSConfigKeys.DFS_NAMENODE_ASYNC_EDIT_RESPONSE_POOL_SIZE, 50);
+    asyncResponsePendingSize = conf.getInt(DFSConfigKeys.DFS_NAMENODE_ASYNC_EDIT_RESPONSE_PENDING_SIZE, 4096);
+    if(asyncResponsePoolEnable) {
+      responsePendingQ = new ArrayBlockingQueue<>(asyncResponsePendingSize);
+    }
   }
 
   private boolean isSyncThreadAlive() {
@@ -67,6 +119,20 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
 
   private void startSyncThread() {
     synchronized(syncThreadLock) {
+      /**
+       * async response worker pool start first
+       */
+      LOG.info("startSyncThread asyncResponsePoolEnable:" + asyncResponsePoolEnable);
+
+      if(asyncResponsePoolEnable){
+        shouldRunAsyncResponse = true;
+        asyncResponseWorkers = new AsyncResponseWorker[asyncResponsePoolSize];
+        for(int i = 0; i < asyncResponsePoolSize; i++){
+          asyncResponseWorkers[i] = new AsyncResponseWorker(i);
+          asyncResponseWorkers[i].start();
+          LOG.info("startSyncThread started asyncResponseWorkers " + i);
+        }
+      }
       if (!isSyncThreadAlive()) {
         syncThread = new Thread(this, this.getClass().getSimpleName());
         syncThread.start();
@@ -80,6 +146,18 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
         try {
           syncThread.interrupt();
           syncThread.join();
+          if(asyncResponsePoolEnable){
+            shouldRunAsyncResponse = false;
+            if(asyncResponseWorkers != null){
+              for(int i  = 0; i < asyncResponsePoolSize; i++){
+                if(asyncResponseWorkers[i] != null){
+                  asyncResponseWorkers[i].interrupt();
+                  asyncResponseWorkers[i].join();
+                }
+              }
+            }
+
+          }
         } catch (InterruptedException e) {
           // we're quitting anyway.
         } finally {
@@ -362,7 +440,11 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
     public void logSyncNotify(RuntimeException syncEx) {
       try {
         if (syncEx == null) {
-          call.sendResponse();
+          if(asyncResponsePoolEnable && responsePendingQ != null) {
+            responsePendingQ.put(call);
+          } else {
+            call.sendResponse();
+          }
         } else {
           call.abortResponse(syncEx);
         }
