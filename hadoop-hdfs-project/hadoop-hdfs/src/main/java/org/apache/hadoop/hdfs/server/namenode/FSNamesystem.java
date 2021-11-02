@@ -446,6 +446,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private final boolean standbyShouldCheckpoint;
   private final int snapshotDiffReportLimit;
   private final int blockDeletionIncrement;
+  private final int pendingDeletionCountThreshold;
+  private final long sleepTimeForPendingDeletion;
+  private final boolean pendingDeletionEnabled;
 
   /** Interval between each check of lease to release. */
   private final long leaseRecheckIntervalMs;
@@ -956,6 +959,25 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       Preconditions.checkArgument(blockDeletionIncrement > 0,
           DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_INCREMENT_KEY +
               " must be a positive integer.");
+
+      this.pendingDeletionCountThreshold = conf.getInt(
+              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_PENDING_THRESHOLD,
+              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_PENDING_THRESHOLD_DEFAULT);
+      Preconditions.checkArgument(this.pendingDeletionCountThreshold > 0,
+              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_PENDING_THRESHOLD +
+                      " must be a positive integer."
+      );
+      this.sleepTimeForPendingDeletion =
+              conf.getTimeDuration(DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_TIME,
+                      DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_TIME_DEFAULT,
+                      TimeUnit.MILLISECONDS);
+      Preconditions.checkArgument(this.sleepTimeForPendingDeletion > 0,
+              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_TIME +
+                      " must be a positive integer."
+      );
+
+      this.pendingDeletionEnabled = conf.getBoolean(DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_ENABLED,
+              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_ENABLED_DEFAULT);
 
       this.delegationTokenAllowEmptyReturn = conf.getBoolean("tq.delegation.token.allow.empty.return", true);
     } catch(IOException e) {
@@ -3143,7 +3165,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * From the given list, incrementally remove the blocks from blockManager
    * Writelock is dropped and reacquired every BLOCK_DELETION_INCREMENT to
    * ensure that other waiters on the lock can get in. See HDFS-2938
-   * 
+   * When the pending deletion blocks exceed the pendingDeletionCountThreshold,
+   * it means so many blocks are pending for deletion,
+   * thread should sleep for sleepTimeForPendingDeletion
+   * to ensure that other waiters on the lock can get in.
+   *
    * @param blocks
    *          An instance of {@link BlocksMapUpdateInfo} which contains a list
    *          of blocks that need to be removed from blocksMap
@@ -3159,6 +3185,16 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
       } finally {
         writeUnlock("removeBlocks");
+        if (pendingDeletionEnabled && blockManager.getPendingDeletionBlocksCount()
+                > pendingDeletionCountThreshold) {
+          try {
+            LOG.info("remove blocks too fast, sleep " + sleepTimeForPendingDeletion + " ms");
+            Thread.sleep(sleepTimeForPendingDeletion);
+          } catch (Exception e){
+            LOG.error("Sleep for pending too many " +
+                    "deletion blocks with exception", e);
+          }
+        }
       }
     }
   }

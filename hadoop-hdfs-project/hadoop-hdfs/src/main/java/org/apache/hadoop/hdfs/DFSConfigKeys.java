@@ -270,6 +270,22 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final boolean
       DFS_NAMENODE_CORRUPT_BLOCK_DELETE_IMMEDIATELY_ENABLED_DEFAULT = false;
 
+  /** Pending deletion block count threshold for sleep
+   *  when pending too many deletion blocks. */
+  public static final String DFS_NAMENODE_BLOCK_DELETION_PENDING_THRESHOLD =
+          "dfs.namenode.block.deletion.pending.threshold";
+  public static final int DFS_NAMENODE_BLOCK_DELETION_PENDING_THRESHOLD_DEFAULT
+          = 1000000;
+
+  /** Sleep time(ms) for block deletion
+   *  when pending too many deletion blocks.*/
+  public static final String DFS_NAMENODE_BLOCK_DELETION_SLEEP_TIME =
+          "dfs.namenode.block.deletion.sleep.time";
+  public static final int DFS_NAMENODE_BLOCK_DELETION_SLEEP_TIME_DEFAULT
+          = 100;
+
+  public static final String DFS_NAMENODE_BLOCK_DELETION_SLEEP_ENABLED = "dfs.namenode.block.deletion.sleep.enabled";
+  public static final boolean DFS_NAMENODE_BLOCK_DELETION_SLEEP_ENABLED_DEFAULT = false;
 
   public static final String  DFS_NAMENODE_ASYNC_EDIT_RESPONSE_POOL_ENABLE = "dfs.namenode.async.edit.response.pool.enable";
   public static final String  DFS_NAMENODE_ASYNC_EDIT_RESPONSE_POOL_SIZE = "dfs.namenode.async.edit.response.pool.size";
