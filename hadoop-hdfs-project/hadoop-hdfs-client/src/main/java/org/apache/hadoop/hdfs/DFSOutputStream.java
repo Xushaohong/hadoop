@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -947,6 +948,7 @@ public class DFSOutputStream extends FSOutputSummer
     long sleeptime = conf.getBlockWriteLocateFollowingInitialDelayMs();
     boolean fileComplete = false;
     int retries = conf.getNumBlockWriteLocateFollowingRetry();
+    DatanodeInfo[] datanodes = getPipeline();
     while (!fileComplete) {
       fileComplete =
           dfsClient.namenode.complete(src, dfsClient.clientName, last, fileId);
@@ -964,7 +966,7 @@ public class DFSOutputStream extends FSOutputSummer
         try {
           if (retries == 0) {
             throw new IOException("Unable to close file because the last block"
-                + last + " does not have enough number of replicas.");
+                + last + " does not have enough number of replicas, datanodes: " + Arrays.toString(datanodes));
           }
           retries--;
           Thread.sleep(sleeptime);
