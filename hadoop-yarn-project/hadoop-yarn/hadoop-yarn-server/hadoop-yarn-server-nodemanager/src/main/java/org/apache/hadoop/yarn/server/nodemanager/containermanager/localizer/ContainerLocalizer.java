@@ -61,6 +61,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.DiskValidator;
+import org.apache.hadoop.util.BasicDiskValidator;
 import org.apache.hadoop.util.DiskValidatorFactory;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -134,7 +135,7 @@ public class ContainerLocalizer {
     this.recordFactory = recordFactory;
     this.conf = initConfiguration();
     this.diskValidator = DiskValidatorFactory.getInstance(
-        YarnConfiguration.DEFAULT_DISK_VALIDATOR);
+        BasicDiskValidator.NAME);
     this.appCacheDirContextName = String.format(APPCACHE_CTXT_FMT, appId);
     this.pendingResources = new HashMap<LocalResource,Future<Path>>();
     this.tokenFileName = Preconditions.checkNotNull(tokenFileName,
