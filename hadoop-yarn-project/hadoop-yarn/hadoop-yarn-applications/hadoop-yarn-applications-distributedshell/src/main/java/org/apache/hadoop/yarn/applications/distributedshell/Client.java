@@ -402,6 +402,8 @@ public class Client {
             + " The \"num_containers\" option will be ignored. All requested"
             + " containers will be of type GUARANTEED" );
     opts.addOption("application_tags", true, "Application tags.");
+    opts.addOption("defaultFS", true, "eg: hdfs://xxx");
+    opts.addOption("rmPrincipal", true, "eg: gaiaadmin");
   }
 
   /**
@@ -452,6 +454,18 @@ public class Client {
     if (cliParser.hasOption("debug")) {
       debugFlag = true;
 
+    }
+
+    if (cliParser.hasOption("defaultFS")) {
+      String defaultFS = cliParser.getOptionValue("defaultFS", "");
+      LOG.info("defaultFS ：" + defaultFS);
+      conf.set("fs.defaultFS", defaultFS);
+    }
+
+    if (cliParser.hasOption("rmPrincipal")) {
+      String rmPrincipal = cliParser.getOptionValue("rmPrincipal", "");
+      LOG.info("rmPrincipal ：" + rmPrincipal);
+      conf.set(YarnConfiguration.RM_PRINCIPAL, rmPrincipal);
     }
 
     if (cliParser.hasOption("keep_containers_across_application_attempts")) {
