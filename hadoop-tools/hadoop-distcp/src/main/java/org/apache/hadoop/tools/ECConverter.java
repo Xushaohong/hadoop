@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -63,6 +64,7 @@ import org.apache.hadoop.tools.mapred.CopyOutputFormat;
 import org.apache.hadoop.tools.util.DistCpUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +84,7 @@ import com.google.common.io.Files;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class ECConverter extends DistCp {
+public class ECConverter extends Configured implements Tool {
   static {
     Configuration.addDefaultResource("hdfs-default.xml");
     Configuration.addDefaultResource("hdfs-site.xml");
@@ -95,6 +97,11 @@ public class ECConverter extends DistCp {
   }
 
   static final Logger LOG = LoggerFactory.getLogger(ECConverter.class);
+
+  /**
+   * Priority of the shutdown hook.
+   */
+  static final int SHUTDOWN_HOOK_PRIORITY = 30;
 
   // some configurations
   public static final String DFS_EC_CONVERT_PATHS = "dfs.ec.convert.paths";
@@ -134,16 +141,15 @@ public class ECConverter extends DistCp {
   public static final long DFS_EC_CONVERT_INTERVAL_MINUTES_DEFAULT = 60;
 
   // internal dirs and log files
-  private static final Path DFS_EC_CONVERT_TMP_DIR =
+  private static final Path DFS_EC_CONVERT_ROOT_DIR =
       new Path("/tmp/ecconverter/");
-  private static final Path EC_CONVERT_LOG_PATH = new Path("/logs");
-  private static final Path EC_CONVERT_WORKING_PATH = new Path("/working");
-  private static final Path DFS_EC_CONVERT_ID_PATH =
-      new Path("/system/ecconverter.id");
+  private static final Path DFS_EC_CONVERT_LOG_DIR = new Path("/logs");
+  private static final Path DFS_EC_CONVERT_WORKING_DIR = new Path("/working");
+  private static final String DFS_EC_CONVERT_ID_DIR = "/system";
 
   private Configuration conf;
   private String ecPolicy;
-  private Path[] ecPaths = new Path[0];;
+  private Path[] ecPaths = new Path[0];
   private long sleepIntervalMills;
   private boolean skipCrcCheck;
   private int listStatusThreads;
@@ -151,81 +157,11 @@ public class ECConverter extends DistCp {
   private int blocksPerChunk;
   private final Timer ecWorkTimer;
   private TimerTask timerTask;
-  private final List<Path> markedRunningClusters = new ArrayList<Path>();
 
   ECConverter() {
     this.ecWorkTimer = new Timer("ECConverterTimer", true);
   }
 
-  private Path getEcTmpDir(Path ecPath) throws IOException {
-    FileSystem fs = ecPath.getFileSystem(conf);
-    Path ecTmpDir = Path.mergePaths(new Path(fs.getUri()),
-       DFS_EC_CONVERT_TMP_DIR);
-    return ecTmpDir;
-  }
-
-  private Path getEcLogDir(Path ecPath) throws IOException {
-    FileSystem fs = ecPath.getFileSystem(conf);
-    Path ecTmpDir = Path.mergePaths(new Path(fs.getUri()),
-        DFS_EC_CONVERT_TMP_DIR);
-    Path ecLogDir = Path.mergePaths(ecTmpDir, EC_CONVERT_LOG_PATH);
-    return ecLogDir;
-  }
-
-  private Path getEcWorkingDir(Path ecPath) throws IOException {
-    FileSystem fs = ecPath.getFileSystem(conf);
-    Path ecTmpDir = Path.mergePaths(new Path(fs.getUri()),
-        DFS_EC_CONVERT_TMP_DIR);
-    Path ecWorkingDir = Path.mergePaths(ecTmpDir, EC_CONVERT_WORKING_PATH);
-    return ecWorkingDir;
-  }
-
-  private Path getEcIdPath(Path ecPath) throws IOException {
-    URI fsUri = ecPath.getFileSystem(conf).getUri();
-    Path ecIdPath = Path.mergePaths(new Path(fsUri), DFS_EC_CONVERT_ID_PATH);
-    return ecIdPath;
-  }
-
-  private String[] prepareDistCpArgs(Path ecPath) throws IOException {
-    List<String> args = new ArrayList<>();
-    // direct copy
-    args.add("-direct");
-
-    // skip crc
-    if (skipCrcCheck) {
-      args.add("-skipcrccheck");
-    } else {
-      // use COMPOSITE_CRC to compare crc between replication and ec files
-      conf.set("dfs.checksum.combine.mode", "COMPOSITE_CRC");
-    }
-
-    // listStatus threads
-    args.add("-numListstatusThreads");
-    args.add(String.valueOf(listStatusThreads));
-
-    // max tasks
-    args.add("-m");
-    args.add(String.valueOf(ecMaxTasks));
-
-    // blocks per chunk
-    args.add("-blocksperchunk");
-    args.add(String.valueOf(blocksPerChunk));
-
-    // log dir
-    Path ecLogDir = getEcLogDir(ecPath);
-    args.add("-v");
-    args.add("-log");
-    args.add(ecLogDir.toString());
-
-    // distcp source: intended ec paths
-    args.add(ecPath.toString());
-
-    // distcp target: ec tmp dir
-    Path ecWorkingDir = getEcWorkingDir(ecPath);
-    args.add(ecWorkingDir.toString());
-
-    return args.toArray(new String[0]);
-  }
 
   /**
    * filter out these files not to convert:
@@ -264,28 +200,36 @@ public class ECConverter extends DistCp {
 
         // directory always false
         if (status.isDirectory()) {
+          LOG.debug("Skip copy, reason: is directory, path: " + path);
           return false;
         }
 
         // filter out already-ec files
         if (status.isErasureCoded()) {
+          LOG.debug("Skip copy, reason: already erasure coded, path: " + path);
           return false;
         }
 
         // filter length
         if (status.getLen() < lengthThreshold) {
+          LOG.debug("Skip copy, reason: length less than threshold "
+                  + lengthThreshold + ", path: " + path);
           return false;
         }
 
         // filter mtime
         if (status.getModificationTime() + mtimeThreshold
             > System.currentTimeMillis()) {
+          LOG.debug("Skip copy, reason: mtime doesn't match threshold "
+                  + mtimeThreshold + ", path: " + path);
           return false;
         }
 
         // filter atime
         if (status.getAccessTime() + atimeThreshold
             > System.currentTimeMillis()) {
+          LOG.debug("Skip copy, reason: atime doesn't match threshold "
+                  + atimeThreshold + ", path: " + path);
           return false;
         }
 
@@ -294,6 +238,7 @@ public class ECConverter extends DistCp {
         LocatedBlocks lbs = dfsClient
             .getLocatedBlocks(absPath.toString(), 0L, 1L);
         if (lbs.isUnderConstruction()) {
+          LOG.debug("Skip copy, file under construction, path: " + path);
           return false;
         }
       } catch (IOException e) {
@@ -338,7 +283,7 @@ public class ECConverter extends DistCp {
           new Path(conf.get(DistCpConstants.CONF_LABEL_LISTING_FILE_PATH));
       URI sourceListingURI = sourceListing.toUri();
       Path backupPath =
-          Path.mergePaths(DFS_EC_CONVERT_TMP_DIR, sourceListing);
+          Path.mergePaths(DFS_EC_CONVERT_ROOT_DIR, sourceListing);
       Path sourceListingBackup = new Path(sourceListingURI.getScheme(),
           sourceListingURI.getAuthority(), backupPath.toString());
       FileSystem clusterFS = sourceListing.getFileSystem(conf);
@@ -437,30 +382,201 @@ public class ECConverter extends DistCp {
     }
   }
 
-  /**
-   * prepare ec tmp/log/working dirs
-   */
-  private void prepareECConverterDirs(Path ecPath) throws IOException {
-    try {
-      FileSystem fs = ecPath.getFileSystem(conf);
-      Path ecTmpDir = getEcTmpDir(ecPath);
-      Path ecLogDir = getEcLogDir(ecPath);
-      Path ecWorkingDir = getEcWorkingDir(ecPath);
+  private class ECExecutor extends DistCp implements Runnable {
+    private Path ecPath;
 
-      // delete corresponding dirs and create them again
-      fs.delete(ecTmpDir, true);
-      fs.mkdirs(ecTmpDir);
-      fs.mkdirs(ecLogDir);
-      fs.mkdirs(ecWorkingDir);
+    private Path ecTmpDir;
+    private Path ecLogDir;
+    private Path ecWorkingDir;
 
-      // set ec-working dir's policy
-      ((DistributedFileSystem)fs).enableErasureCodingPolicy(ecPolicy);
-      ((DistributedFileSystem)fs).setErasureCodingPolicy(
-          ecWorkingDir, ecPolicy);
-    } catch (IOException e) {
-      LOG.error("Unable to prepare ecEconverter dirs for " + ecPath, e);
-      throw e;
+    ECExecutor(Path ecPath) {
+      setConf(conf);
+      this.ecPath = ecPath;
     }
+
+    private void init() throws IOException {
+      this.ecTmpDir = getEcTmpDir(ecPath);
+      this.ecLogDir = Path.mergePaths(this.ecTmpDir, DFS_EC_CONVERT_LOG_DIR);
+      this.ecWorkingDir = Path.mergePaths(this.ecTmpDir, DFS_EC_CONVERT_WORKING_DIR);
+    }
+
+    /**
+     * make sure that only one converting instance running for an
+     * individual ec path.
+     */
+    private void checkAndMarkRunning() throws IOException {
+      FileSystem fs = ecPath.getFileSystem(conf);
+      Path ecIdPath = Path.mergePaths(
+              new Path(fs.getUri()),
+              new Path(DFS_EC_CONVERT_ID_DIR + getEcId(ecPath)));
+
+      try {
+        if (fs.exists(ecIdPath)) {
+          // try appending to it so that it will fail fast if another balancer is
+          // running.
+          IOUtils.closeStream(fs.append(ecIdPath));
+          fs.delete(ecIdPath, true);
+        }
+        FSDataOutputStream fsout = fs.create(ecIdPath, false);
+        fs.deleteOnExit(ecIdPath);
+        fsout.writeBytes(InetAddress.getLocalHost().getHostName());
+        fsout.writeBytes(System.lineSeparator());
+        fsout.writeBytes(ecPath.toString());
+        fsout.writeBytes(System.lineSeparator());
+        fsout.hflush();
+      } catch(RemoteException e) {
+        if (AlreadyBeingCreatedException.class.getName()
+                .equals(e.getClassName())) {
+          Path absIdPath = ecIdPath.makeQualified(fs.getUri(), ecIdPath);
+          LOG.error("Another ECConverter is running, please check id file "
+                  + "to visit it: " + absIdPath);
+        }
+        throw e;
+      } catch (IOException e) {
+        LOG.error("ECConverter checkAndMarkRunning meets exception", e);
+        throw e;
+      }
+    }
+
+    /**
+     * prepare ec tmp/log/working dirs
+     */
+    private void prepareECConverterDirs() throws IOException {
+      try {
+        FileSystem fs = ecPath.getFileSystem(conf);
+
+        // delete corresponding dirs and create them again
+        fs.delete(ecTmpDir, true);
+        fs.mkdirs(ecTmpDir);
+        fs.mkdirs(ecLogDir);
+        fs.mkdirs(ecWorkingDir);
+
+        // set ec-working dir's policy
+        ((DistributedFileSystem)fs).enableErasureCodingPolicy(ecPolicy);
+        ((DistributedFileSystem)fs).setErasureCodingPolicy(ecWorkingDir, ecPolicy);
+      } catch (IOException e) {
+        LOG.error("Unable to prepare ecEconverter dirs for " + ecPath, e);
+        throw e;
+      }
+    }
+
+    private String[] prepareDistCpArgs() throws IOException {
+      List<String> args = new ArrayList<>();
+      // direct copy
+      args.add("-direct");
+
+      // sync folder in case retry in CopyMapper
+      args.add("-update");
+
+      // skip crc
+      if (skipCrcCheck) {
+        args.add("-skipcrccheck");
+      } else {
+        // use COMPOSITE_CRC to compare crc between replication and ec files
+        conf.set("dfs.checksum.combine.mode", "COMPOSITE_CRC");
+      }
+
+      // listStatus threads
+      args.add("-numListstatusThreads");
+      args.add(String.valueOf(listStatusThreads));
+
+      // max tasks
+      args.add("-m");
+      args.add(String.valueOf(ecMaxTasks));
+
+      // blocks per chunk
+      args.add("-blocksperchunk");
+      args.add(String.valueOf(blocksPerChunk));
+
+      // log dir
+      args.add("-v");
+      args.add("-log");
+      args.add(ecLogDir.toString());
+
+      // distcp source: intended ec paths
+      args.add(ecPath.toString());
+
+      // distcp target: ec tmp dir
+      args.add(ecWorkingDir.toString());
+
+      return args.toArray(new String[0]);
+    }
+
+    private void cleanupECConverterDir() {
+      try {
+        ecTmpDir.getFileSystem(conf).delete(ecTmpDir, true);
+      } catch (IOException e) {
+        LOG.error("Unable to cleanup ecEconverter tmp dir: " + ecTmpDir, e);
+      }
+    }
+
+    /*
+     * write converted files during last distcp to local log file.
+     */
+    private void writeConvertedFilesLog() throws IOException {
+      try {
+        FileSystem fs = ecLogDir.getFileSystem(conf);
+        FileStatus[] status = fs.listStatus(ecLogDir);
+        for (FileStatus s : status) {
+          BufferedReader br = new BufferedReader(
+                  new InputStreamReader(fs.open(s.getPath())));
+          for (String line = br.readLine(); line != null; line = br.readLine()) {
+            LOG.info(line);
+          }
+          br.close();
+        }
+      } catch (IOException e) {
+        LOG.error("Write converted file lists to log meets exception ", e);
+        throw e;
+      }
+    }
+
+    @Override
+    public void run() {
+      try {
+        init();
+
+        // check and mark running
+        checkAndMarkRunning();
+
+        // prepare convert dirs
+        prepareECConverterDirs();
+
+        // get distcp args
+        String[] distcpArgs = prepareDistCpArgs();
+
+        if (super.run(distcpArgs) == DistCpConstants.SUCCESS) {
+          // write converted file list
+          writeConvertedFilesLog();
+        }
+
+        super.cleanup();
+
+        // clean ec convert dirs
+        cleanupECConverterDir();
+      } catch (Exception e) {
+        LOG.warn("ECconverter meets exception while converting " + ecPath, e);
+      }
+    }
+  }
+
+  private String getEcId(Path ecPath) {
+    String pathName = ecPath.getName();
+    int hashCode = ecPath.hashCode();
+    return pathName + "_" + hashCode;
+  }
+
+  private Path getEcRootDir(Path ecPath) throws IOException {
+    FileSystem fs = ecPath.getFileSystem(conf);
+    Path ecRootDir = Path.mergePaths(new Path(fs.getUri()),
+            DFS_EC_CONVERT_ROOT_DIR);
+    return ecRootDir;
+  }
+
+  private Path getEcTmpDir(Path ecPath) throws IOException {
+    Path ecTmpDir = Path.mergePaths(getEcRootDir(ecPath),
+            new Path("/" + getEcId(ecPath)));
+    return ecTmpDir;
   }
 
   /*
@@ -490,36 +606,13 @@ public class ECConverter extends DistCp {
   private void customizeDistcp() {
     // mapper
     conf.setClass(DistCpConstants.CONF_LABEL_OUTPUT_FORMAT_CLASS,
-        ECConverterOutputFormat.class,
-        OutputFormat.class);
+            ECConverterOutputFormat.class,
+            OutputFormat.class);
 
     // filter
     conf.setClass(DistCpConstants.CONF_LABEL_FILTERS_CLASS,
-        ECEonverterCopyFilter.class,
-        CopyFilter.class);
-  }
-
-  /*
-   * write converted files during last distcp to local log file.
-   */
-  private void writeConvertedFilesLog(Path ecPath)
-      throws IOException {
-    try {
-      Path ecLogDir = getEcLogDir(ecPath);
-      FileSystem fs = ecLogDir.getFileSystem(conf);
-      FileStatus[] status = fs.listStatus(ecLogDir);
-      for (FileStatus s : status) {
-        BufferedReader br = new BufferedReader(
-            new InputStreamReader(fs.open(s.getPath())));
-        for (String line = br.readLine(); line != null; line = br.readLine()) {
-          LOG.info(line);
-        }
-        br.close();
-      }
-    } catch (IOException e) {
-      LOG.error("Write converted file lists to log meets exception ", e);
-      throw e;
-    }
+            ECEonverterCopyFilter.class,
+            CopyFilter.class);
   }
 
   /**
@@ -546,31 +639,21 @@ public class ECConverter extends DistCp {
       return;
     }
 
-    // traverse ec paths one by one
-    for (Path ecPath : ecPaths) {
+    List<Thread> executors = new ArrayList<Thread>(ecPaths.length);
+
+    for (int i=0; i<ecPaths.length; i++) {
+      ECExecutor executor = new ECExecutor(ecPaths[i]);
+      Thread thread = new Thread(executor);
+      thread.start();
+      executors.add(i, thread);
+    }
+
+    for (int i=0; i<ecPaths.length; i++) {
+      Thread thread = executors.get(i);
       try {
-        // check and mark running
-        checkAndMarkRunning(ecPath);
-
-        // prepare convert dirs
-        prepareECConverterDirs(ecPath);
-
-        // get distcp args
-        String[] distcpArgs = prepareDistCpArgs(ecPath);
-
-        // run distcp
-        if (super.run(distcpArgs) == DistCpConstants.SUCCESS) {
-          // write converted file list
-          writeConvertedFilesLog(ecPath);
-        }
-
-        // clean distcp
-        super.cleanup();
-
-        // clean ec convert dirs
-        cleanupECConverterDir(ecPath);
-      } catch (Exception e) {
-        LOG.warn("ECconverter meets exception while converting " + ecPath, e);
+        thread.join();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
       }
     }
 
@@ -583,46 +666,7 @@ public class ECConverter extends DistCp {
     LOG.info("Took " +  elasped/1000 + " seconds to convert " + pathsMessage);
   }
 
-  /**
-   * make sure that only one converting instance running for an
-   * individual ec path.
-   */
-  private void checkAndMarkRunning(Path ecPath) throws IOException {
-    Path ecId = getEcIdPath(ecPath);
-    // mark one cluster only once
-    if (markedRunningClusters.contains(ecId)) {
-      return;
-    }
 
-    FileSystem fs = ecId.getFileSystem(conf);
-    try {
-      if (fs.exists(ecId)) {
-        // try appending to it so that it will fail fast if another balancer is
-        // running.
-        IOUtils.closeStream(fs.append(ecId));
-        fs.delete(ecId, true);
-      }
-      FSDataOutputStream fsout = fs.create(ecId, false);
-      fs.deleteOnExit(ecId);
-      fsout.writeBytes(InetAddress.getLocalHost().getHostName());
-      fsout.writeBytes(System.lineSeparator());
-      fsout.hflush();
-
-      // marked converting
-      markedRunningClusters.add(ecId);
-    } catch(RemoteException e) {
-      if (AlreadyBeingCreatedException.class.getName()
-          .equals(e.getClassName())) {
-        Path absIdPath = ecId.makeQualified(fs.getUri(), ecId);
-        LOG.error("Another ECConverter is running, please check id file "
-              + "to visit it: " + absIdPath);
-      }
-      throw e;
-    } catch (IOException e) {
-        LOG.error("ECConverter checkAndMarkRunning meets exception", e);
-        throw e;
-    }
-  }
 
   /**
    * Because there are possible many ec paths, allow them to be indirected
