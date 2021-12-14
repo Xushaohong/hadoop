@@ -36,6 +36,7 @@ message ApplicationHistoryDataProto {
   optional string diagnostics_info = 9;
   optional FinalApplicationStatusProto final_application_status = 10;
   optional YarnApplicationStateProto yarn_application_state = 11;
+  optional int64 launch_time = 12;
 }
 
 message ApplicationStartDataProto {
@@ -54,6 +55,7 @@ message ApplicationFinishDataProto {
   optional string diagnostics_info = 3;
   optional FinalApplicationStatusProto final_application_status = 4;
   optional YarnApplicationStateProto yarn_application_state = 5;
+  optional int64 launch_time = 6;
 }
 
 message ApplicationAttemptHistoryDataProto {

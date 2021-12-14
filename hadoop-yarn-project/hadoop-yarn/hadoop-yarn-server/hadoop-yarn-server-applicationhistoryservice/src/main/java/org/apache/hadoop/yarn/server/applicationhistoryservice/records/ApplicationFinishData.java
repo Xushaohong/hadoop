@@ -38,7 +38,7 @@ public abstract class ApplicationFinishData {
   public static ApplicationFinishData newInstance(ApplicationId applicationId,
       long finishTime, String diagnosticsInfo,
       FinalApplicationStatus finalApplicationStatus,
-      YarnApplicationState yarnApplicationState) {
+      YarnApplicationState yarnApplicationState, long launchTime) {
     ApplicationFinishData appFD =
         Records.newRecord(ApplicationFinishData.class);
     appFD.setApplicationId(applicationId);
@@ -46,6 +46,7 @@ public abstract class ApplicationFinishData {
     appFD.setDiagnosticsInfo(diagnosticsInfo);
     appFD.setFinalApplicationStatus(finalApplicationStatus);
     appFD.setYarnApplicationState(yarnApplicationState);
+    appFD.setLaunchTime(launchTime);
     return appFD;
   }
 
@@ -85,6 +86,14 @@ public abstract class ApplicationFinishData {
   @Public
   @Unstable
   public abstract YarnApplicationState getYarnApplicationState();
+
+  @Public
+  @Unstable
+  public abstract long getLaunchTime();
+
+  @Public
+  @Unstable
+  public abstract void setLaunchTime(long launchTime);
 
   @Public
   @Unstable

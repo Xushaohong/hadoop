@@ -46,6 +46,8 @@ public class ApplicationHistoryData {
 
   private long startTime;
 
+  private long launchTime;
+
   private long finishTime;
 
   private String diagnosticsInfo;
@@ -60,7 +62,7 @@ public class ApplicationHistoryData {
       String applicationName, String applicationType, String queue,
       String user, long submitTime, long startTime, long finishTime,
       String diagnosticsInfo, FinalApplicationStatus finalApplicationStatus,
-      YarnApplicationState yarnApplicationState) {
+      YarnApplicationState yarnApplicationState, long launchTimeTime) {
     ApplicationHistoryData appHD = new ApplicationHistoryData();
     appHD.setApplicationId(applicationId);
     appHD.setApplicationName(applicationName);
@@ -73,7 +75,20 @@ public class ApplicationHistoryData {
     appHD.setDiagnosticsInfo(diagnosticsInfo);
     appHD.setFinalApplicationStatus(finalApplicationStatus);
     appHD.setYarnApplicationState(yarnApplicationState);
+    appHD.setLaunchTime(launchTimeTime);
     return appHD;
+  }
+
+  @Public
+  @Unstable
+  public long getLaunchTime() {
+    return launchTime;
+  }
+
+  @Public
+  @Unstable
+  public void setLaunchTime(long launchTime) {
+    this.launchTime = launchTime;
   }
 
   @Public

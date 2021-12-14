@@ -2993,6 +2993,14 @@ public class YarnConfiguration extends Configuration {
   @Private
   public static final boolean DEFAULT_APPLICATION_HISTORY_ENABLED = false;
 
+  /**
+   *  The setting that controls whether yarn application metrics is published on the
+   *  disk.
+   */
+  public static final String RM_APPLICATION_METRICS_PUBLISHER_ENABLED =
+      RM_PREFIX + "application-metrics-publisher.enabled";
+  public static final boolean DEFAULT_RM_APPLICATION_METRICS_PUBLISHER_ENABLED = false;
+
   /** Application history store class */
   @Private
   public static final String APPLICATION_HISTORY_STORE =
@@ -3019,6 +3027,13 @@ public class YarnConfiguration extends Configuration {
   @Private
   public static final String
       DEFAULT_FS_APPLICATION_HISTORY_STORE_COMPRESSION_TYPE = "none";
+
+  @Private
+  public static final String APPLICATION_HISTORY_WRITER_DELAY_CLEAN_MS =
+      APPLICATION_HISTORY_PREFIX + "writer.delay.clean.ms";
+  @Private
+  public static final long DEFAULT_APPLICATION_HISTORY_WRITER_DELAY_CLEAN_MS =
+      60*1000;
 
   /** The setting that controls whether timeline service is enabled or not. */
   public static final String TIMELINE_SERVICE_ENABLED =

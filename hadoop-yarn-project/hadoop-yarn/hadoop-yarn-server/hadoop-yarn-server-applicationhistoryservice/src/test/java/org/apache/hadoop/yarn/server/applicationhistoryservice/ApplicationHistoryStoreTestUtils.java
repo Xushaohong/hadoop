@@ -51,7 +51,7 @@ public class ApplicationHistoryStoreTestUtils {
       throws IOException {
     store.applicationFinished(ApplicationFinishData.newInstance(appId, 0,
       appId.toString(), FinalApplicationStatus.UNDEFINED,
-      YarnApplicationState.FINISHED));
+      YarnApplicationState.FINISHED, 0));
   }
 
   protected void writeApplicationAttemptStartData(

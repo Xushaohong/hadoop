@@ -86,7 +86,9 @@ public class RMApplicationHistoryWriter extends CompositeService {
   protected synchronized void serviceInit(Configuration conf) throws Exception {
     historyServiceEnabled =
         conf.getBoolean(YarnConfiguration.APPLICATION_HISTORY_ENABLED,
-          YarnConfiguration.DEFAULT_APPLICATION_HISTORY_ENABLED);
+          YarnConfiguration.DEFAULT_APPLICATION_HISTORY_ENABLED ||
+        conf.getBoolean(YarnConfiguration.RM_APPLICATION_METRICS_PUBLISHER_ENABLED,
+            YarnConfiguration.DEFAULT_RM_APPLICATION_METRICS_PUBLISHER_ENABLED));
     if (conf.get(YarnConfiguration.APPLICATION_HISTORY_STORE) == null ||
         conf.get(YarnConfiguration.APPLICATION_HISTORY_STORE).length() == 0 ||
         conf.get(YarnConfiguration.APPLICATION_HISTORY_STORE).equals(
@@ -145,11 +147,13 @@ public class RMApplicationHistoryWriter extends CompositeService {
             (WritingApplicationStartEvent) event;
         try {
           writer.applicationStarted(wasEvent.getApplicationStartData());
-          LOG.info("Stored the start data of application "
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Stored the start data of application "
               + wasEvent.getApplicationId());
+          }
         } catch (IOException e) {
           LOG.error("Error when storing the start data of application "
-              + wasEvent.getApplicationId());
+              + wasEvent.getApplicationId()+ " error :"+e.getMessage());
         }
         break;
       case APP_FINISH:
@@ -157,11 +161,13 @@ public class RMApplicationHistoryWriter extends CompositeService {
             (WritingApplicationFinishEvent) event;
         try {
           writer.applicationFinished(wafEvent.getApplicationFinishData());
-          LOG.info("Stored the finish data of application "
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Stored the finish data of application "
               + wafEvent.getApplicationId());
+          }
         } catch (IOException e) {
           LOG.error("Error when storing the finish data of application "
-              + wafEvent.getApplicationId());
+              + wafEvent.getApplicationId()+ " error :"+e.getMessage());
         }
         break;
       case APP_ATTEMPT_START:
@@ -170,11 +176,13 @@ public class RMApplicationHistoryWriter extends CompositeService {
         try {
           writer.applicationAttemptStarted(waasEvent
             .getApplicationAttemptStartData());
-          LOG.info("Stored the start data of application attempt "
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Stored the start data of application attempt "
               + waasEvent.getApplicationAttemptId());
+          }
         } catch (IOException e) {
           LOG.error("Error when storing the start data of application attempt "
-              + waasEvent.getApplicationAttemptId());
+              + waasEvent.getApplicationAttemptId()+ " error :"+e.getMessage());
         }
         break;
       case APP_ATTEMPT_FINISH:
@@ -183,12 +191,14 @@ public class RMApplicationHistoryWriter extends CompositeService {
         try {
           writer.applicationAttemptFinished(waafEvent
             .getApplicationAttemptFinishData());
-          LOG.info("Stored the finish data of application attempt "
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Stored the finish data of application attempt "
               + waafEvent.getApplicationAttemptId());
+          }
         } catch (IOException e) {
           LOG
             .error("Error when storing the finish data of application attempt "
-                + waafEvent.getApplicationAttemptId());
+                + waafEvent.getApplicationAttemptId()+ " error :"+e.getMessage());
         }
         break;
       case CONTAINER_START:
@@ -196,11 +206,13 @@ public class RMApplicationHistoryWriter extends CompositeService {
             (WritingContainerStartEvent) event;
         try {
           writer.containerStarted(wcsEvent.getContainerStartData());
-          LOG.info("Stored the start data of container "
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Stored the start data of container "
               + wcsEvent.getContainerId());
+          }
         } catch (IOException e) {
           LOG.error("Error when storing the start data of container "
-              + wcsEvent.getContainerId());
+              + wcsEvent.getContainerId()+ " error :"+e.getMessage());
         }
         break;
       case CONTAINER_FINISH:
@@ -208,11 +220,13 @@ public class RMApplicationHistoryWriter extends CompositeService {
             (WritingContainerFinishEvent) event;
         try {
           writer.containerFinished(wcfEvent.getContainerFinishData());
-          LOG.info("Stored the finish data of container "
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Stored the finish data of container "
               + wcfEvent.getContainerId());
+          }
         } catch (IOException e) {
           LOG.error("Error when storing the finish data of container "
-              + wcfEvent.getContainerId());
+              + wcfEvent.getContainerId()+ " error :"+e.getMessage());
         }
         break;
       default:
@@ -229,6 +243,11 @@ public class RMApplicationHistoryWriter extends CompositeService {
           ApplicationStartData.newInstance(app.getApplicationId(), app.getName(),
             app.getApplicationType(), app.getQueue(), app.getUser(),
             app.getSubmitTime(), app.getStartTime())));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("the start data of application details: "+ app.getApplicationId()+"|"+app.getName()
+            +"|"+app.getName()+"|"+app.getApplicationType()+"|"+app.getQueue()+"|"+app.getUser()
+            +"|"+app.getSubmitTime()+"|"+ app.getStartTime());
+      }
     }
   }
 
@@ -240,7 +259,13 @@ public class RMApplicationHistoryWriter extends CompositeService {
           ApplicationFinishData.newInstance(app.getApplicationId(),
             app.getFinishTime(), app.getDiagnostics().toString(),
             app.getFinalApplicationStatus(),
-            RMServerUtils.createApplicationState(finalState))));
+            RMServerUtils.createApplicationState(finalState),
+              app.getLaunchTime())));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("the finish data of application details: "+ app.getApplicationId()+"|"+app.getFinishTime()
+            +"|"+app.getDiagnostics()+"|"+app.getFinalApplicationStatus()+"|"+RMServerUtils.createApplicationState(finalState)
+            +"|"+app.getLaunchTime());
+      }
     }
   }
 
@@ -252,6 +277,10 @@ public class RMApplicationHistoryWriter extends CompositeService {
           ApplicationAttemptStartData.newInstance(appAttempt.getAppAttemptId(),
             appAttempt.getHost(), appAttempt.getRpcPort(), appAttempt
               .getMasterContainer().getId())));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("the start data of application attempt details: "+ appAttempt.getAppAttemptId()+"|"+appAttempt.getHost()
+            +"|"+appAttempt.getRpcPort()+"|"+appAttempt.getMasterContainer().getId());
+      }
     }
   }
 
@@ -266,6 +295,11 @@ public class RMApplicationHistoryWriter extends CompositeService {
               .toString(), appAttempt.getTrackingUrl(), appAttempt
               .getFinalApplicationStatus(),
               RMServerUtils.createApplicationAttemptState(finalState))));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("the finish data of application attempt details: "+ appAttempt.getAppAttemptId()+"|"+appAttempt.getDiagnostics()
+            +"|"+appAttempt.getFinalApplicationStatus()+"|"+appAttempt.getTrackingUrl()
+            +"|"+RMServerUtils.createApplicationAttemptState(finalState));
+      }
     }
   }
 
@@ -277,6 +311,10 @@ public class RMApplicationHistoryWriter extends CompositeService {
           ContainerStartData.newInstance(container.getContainerId(),
             container.getAllocatedResource(), container.getAllocatedNode(),
             container.getAllocatedPriority(), container.getCreationTime())));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("the start data of container details: "+ container.getContainerId()+"|"+container.getAllocatedResource()
+            +"|"+container.getAllocatedNode()+"|"+container.getAllocatedPriority()+"|"+container.getCreationTime());
+      }
     }
   }
 
@@ -289,6 +327,10 @@ public class RMApplicationHistoryWriter extends CompositeService {
             container.getFinishTime(), container.getDiagnosticsInfo(),
             container.getContainerExitStatus(),
             container.getContainerState())));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("the finish data of container details: "+ container.getContainerId()+"|"+container.getFinishTime()
+            +"|"+container.getDiagnosticsInfo()+"|"+container.getContainerExitStatus()+"|"+container.getContainerState());
+      }
     }
   }
 

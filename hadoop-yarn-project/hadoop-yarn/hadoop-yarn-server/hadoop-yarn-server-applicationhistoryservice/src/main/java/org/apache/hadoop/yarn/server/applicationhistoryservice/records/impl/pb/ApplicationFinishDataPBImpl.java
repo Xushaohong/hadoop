@@ -143,6 +143,18 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
     builder.setYarnApplicationState(convertToProtoFormat(state));
   }
 
+  @Override
+  public long getLaunchTime() {
+    ApplicationFinishDataProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getLaunchTime();
+  }
+
+  @Override
+  public void setLaunchTime(long launchTime) {
+    maybeInitBuilder();
+    builder.setLaunchTime(launchTime);
+  }
+
   public ApplicationFinishDataProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();

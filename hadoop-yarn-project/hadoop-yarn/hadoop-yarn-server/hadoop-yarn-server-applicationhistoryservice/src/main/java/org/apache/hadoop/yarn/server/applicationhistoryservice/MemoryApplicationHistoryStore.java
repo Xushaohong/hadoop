@@ -142,7 +142,8 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
           ApplicationHistoryData.newInstance(appStart.getApplicationId(),
             appStart.getApplicationName(), appStart.getApplicationType(),
             appStart.getQueue(), appStart.getUser(), appStart.getSubmitTime(),
-            appStart.getStartTime(), Long.MAX_VALUE, null, null, null));
+            appStart.getStartTime(), Long.MAX_VALUE, null, null,
+            null, Long.MIN_VALUE));
     if (oldData != null) {
       throw new IOException("The start information of application "
           + appStart.getApplicationId() + " is already stored.");
@@ -165,6 +166,7 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
       throw new IOException("The finish information of application "
           + appFinish.getApplicationId() + " is already stored.");
     }
+    data.setLaunchTime(appFinish.getLaunchTime());
     data.setFinishTime(appFinish.getFinishTime());
     data.setDiagnosticsInfo(appFinish.getDiagnosticsInfo());
     data.setFinalApplicationStatus(appFinish.getFinalApplicationStatus());
