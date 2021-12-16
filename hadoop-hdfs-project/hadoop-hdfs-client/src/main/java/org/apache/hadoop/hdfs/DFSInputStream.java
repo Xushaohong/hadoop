@@ -259,7 +259,8 @@ public class DFSInputStream extends FSInputStream
       }
       if (lastBlockBeingWrittenLength == -1
           && retriesForLastBlockLength == 0) {
-        throw new IOException("Could not obtain the last block locations.");
+        throw new IOException("[Schema: " + dfsClient.getNamenodeUri()
+                + "] Could not obtain the last block locations.");
       }
     }
   }
@@ -269,8 +270,8 @@ public class DFSInputStream extends FSInputStream
       Thread.sleep(waitTime);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new InterruptedIOException(
-          "Interrupted while getting the last block length.");
+      throw new InterruptedIOException("[Schema: " + dfsClient.getNamenodeUri()
+              + "] Interrupted while getting the last block length.");
     }
   }
 
@@ -324,7 +325,8 @@ public class DFSInputStream extends FSInputStream
     }
     DFSClient.LOG.debug("newInfo = {}", newInfo);
     if (newInfo == null) {
-      throw new IOException("Cannot open filename " + src);
+      throw new IOException("[Schema: " + dfsClient.getNamenodeUri()
+              + "] Cannot open filename " + src);
     }
 
     if (locatedBlocks != null) {
@@ -333,7 +335,8 @@ public class DFSInputStream extends FSInputStream
       Iterator<LocatedBlock> newIter = newInfo.getLocatedBlocks().iterator();
       while (oldIter.hasNext() && newIter.hasNext()) {
         if (!oldIter.next().getBlock().equals(newIter.next().getBlock())) {
-          throw new IOException("Blocklist for " + src + " has changed!");
+          throw new IOException("[Schema: " + dfsClient.getNamenodeUri()
+                  + "] Blocklist for " + src + " has changed!");
         }
       }
     }
@@ -429,8 +432,8 @@ public class DFSInputStream extends FSInputStream
           Thread.sleep(500); // delay between retries.
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
-          throw new InterruptedIOException(
-              "Interrupted while getting the length.");
+          throw new InterruptedIOException("[Schema: " + dfsClient.getNamenodeUri()
+                  + "] Interrupted while getting the length.");
         }
       }
 
@@ -544,7 +547,8 @@ public class DFSInputStream extends FSInputStream
             ? dfsClient.getLocatedBlocks(src, offset)
             : dfsClient.getLocatedBlocks(src, offset, length);
         if (newBlocks == null || newBlocks.locatedBlockCount() == 0) {
-          throw new EOFException("Could not find target position " + offset);
+          throw new EOFException("[Schema: " + dfsClient.getNamenodeUri()
+                  + "] Could not find target position " + offset);
         }
         // Update the LastLocatedBlock, if offset is for last block.
         if (offset >= locatedBlocks.getFileLength()) {
@@ -974,9 +978,10 @@ public class DFSInputStream extends FSInputStream
         deadNodes, ignoredNodes);
     String blockInfo = block.getBlock() + " file=" + src;
     if (failures >= dfsClient.getConf().getMaxBlockAcquireFailures()) {
-      String description = "Could not obtain block: " + blockInfo;
+      String description = "[Schema: " + dfsClient.getNamenodeUri()
+              + "] Could not obtain block: " + blockInfo;
       DFSClient.LOG.warn(description + errMsg
-          + ". Throwing a BlockMissingException");
+              + ". Throwing a BlockMissingException");
       throw new BlockMissingException(src, description,
           block.getStartOffset());
     }

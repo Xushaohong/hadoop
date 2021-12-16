@@ -139,7 +139,8 @@ public class DFSOutputStream extends FSOutputSummer
       buf = byteArrayManager.newByteArray(bufferSize);
     } catch (InterruptedException ie) {
       final InterruptedIOException iioe = new InterruptedIOException(
-          "seqno=" + seqno);
+              "[Schema: " + dfsClient.getNamenodeUri()
+              + "] seqno=" + seqno);
       iioe.initCause(ie);
       throw iioe;
     }
@@ -300,10 +301,12 @@ public class DFSOutputStream extends FSOutputSummer
               shouldRetry = true;
               retryCount--;
             } else {
-              throw new IOException("Too many retries because of encryption" +
-                  " zone operations", e);
+              throw new IOException("[Schema: " + dfsClient.getNamenodeUri()
+                      + "] Too many retries because of encryption"
+                      + " zone operations", e);
             }
           } else {
+            dfsClient.logExceptionWithSchemaInfo(re.getClassName());
             throw e;
           }
         }
@@ -366,8 +369,8 @@ public class DFSOutputStream extends FSOutputSummer
     // if there is space in the last block, then we have to
     // append to that block
     if (freeInLastBlock == blockSize) {
-      throw new IOException("The last block for file " +
-          src + " is full.");
+      throw new IOException("[Schema: " + dfsClient.getNamenodeUri()
+              + "] The last block for file " + src + " is full.");
     }
 
     if (usedInCksum > 0 && freeInCksum > 0) {
@@ -394,8 +397,8 @@ public class DFSOutputStream extends FSOutputSummer
       HdfsFileStatus stat, DataChecksum checksum, String[] favoredNodes)
       throws IOException {
     if(stat.getErasureCodingPolicy() != null) {
-      throw new IOException(
-          "Not support appending to a striping layout file yet.");
+      throw new IOException("[Schema: " + dfsClient.getNamenodeUri()
+              + "] Not support appending to a striping layout file yet.");
     }
     try (TraceScope ignored =
              dfsClient.newPathTraceScope("newStreamForAppend", src)) {
@@ -710,8 +713,9 @@ public class DFSOutputStream extends FSOutputSummer
           dfsClient.namenode.fsync(src, fileId, dfsClient.clientName,
               lastBlockLength);
         } catch (IOException ioe) {
-          DFSClient.LOG.warn("Unable to persist blocks in hflush for " + src,
-              ioe);
+          DFSClient.LOG.warn("[Schema: " + dfsClient.getNamenodeUri()
+                  + "] Unable to persist blocks in hflush for " + src,
+                  ioe);
           // If we got an error here, it might be because some other thread
           // called close before our hflush completed. In that case, we should
           // throw an exception that the stream is closed.
@@ -957,16 +961,19 @@ public class DFSOutputStream extends FSOutputSummer
         if (!dfsClient.clientRunning
             || (hdfsTimeout > 0
                 && localstart + hdfsTimeout < Time.monotonicNow())) {
-          String msg = "Unable to close file because dfsclient " +
-              " was unable to contact the HDFS servers. clientRunning " +
-              dfsClient.clientRunning + " hdfsTimeout " + hdfsTimeout;
+          String msg = "[Schema: " + dfsClient.getNamenodeUri()
+                  + "] Unable to close file because dfsclient "
+                  + " was unable to contact the HDFS servers. clientRunning "
+                  + dfsClient.clientRunning + " hdfsTimeout " + hdfsTimeout;
           DFSClient.LOG.info(msg);
           throw new IOException(msg);
         }
         try {
           if (retries == 0) {
-            throw new IOException("Unable to close file because the last block"
-                + last + " does not have enough number of replicas, datanodes: " + Arrays.toString(datanodes));
+            throw new IOException("[Schema: " + dfsClient.getNamenodeUri()
+                    + "] Unable to close file because the last block" + last
+                    + " does not have enough number of replicas, datanodes: "
+                    + Arrays.toString(datanodes));
           }
           retries--;
           Thread.sleep(sleeptime);
@@ -1093,11 +1100,13 @@ public class DFSOutputStream extends FSOutputSummer
             QuotaByStorageTypeExceededException.class,
             UnresolvedPathException.class);
         if (ue != e) {
+          dfsClient.logExceptionWithSchemaInfo(e.getClassName());
           throw ue; // no need to retry these exceptions
         }
         if (NotReplicatedYetException.class.getName()
             .equals(e.getClassName())) {
           if (retries == 0) {
+            dfsClient.logExceptionWithSchemaInfo(e.getClassName());
             throw e;
           } else {
             --retries;
@@ -1117,6 +1126,7 @@ public class DFSOutputStream extends FSOutputSummer
             }
           }
         } else {
+          dfsClient.logExceptionWithSchemaInfo(e.getClassName());
           throw e;
         }
       }
