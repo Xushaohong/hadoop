@@ -32,6 +32,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -121,10 +123,17 @@ public class ECConverter extends Configured implements Tool {
       "dfs.ec.convert.length.threshold.bytes";
   public static final long DFS_EC_CONVERT_LENGTH_THRESHOLD_BYTES_DEFAULT = 0;
 
+  // Run several EC convert jobs for different directories, this config decides
+  // the thread number in EC converter thread pool.
+  public static final String DFS_EC_CONVERT_MAX_CONCURRNET_JOBS =
+          "dfs.ec.convert.max.concurrent.jobs";
+  public static final int DFS_EC_CONVERT_MAX_CONCURRNET_JOBS_DEFAULT  = 1;
+
   public static final String DFS_EC_CONVERT_NUM_LISTSTATUS_THREADS =
       "dfs.ec.convert.num.liststatus.threads";
   public static final int DFS_EC_CONVERT_NUM_LISTSTATUS_THREADS_DEFAULT = 1;
 
+  // Map number for one EC converter job.
   public static final String DFS_EC_CONVERT_MAX_MAP_TASKS =
       "dfs.ec.convert.max.map.tasks";
   public static final int DFS_EC_CONVERT_MAX_MAP_TASKS_DEFAULT  = 20;
@@ -152,6 +161,7 @@ public class ECConverter extends Configured implements Tool {
   private Path[] ecPaths = new Path[0];
   private long sleepIntervalMills;
   private boolean skipCrcCheck;
+  private int ecMaxJobs;
   private int listStatusThreads;
   private int ecMaxTasks;
   private int blocksPerChunk;
@@ -533,6 +543,7 @@ public class ECConverter extends Configured implements Tool {
 
     @Override
     public void run() {
+      LOG.info("Start to convert dir: " + ecPath.toString());
       try {
         init();
 
@@ -639,22 +650,24 @@ public class ECConverter extends Configured implements Tool {
       return;
     }
 
-    List<Thread> executors = new ArrayList<Thread>(ecPaths.length);
-
-    for (int i=0; i<ecPaths.length; i++) {
-      ECExecutor executor = new ECExecutor(ecPaths[i]);
-      Thread thread = new Thread(executor);
-      thread.start();
-      executors.add(i, thread);
+    ExecutorService executorService = Executors.newFixedThreadPool(ecMaxJobs);
+    for (Path p : ecPaths) {
+      LOG.info("Submitting dir: " + p.toString());
+      ECExecutor executor = new ECExecutor(p);
+      executorService.submit(executor);
     }
 
-    for (int i=0; i<ecPaths.length; i++) {
-      Thread thread = executors.get(i);
-      try {
-        thread.join();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
+    executorService.shutdown();
+    try {
+      boolean terminated = false;
+      while (!terminated) {
+        terminated = executorService.awaitTermination(
+                10000, TimeUnit.SECONDS);
       }
+      LOG.info("All tasks done!");
+    } catch (InterruptedException e) {
+      LOG.warn("Exiting... Caused by InterruptedException.");
+      executorService.shutdownNow();
     }
 
     // print consumed time and corresponding paths
@@ -711,6 +724,9 @@ public class ECConverter extends Configured implements Tool {
         DFS_EC_CONVERT_POLICY, DFS_EC_CONVERT_POLICY_DEFAULT);
     skipCrcCheck = conf.getBoolean(
         DFS_EC_CONVERT_SKIPCRC, DFS_EC_CONVERT_SKIPCRC_DEFAULT);
+    ecMaxJobs = conf.getInt(
+            DFS_EC_CONVERT_MAX_CONCURRNET_JOBS,
+            DFS_EC_CONVERT_MAX_CONCURRNET_JOBS_DEFAULT);
     listStatusThreads = conf.getInt(
         DFS_EC_CONVERT_NUM_LISTSTATUS_THREADS,
         DFS_EC_CONVERT_NUM_LISTSTATUS_THREADS_DEFAULT);
