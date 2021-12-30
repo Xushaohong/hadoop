@@ -565,6 +565,8 @@ public class ECConverter extends Configured implements Tool {
 
         // clean ec convert dirs
         cleanupECConverterDir();
+
+        LOG.info("Succeed to convert dir: " + ecPath.toString());
       } catch (Exception e) {
         LOG.warn("ECconverter meets exception while converting " + ecPath, e);
       }
