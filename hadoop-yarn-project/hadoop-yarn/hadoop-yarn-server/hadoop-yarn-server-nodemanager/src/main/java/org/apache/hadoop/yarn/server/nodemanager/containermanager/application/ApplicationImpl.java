@@ -28,6 +28,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +89,7 @@ public class ApplicationImpl implements Application {
   private final WriteLock writeLock;
   private final Context context;
   private volatile Path luckyLogdir = null;
+  static NodeManagerMetrics nodeManagerMetrics;
 
   private static final Logger LOG =
        LoggerFactory.getLogger(ApplicationImpl.class);
@@ -130,6 +132,7 @@ public class ApplicationImpl implements Application {
       }
     }
     this.context = context;
+    nodeManagerMetrics = context.getNodeManagerMetrics();
     this.appStateStore = context.getNMStateStore();
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     readLock = lock.readLock();
@@ -493,6 +496,7 @@ public class ApplicationImpl implements Application {
     @Override
     public void transition(ApplicationImpl app, ApplicationEvent event) {
       // Start all the containers waiting for ApplicationInit
+      nodeManagerMetrics.runningApplications();
       for (Container container : app.containers.values()) {
         app.dispatcher.getEventHandler().handle(new ContainerInitEvent(
               container.getContainerId()));
@@ -524,6 +528,7 @@ public class ApplicationImpl implements Application {
         new ApplicationLocalizationEvent(
             LocalizationEventType.DESTROY_APPLICATION_RESOURCES, this));
 
+    nodeManagerMetrics.endRunningApplications();
     // tell any auxiliary services that the app is done 
     this.dispatcher.getEventHandler().handle(
         new AuxServicesEvent(AuxServicesEventType.APPLICATION_STOP, appId));

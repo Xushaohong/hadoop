@@ -45,6 +45,8 @@ public class NodeManagerMetrics {
   @Metric("# of initializing containers")
       MutableGaugeInt containersIniting;
   @Metric MutableGaugeInt containersRunning;
+  @Metric("# of running applications")
+  MutableGaugeInt applicationsRunning;
   @Metric("Current allocated memory in GB")
       MutableGaugeInt allocatedGB;
   @Metric("Current # of allocated containers")
@@ -426,5 +428,13 @@ public class NodeManagerMetrics {
 
   public void localizationComplete(long downloadMillis) {
     localizationDurationMillis.add(downloadMillis);
+  }
+
+  public void runningApplications() {
+    applicationsRunning.incr();
+  }
+
+  public void endRunningApplications() {
+    applicationsRunning.decr();
   }
 }
