@@ -154,7 +154,7 @@ public class ECConverter extends Configured implements Tool {
       new Path("/tmp/ecconverter/");
   private static final Path DFS_EC_CONVERT_LOG_DIR = new Path("/logs");
   private static final Path DFS_EC_CONVERT_WORKING_DIR = new Path("/working");
-  private static final String DFS_EC_CONVERT_ID_DIR = "/system";
+  private static final String DFS_EC_CONVERT_ID_DIR = "/system/ec_converter";
 
   private Configuration conf;
   private String ecPolicy;
@@ -399,6 +399,9 @@ public class ECConverter extends Configured implements Tool {
     private Path ecLogDir;
     private Path ecWorkingDir;
 
+    private Path ecIdPath;
+    private FSDataOutputStream ecIdFile;
+
     ECExecutor(Path ecPath) {
       setConf(conf);
       this.ecPath = ecPath;
@@ -416,9 +419,11 @@ public class ECConverter extends Configured implements Tool {
      */
     private void checkAndMarkRunning() throws IOException {
       FileSystem fs = ecPath.getFileSystem(conf);
-      Path ecIdPath = Path.mergePaths(
-              new Path(fs.getUri()),
-              new Path(DFS_EC_CONVERT_ID_DIR + getEcId(ecPath)));
+      Path ecConvertIdDir = Path.mergePaths(new Path(fs.getUri()), new Path(DFS_EC_CONVERT_ID_DIR));
+      if (!fs.exists(ecConvertIdDir)){
+        fs.mkdirs(ecConvertIdDir);
+      }
+      ecIdPath = Path.mergePaths(ecConvertIdDir, new Path("/" + getEcId(ecPath)));
 
       try {
         if (fs.exists(ecIdPath)) {
@@ -427,13 +432,12 @@ public class ECConverter extends Configured implements Tool {
           IOUtils.closeStream(fs.append(ecIdPath));
           fs.delete(ecIdPath, true);
         }
-        FSDataOutputStream fsout = fs.create(ecIdPath, false);
-        fs.deleteOnExit(ecIdPath);
-        fsout.writeBytes(InetAddress.getLocalHost().getHostName());
-        fsout.writeBytes(System.lineSeparator());
-        fsout.writeBytes(ecPath.toString());
-        fsout.writeBytes(System.lineSeparator());
-        fsout.hflush();
+        ecIdFile = fs.create(ecIdPath, false);
+        ecIdFile.writeBytes(InetAddress.getLocalHost().getHostName());
+        ecIdFile.writeBytes(System.lineSeparator());
+        ecIdFile.writeBytes(ecPath.toString());
+        ecIdFile.writeBytes(System.lineSeparator());
+        ecIdFile.hflush();
       } catch(RemoteException e) {
         if (AlreadyBeingCreatedException.class.getName()
                 .equals(e.getClassName())) {
@@ -514,6 +518,8 @@ public class ECConverter extends Configured implements Tool {
 
     private void cleanupECConverterDir() {
       try {
+        ecIdFile.close();
+        ecIdPath.getFileSystem(conf).delete(ecIdPath, true);
         ecTmpDir.getFileSystem(conf).delete(ecTmpDir, true);
       } catch (IOException e) {
         LOG.error("Unable to cleanup ecEconverter tmp dir: " + ecTmpDir, e);
