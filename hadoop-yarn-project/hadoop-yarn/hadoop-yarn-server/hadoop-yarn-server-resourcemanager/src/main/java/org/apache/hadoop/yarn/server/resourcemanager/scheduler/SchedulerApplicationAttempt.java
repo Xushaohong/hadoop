@@ -635,7 +635,7 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
   public void containerLaunchedOnNode(ContainerId containerId,
       NodeId nodeId) {
     try {
-      writeLock.lock();
+      readLock.lock();
       // Inform the container
       RMContainer rmContainer = getRMContainer(containerId);
       if (rmContainer == null) {
@@ -648,7 +648,7 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
       rmContainer.handle(
           new RMContainerEvent(containerId, RMContainerEventType.LAUNCHED));
     } finally {
-      writeLock.unlock();
+      readLock.unlock();
     }
   }
   
