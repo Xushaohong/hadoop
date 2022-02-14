@@ -152,10 +152,10 @@ class IncrementalBlockReportManager {
     return readyToSend && monotonicNow() - ibrInterval >= lastIBR;
   }
 
-  synchronized void waitTillNextIBR(long waitTime) {
-    if (waitTime > 0 && !sendImmediately()) {
+  synchronized void waitTillNextIBR(long maxWaitTime) {
+    if (maxWaitTime > 0 && !sendImmediately()) {
       try {
-        wait(ibrInterval > 0 && ibrInterval < waitTime? ibrInterval: waitTime);
+        wait(ibrInterval > 0 && ibrInterval < maxWaitTime? ibrInterval: maxWaitTime);
       } catch (InterruptedException ie) {
         LOG.warn(getClass().getSimpleName() + " interrupted");
       }

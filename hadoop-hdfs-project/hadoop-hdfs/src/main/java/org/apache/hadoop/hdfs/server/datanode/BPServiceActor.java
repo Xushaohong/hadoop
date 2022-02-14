@@ -725,7 +725,10 @@ class BPServiceActor implements Runnable {
 
         // There is no work to do;  sleep until hearbeat timer elapses, 
         // or work arrives, and then iterate again.
-        ibrManager.waitTillNextIBR(scheduler.getHeartbeatWaitTime());
+        final long waitTime = scheduler.getHeartbeatWaitTime();
+        if (waitTime > 0) {
+          sleepAndLogInterrupts(waitTime, "heartbeat interrupted");
+        }
       } catch(RemoteException re) {
         String reClass = re.getClassName();
         if (UnregisteredNodeException.class.getName().equals(reClass) ||
@@ -810,7 +813,7 @@ class BPServiceActor implements Runnable {
   }
 
 
-  private void sleepAndLogInterrupts(int millis,
+  private void sleepAndLogInterrupts(long millis,
       String stateString) {
     try {
       Thread.sleep(millis);
@@ -1098,16 +1101,16 @@ class BPServiceActor implements Runnable {
       while (shouldRun()) {
         try {
           final long startTime = scheduler.monotonicNow();
-          final boolean sendHeartbeat = scheduler.isHeartbeatDue(startTime);
-          if (!dn.areIBRDisabledForTests() &&
-              (ibrManager.sendImmediately() || sendHeartbeat)) {
+          if (!dn.areIBRDisabledForTests() && ibrManager.sendImmediately()) {
             synchronized (sendIBRLock) {
               ibrManager.sendIBRs(bpNamenode, bpRegistration, bpos.getBlockPoolId());
             }
           }
           // There is no work to do; sleep until heartbeat timer elapses,
           // or work arrives, and then iterate again.
-          ibrManager.waitTillNextIBR(scheduler.getHeartbeatWaitTime());
+          final long endTime = scheduler.monotonicNow();
+          // use heartbeat interval as max wait time in case that ibr interval is zero.
+          ibrManager.waitTillNextIBR(dnConf.heartBeatInterval - (endTime - startTime));
         } catch (Throwable t) {
           LOG.error("Exception in IBRTaskHandler.", t);
           sleepAndLogInterrupts(5000, "offering IBR service");
