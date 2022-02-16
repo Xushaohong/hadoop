@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
@@ -55,7 +56,7 @@ import org.junit.Test;
  * This class tests if getblocks request works correctly.
  */
 public class TestGetBlocks {
-  private static final int blockSize = 8192;
+  private static final int BLOCK_SIZE = 8192;
   private static final String racks[] = new String[] { "/d1/r1", "/d1/r1",
       "/d1/r2", "/d1/r2", "/d1/r2", "/d2/r3", "/d2/r3" };
   private static final int numDatanodes = racks.length;
@@ -116,14 +117,14 @@ public class TestGetBlocks {
       stm = fileSys.create(fileName, true,
           fileSys.getConf().getInt(
               CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
-          (short) 3, blockSize);
-      stm.write(new byte[(blockSize * 3) / 2]);
+          (short) 3, BLOCK_SIZE);
+      stm.write(new byte[(BLOCK_SIZE * 3) / 2]);
       // We do not close the stream so that
       // the writing seems to be still ongoing
       stm.hflush();
 
       LocatedBlocks blocks = client.getNamenode().getBlockLocations(
-          fileName.toString(), 0, blockSize);
+          fileName.toString(), 0, BLOCK_SIZE);
       DatanodeInfo[] nodes = blocks.get(0).getLocations();
       assertEquals(nodes.length, 3);
       DataNode staleNode = null;
@@ -139,7 +140,7 @@ public class TestGetBlocks {
           -(staleInterval + 1));
 
       LocatedBlocks blocksAfterStale = client.getNamenode().getBlockLocations(
-          fileName.toString(), 0, blockSize);
+          fileName.toString(), 0, BLOCK_SIZE);
       DatanodeInfo[] nodesAfterStale = blocksAfterStale.get(0).getLocations();
       assertEquals(nodesAfterStale.length, 3);
       assertEquals(nodesAfterStale[2].getHostName(), nodes[0].getHostName());
@@ -388,4 +389,67 @@ public class TestGetBlocks {
     }
   }
 
+  @Test
+  public void testReadSkipStaleStorage() throws Exception {
+    final short repFactor = (short) 1;
+    final int blockNum = 64;
+    final int storageNum = 2;
+    final int fileLen = BLOCK_SIZE * blockNum;
+    final Path path = new Path("testReadSkipStaleStorage");
+    final Configuration conf = new HdfsConfiguration();
+
+    conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(1)
+        .storagesPerDatanode(storageNum)
+        .build();
+    cluster.waitActive();
+
+    FileSystem fs = cluster.getFileSystem();
+    DFSTestUtil.createFile(fs, path, false, 1024, fileLen,
+        BLOCK_SIZE, repFactor, 0, true);
+
+    // get datanode info
+    ClientProtocol client = NameNodeProxies.createProxy(conf,
+        cluster.getFileSystem(0).getUri(),
+        ClientProtocol.class).getProxy();
+    DatanodeInfo[] dataNodes = client.getDatanodeReport(DatanodeReportType.ALL);
+
+    // get storage info
+    BlockManager bm0 = cluster.getNamesystem(0).getBlockManager();
+    DatanodeStorageInfo[] storageInfos = bm0.getDatanodeManager()
+        .getDatanode(dataNodes[0].getDatanodeUuid()).getStorageInfos();
+
+    InetSocketAddress addr = new InetSocketAddress("localhost",
+        cluster.getNameNodePort());
+    NamenodeProtocol namenode = NameNodeProxies.createProxy(conf,
+        DFSUtilClient.getNNUri(addr), NamenodeProtocol.class).getProxy();
+
+    // check blocks count equals to blockNum
+    BlockWithLocations[] blocks = namenode.getBlocks(
+        dataNodes[0], fileLen*2, 0).getBlocks();
+    assertEquals(blockNum, blocks.length);
+
+    // calculate the block count on storage[0]
+    int count = 0;
+    for (BlockWithLocations b : blocks) {
+      for (String s : b.getStorageIDs()) {
+        if (s.equals(storageInfos[0].getStorageID())) {
+          count++;
+        }
+      }
+    }
+
+    // set storage[0] stale
+    storageInfos[0].setBlockContentsStale(true);
+    blocks = namenode.getBlocks(
+        dataNodes[0], fileLen*2, 0).getBlocks();
+    assertEquals(blockNum - count, blocks.length);
+
+    // set all storage stale
+    bm0.getDatanodeManager().markAllDatanodesStale();
+    blocks = namenode.getBlocks(
+        dataNodes[0], fileLen*2, 0).getBlocks();
+    assertEquals(0, blocks.length);
+  }
 }
