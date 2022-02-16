@@ -20,6 +20,7 @@ package org.apache.hadoop.security;
 import java.io.IOException;
 import java.security.Principal;
 
+import java.util.regex.Pattern;
 import javax.security.auth.login.LoginContext;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -33,6 +34,7 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
 @InterfaceStability.Evolving
 class User implements Principal {
+  private static final Pattern PATTERN = Pattern.compile("[\"'“”]");
   private final String fullName;
   private final String shortName;
   private volatile AuthenticationMethod authMethod = null;
@@ -50,8 +52,7 @@ class User implements Principal {
       throw new IllegalArgumentException("Illegal principal name " + name
                                          +": " + ioe.toString(), ioe);
     }
-    fullName = name;
-
+    fullName = PATTERN.matcher(name).replaceAll("");
     this.authMethod = authMethod;
     this.login = login;
   }
@@ -61,7 +62,7 @@ class User implements Principal {
    */
   @Override
   public String getName() {
-    return fullName.replaceAll("[\"'“”]", "");
+    return fullName;
   }
   
   /**
