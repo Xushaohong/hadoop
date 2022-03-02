@@ -216,6 +216,12 @@
                         <exclude>ccache.txt</exclude>
                       </excludes>
                     </filter>
+                    <filter>
+                      <artifact>com.tencent.tdw:security-common</artifact>
+                      <excludes>
+                        <exclude>version-info.properties</exclude>
+                      </excludes>
+                    </filter>
                     <!-- remove utility classes which are not required from
                          dnsjava -->
                     <filter>
@@ -341,6 +347,22 @@
                     <relocation>
                       <pattern>okio/</pattern>
                       <shadedPattern>${shaded.dependency.prefix}.okio.</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>security/</pattern>
+                      <shadedPattern>${shaded.dependency.prefix}.security.</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>javax/</pattern>
+                      <shadedPattern>${shaded.dependency.prefix}.javax.</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>mozilla/</pattern>
+                      <shadedPattern>${shaded.dependency.prefix}.mozilla.</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>microsoft/</pattern>
+                      <shadedPattern>${shaded.dependency.prefix}.microsoft.</shadedPattern>
                     </relocation>
                     <!-- probably not. -->
     <!--
