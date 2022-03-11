@@ -62,6 +62,7 @@ import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factories.impl.pb.RecordFactoryPBImpl;
 import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.nodelabels.NodeLabelUtil;
+import org.apache.hadoop.yarn.server.api.ContainerType;
 import org.apache.hadoop.yarn.server.api.ResourceManagerConstants;
 import org.apache.hadoop.yarn.server.api.ResourceTracker;
 import org.apache.hadoop.yarn.server.api.ServerRMProxy;
@@ -591,6 +592,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   // recentlyStoppedContainers collections.
   @VisibleForTesting
   protected List<ContainerStatus> getContainerStatuses() throws IOException {
+    int numAmContainers = 0;
     List<ContainerStatus> containerStatuses = new ArrayList<ContainerStatus>();
     for (Container container : this.context.getContainers().values()) {
       ContainerId containerId = container.getContainerId();
@@ -616,6 +618,10 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         // subsequent call to stop container it will get removed from cache.
         addCompletedContainer(containerId);
       } else {
+        if (ContainerType.APPLICATION_MASTER.
+            equals(container.getContainerTokenIdentifier().getContainerType())){
+          numAmContainers++;
+        }
         containerStatuses.add(containerStatus);
       }
     }
@@ -626,6 +632,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       LOG.debug("Sending out " + containerStatuses.size()
           + " container statuses: " + containerStatuses);
     }
+    metrics.setNumAmContainers(numAmContainers);
     return containerStatuses;
   }
 

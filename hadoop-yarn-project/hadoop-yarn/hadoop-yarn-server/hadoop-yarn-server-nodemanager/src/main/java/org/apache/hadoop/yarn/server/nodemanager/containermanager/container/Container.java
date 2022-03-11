@@ -129,4 +129,6 @@ public interface Container extends EventHandler<ContainerEvent> {
    */
   String localizationCountersAsString();
 
+  long getContainerLaunchStartTime();
+
 }

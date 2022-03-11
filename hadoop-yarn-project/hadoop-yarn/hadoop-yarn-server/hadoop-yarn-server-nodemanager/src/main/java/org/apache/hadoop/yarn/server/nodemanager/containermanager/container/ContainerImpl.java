@@ -2321,4 +2321,11 @@ public class ContainerImpl implements Container {
     }
     return result.toString();
   }
+
+  @Override
+  public long getContainerLaunchStartTime() {
+    return containerLaunchStartTime;
+  }
+
+
 }

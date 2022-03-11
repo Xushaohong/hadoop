@@ -27,6 +27,7 @@ import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.server.api.ContainerType;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.webapp.ContainerLogsUtils;
@@ -55,6 +56,9 @@ public class ContainerInfo {
   protected String exitStatus;
 
   protected List<String> containerLogFiles;
+
+  protected String containerType;
+  protected long launchStartTime;
 
   public ContainerInfo() {
   } // JAXB needs this
@@ -100,6 +104,8 @@ public class ContainerInfo {
         this.containerLogsShortLink);
     this.containerLogFiles =
         getContainerLogFiles(container.getContainerId(), remoteUser, nmContext);
+    this.containerType = container.getContainerTokenIdentifier().getContainerType().name();
+    this.launchStartTime = container.getContainerLaunchStartTime();
   }
 
   public String getId() {
@@ -176,4 +182,11 @@ public class ContainerInfo {
     return logFiles;
   }
 
+  public String getContainerType() {
+    return containerType;
+  }
+
+  public long getLaunchStartTime() {
+    return launchStartTime;
+  }
 }

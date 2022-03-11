@@ -108,6 +108,8 @@ public class NodeManagerMetrics {
       MutableGaugeInt localizedCacheHitFilesRatio;
   @Metric("Container localization time in milliseconds")
       MutableRate localizationDurationMillis;
+  @Metric("# of am containers")
+  MutableGaugeInt numAMContainers;
 
   // CHECKSTYLE:ON:VisibilityModifier
 
@@ -428,6 +430,14 @@ public class NodeManagerMetrics {
 
   public void localizationComplete(long downloadMillis) {
     localizationDurationMillis.add(downloadMillis);
+  }
+
+  public int getNumAmContainers() {
+    return numAMContainers.value();
+  }
+
+  public void setNumAmContainers(int numAMContainers) {
+    this.numAMContainers.set(numAMContainers);
   }
 
   public void runningApplications() {

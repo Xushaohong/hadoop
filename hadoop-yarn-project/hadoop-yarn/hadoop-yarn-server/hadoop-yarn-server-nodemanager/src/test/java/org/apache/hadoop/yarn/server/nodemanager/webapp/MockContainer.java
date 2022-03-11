@@ -263,4 +263,9 @@ public class MockContainer implements Container {
   @Override public boolean isContainerInFinalStates() {
     return false;
   }
+
+  @Override
+  public long getContainerLaunchStartTime() {
+    return 0;
+  }
 }
