@@ -238,6 +238,7 @@ public class RMWebServices extends WebServices implements RMWebServiceProtocol {
   boolean isCentralizedNodeLabelConfiguration = true;
   private boolean filterAppsByUser = false;
   private boolean enableRestAppSubmissions = true;
+  private boolean enableRestAppKill = true;
 
   public final static String DELEGATION_TOKEN_HEADER =
       "Hadoop-YARN-RM-Delegation-Token";
@@ -256,6 +257,9 @@ public class RMWebServices extends WebServices implements RMWebServiceProtocol {
     this.enableRestAppSubmissions = conf.getBoolean(
         YarnConfiguration.ENABLE_REST_APP_SUBMISSIONS,
         YarnConfiguration.DEFAULT_ENABLE_REST_APP_SUBMISSIONS);
+    this.enableRestAppKill = conf.getBoolean(
+        YarnConfiguration.ENABLE_REST_APP_KILL,
+        YarnConfiguration.DEFAULT_ENABLE_REST_APP_KILL);
   }
 
   RMWebServices(ResourceManager rm, Configuration conf,
@@ -923,6 +927,10 @@ public class RMWebServices extends WebServices implements RMWebServiceProtocol {
     UserGroupInformation callerUGI = getCallerUserGroupInformation(hsr, true);
     initForWritableEndpoints(callerUGI, false);
 
+    if (!enableRestAppKill) {
+      String msg = "App kill via REST is disabled.";
+      return Response.status(Status.FORBIDDEN).entity(msg).build();
+    }
     String userName = callerUGI.getUserName();
     RMApp app = null;
     try {

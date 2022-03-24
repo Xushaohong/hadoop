@@ -3981,6 +3981,11 @@ public class YarnConfiguration extends Configuration {
       "yarn.webapp.enable-rest-app-submissions";
   public static final boolean DEFAULT_ENABLE_REST_APP_SUBMISSIONS = true;
 
+
+  public static final String ENABLE_REST_APP_KILL =
+      "yarn.webapp.enable-rest-app-kill";
+  public static final boolean DEFAULT_ENABLE_REST_APP_KILL = true;
+
   // RM and NM CSRF props
   public static final String REST_CSRF = "webapp.rest-csrf.";
   public static final String RM_CSRF_PREFIX = RM_PREFIX + REST_CSRF;
