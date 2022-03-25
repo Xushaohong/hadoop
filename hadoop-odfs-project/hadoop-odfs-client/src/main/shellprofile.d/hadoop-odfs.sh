@@ -27,10 +27,15 @@ function _odfs_hadoop_classpath
   fi
 
   # put odfs in classpath if present
-  if [[ -d "${HADOOP_ODFS_HOME}/${ODFS_DIR}/webapps" ]]; then
+  if [[ -n "${HADOOP_ODFS_HOME}" ]] && [[ -d "${HADOOP_ODFS_HOME}/${ODFS_DIR}/webapps" ]]; then
     hadoop_add_classpath "${HADOOP_ODFS_HOME}/${ODFS_DIR}"
   fi
 
-  hadoop_add_classpath "${HADOOP_ODFS_HOME}/${ODFS_LIB_JARS_DIR}"'/*'
-  hadoop_add_classpath "${HADOOP_ODFS_HOME}/${ODFS_DIR}"'/*'
+  if [[ -n "${HADOOP_ODFS_HOME}" ]] && [[ -d "${HADOOP_ODFS_HOME}/${ODFS_LIB_JARS_DIR}" ]]; then
+      hadoop_add_classpath "${HADOOP_ODFS_HOME}/${ODFS_LIB_JARS_DIR}"'/*'
+  fi
+
+  if [[ -n "${HADOOP_ODFS_HOME}" ]] && [[ -d "${HADOOP_ODFS_HOME}/${ODFS_DIR}" ]]; then
+      hadoop_add_classpath "${HADOOP_ODFS_HOME}/${ODFS_DIR}"'/*'
+  fi
 }
