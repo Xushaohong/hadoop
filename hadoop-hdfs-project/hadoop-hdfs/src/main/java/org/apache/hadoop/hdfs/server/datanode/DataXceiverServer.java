@@ -108,6 +108,8 @@ class DataXceiverServer implements Runnable {
   }
 
   final BlockBalanceThrottler balanceThrottler;
+
+  private final DataTransferThrottler transferThrottler;
   
   /**
    * We need an estimate for block size to check if the disk partition has
@@ -135,6 +137,15 @@ class DataXceiverServer implements Runnable {
             DFSConfigKeys.DFS_DATANODE_BALANCE_BANDWIDTHPERSEC_DEFAULT),
         conf.getInt(DFSConfigKeys.DFS_DATANODE_BALANCE_MAX_NUM_CONCURRENT_MOVES_KEY,
             DFSConfigKeys.DFS_DATANODE_BALANCE_MAX_NUM_CONCURRENT_MOVES_DEFAULT));
+
+    long bandwidthPerSec = conf.getLongBytes(
+        DFSConfigKeys.DFS_DATANODE_DATA_TRANSFER_BANDWIDTHPERSEC_KEY,
+        DFSConfigKeys.DFS_DATANODE_DATA_TRANSFER_BANDWIDTHPERSEC_DEFAULT);
+    if (bandwidthPerSec > 0) {
+      this.transferThrottler = new DataTransferThrottler(bandwidthPerSec);
+    } else {
+      this.transferThrottler = null;
+    }
   }
 
   @Override
@@ -311,5 +322,9 @@ class DataXceiverServer implements Runnable {
 
   public void updateBalancerMaxConcurrentMovers(int movers) {
     balanceThrottler.setMaxConcurrentMovers(movers);
+  }
+
+  public DataTransferThrottler getTransferThrottler() {
+    return transferThrottler;
   }
 }
