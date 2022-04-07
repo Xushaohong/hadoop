@@ -1312,8 +1312,11 @@ public class FairScheduler extends
 
           assignedContainers++;
           Resources.addTo(assignedResource, assignment);
-          if (!getConf().isAssignAllResourceEnabled() && !shouldContinueAssigning(assignedContainers,
-              maxResourcesToAssign, assignedResource)) {
+          if (!shouldContinueAssigning(assignedContainers , maxResourcesToAssign,
+              assignedResource)) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(assignedResource +" is allocated on node " + node);
+            }
             break;
           }
         }
@@ -1572,6 +1575,11 @@ public class FairScheduler extends
       sizeBasedWeight = this.conf.getSizeBasedWeight();
       usePortForNodeName = this.conf.getUsePortForNodeName();
       reservableNodesRatio = this.conf.getReservableNodes();
+
+      if (LOG.isDebugEnabled()){
+        LOG.debug("isSortAppsEnabled: " + this.conf.isSortAppsEnabled());
+        LOG.debug("isAssignAllResourceEnabled: " + this.conf.isAssignAllResourceEnabled());
+      }
 
       updateInterval = this.conf.getUpdateInterval();
       if (updateInterval < 0) {

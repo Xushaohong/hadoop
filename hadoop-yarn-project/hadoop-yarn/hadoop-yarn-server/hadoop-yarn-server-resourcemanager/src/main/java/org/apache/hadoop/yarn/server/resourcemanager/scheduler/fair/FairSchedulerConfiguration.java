@@ -217,6 +217,12 @@ public class FairSchedulerConfiguration extends Configuration {
   protected static final String MAX_ASSIGN = CONF_PREFIX + "max.assign";
   protected static final int DEFAULT_MAX_ASSIGN = -1;
 
+  /**
+   * Specify max number of containers to assign on each heartbeat.
+   */
+  protected static final String LEAF_MAX_ASSIGN = CONF_PREFIX + "leaf.max.assign";
+  protected static final int DEFAULT_LEAF_MAX_ASSIGN = -1;
+
   /** The update interval for calculating resources in FairScheduler .*/
   public static final String UPDATE_INTERVAL_MS =
       CONF_PREFIX + "update-interval-ms";
@@ -444,6 +450,10 @@ public class FairSchedulerConfiguration extends Configuration {
 
   public int getMaxAssign() {
     return getInt(MAX_ASSIGN, DEFAULT_MAX_ASSIGN);
+  }
+
+  public int getLeafMaxAssign() {
+    return getInt(LEAF_MAX_ASSIGN, DEFAULT_LEAF_MAX_ASSIGN);
   }
 
   public boolean getSizeBasedWeight() {

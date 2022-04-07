@@ -83,6 +83,7 @@ public class FSLeafQueue extends FSQueue {
   private String lastScheduledNodeId;
   private Map<String, Integer> assignedContainersForApp;
   private int maxAssignForSameApp;
+  private int maxAssignForLeaf;
 
   public FSLeafQueue(String name, FairScheduler scheduler,
       FSParentQueue parent) {
@@ -95,6 +96,7 @@ public class FSLeafQueue extends FSQueue {
     assignedContainersForApp = new HashMap<>();
     lastScheduledNodeId = "";
     maxAssignForSameApp = scheduler.getConf().getMaxAssignForSameApp();
+    maxAssignForLeaf = scheduler.getConf().getLeafMaxAssign();
   }
   
   void addApp(FSAppAttempt app, boolean runnable) {
@@ -352,8 +354,6 @@ public class FSLeafQueue extends FSQueue {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Node " + node.getNodeName() + " offered to queue: " +
           getName() + " fairShare: " + getFairShare());
-      LOG.debug("isSortAppsEnabled: " + scheduler.getConf().isSortAppsEnabled());
-      LOG.debug("isAssignAllResourceEnabled: " + scheduler.getConf().isAssignAllResourceEnabled());
     }
 
     if (!assignContainerPreCheck(node)) {
@@ -417,6 +417,7 @@ public class FSLeafQueue extends FSQueue {
 
     Resource totalAssigned = Resources.none();
     int index = 0;
+    int leafAssignedContainers = 0;
     for (FSAppAttempt sched : apps) {
       index++;
       if (sched.isRemoved()) {
@@ -456,9 +457,12 @@ public class FSLeafQueue extends FSQueue {
           LOG.debug("Assigned container in queue:" + getName() + " " +
                   "container:" + assigned);
         }
-        if (scheduler.getConf().isAssignAllResourceEnabled()
-            && !assigned.equals(FairScheduler.CONTAINER_RESERVED)) {
+        if (!assigned.equals(FairScheduler.CONTAINER_RESERVED)) {
           totalAssigned = Resources.add(totalAssigned, assigned);
+          leafAssignedContainers ++;
+          if (shouldContinueAssigningOnLeaf(leafAssignedContainers, maxAssignForLeaf)) {
+            break;
+          }
         } else {
           totalAssigned = Resources.add(totalAssigned, assigned);
           break;
@@ -475,6 +479,10 @@ public class FSLeafQueue extends FSQueue {
     writeLock.unlock();
 
     return totalAssigned;
+  }
+
+  private boolean shouldContinueAssigningOnLeaf(int containers, int leafMaxAssign) {
+    return leafMaxAssign <= 0 || containers < leafMaxAssign;
   }
 
   /**
