@@ -60,6 +60,8 @@ import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdenti
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.hadoop.yarn.util.Clock;
+import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AbstractEvent;
@@ -121,6 +123,11 @@ public class DelegationTokenRenewer extends AbstractService {
   public static final long DEFAULT_RM_SYSTEM_CREDENTIALS_VALID_TIME_REMAINING =
       10800000; // 3h
 
+
+  private volatile Clock clock;
+  @VisibleForTesting
+  protected DelegationTokenRenewerOpDurations opDurations;
+
   public DelegationTokenRenewer() {
     super(DelegationTokenRenewer.class.getName());
   }
@@ -146,6 +153,10 @@ public class DelegationTokenRenewer extends AbstractService {
     renewerService = createNewThreadPoolService(conf);
     pendingEventQueue = new LinkedBlockingQueue<DelegationTokenRenewerEvent>();
     renewalTimer = new Timer(true);
+
+    opDurations = DelegationTokenRenewerOpDurations.getInstance(true);
+    clock = new SystemClock();
+
     super.serviceInit(conf);
   }
 
@@ -906,17 +917,29 @@ public class DelegationTokenRenewer extends AbstractService {
     
     @Override
     public void run() {
+      long start = clock.getTime();
+      long costMs = 0;
       if (evt instanceof DelegationTokenRenewerAppSubmitEvent) {
         DelegationTokenRenewerAppSubmitEvent appSubmitEvt =
             (DelegationTokenRenewerAppSubmitEvent) evt;
         handleDTRenewerAppSubmitEvent(appSubmitEvt);
+        costMs = clock.getTime() - start;
+        opDurations.addDelegationTokenRenewerAppSubmitEventDuration(costMs);
       } else if (evt instanceof DelegationTokenRenewerAppRecoverEvent) {
         DelegationTokenRenewerAppRecoverEvent appRecoverEvt =
             (DelegationTokenRenewerAppRecoverEvent) evt;
         handleDTRenewerAppRecoverEvent(appRecoverEvt);
+        costMs = clock.getTime() - start;
+        opDurations.addDelegationTokenRenewerAppRecoverEventDuration(costMs);
       } else if (evt.getType().equals(
           DelegationTokenRenewerEventType.FINISH_APPLICATION)) {
         DelegationTokenRenewer.this.handleAppFinishEvent(evt);
+        costMs = clock.getTime() - start;
+        opDurations.addDelegationTokenRenewerAppFinishEventDuration(costMs);
+      }
+      if (costMs > 10){
+        LOG.warn(
+            "Handle DelegationToken Renewer of "+evt.getType().name()+" is too long, cost "+costMs +" ms");
       }
     }
 
