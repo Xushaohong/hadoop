@@ -143,6 +143,7 @@
                         <exclude>org/w3c/dom/**/*</exclude>
                         <exclude>org/xml/sax/*</exclude>
                         <exclude>org/xml/sax/**/*</exclude>
+                        <exclude>org/apache/zookeeper/**/*</exclude>
                       </excludes>
                     </relocation>
                     <relocation>

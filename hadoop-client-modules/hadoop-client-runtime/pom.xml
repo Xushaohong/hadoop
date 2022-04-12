@@ -258,6 +258,7 @@
                         <exclude>org/w3c/dom/**/*</exclude>
                         <exclude>org/xml/sax/*</exclude>
                         <exclude>org/xml/sax/**/*</exclude>
+                        <exclude>org/apache/zookeeper/**/*</exclude>
                       </excludes>
                     </relocation>
                     <relocation>
@@ -351,10 +352,6 @@
                     <relocation>
                       <pattern>security/</pattern>
                       <shadedPattern>${shaded.dependency.prefix}.security.</shadedPattern>
-                    </relocation>
-                    <relocation>
-                      <pattern>javax/</pattern>
-                      <shadedPattern>${shaded.dependency.prefix}.javax.</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>mozilla/</pattern>
