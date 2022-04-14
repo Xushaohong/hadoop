@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+    <settings>
+        <!-- changes from the defaults for testing -->
+        <setting name="cacheEnabled" value="false" />
+        <setting name="useGeneratedKeys" value="true" />
+        <setting name="defaultExecutorType" value="REUSE" />
+        <setting name="mapUnderscoreToCamelCase" value="true" />
+    </settings>
+    <typeAliases>
+        <typeAlias alias="AppRoot" type="com.tencent.mdfs.provider.pojo.AppRoot"/>
+        <typeAlias alias="AppInfo" type="com.tencent.mdfs.provider.pojo.AppInfo"/>
+        <typeAlias alias="DirInfo" type="com.tencent.mdfs.provider.pojo.DirInfo"/>
+        <typeAlias alias="AppDirRelation" type="com.tencent.mdfs.provider.pojo.AppDirRelation"/>
+        <typeAlias alias="SpecialPath" type="com.tencent.mdfs.provider.pojo.SpecialPath"/>
+        <typeAlias alias="AppRelation" type="com.tencent.mdfs.provider.pojo.AppRelation"/>
+        <typeAlias type="com.tencent.mdfs.provider.pojo.NameNodeIp" alias="NameNodeIp"/>
+        <typeAlias type="com.tencent.mdfs.provider.pojo.SpecialPath" alias="SpecialPath"/>
+    </typeAliases>
+    <environments default="product">
+        <environment id="local">
+            <transactionManager type="test"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="com.mysql.jdbc.Driver"/>
+                <property name="url" value="jdbc:mysql://127.0.0.1:3306/tdc_vnn"/>
+                <property name="username" value="root"/>
+                <property name="password" value="5796867"/>
+            </dataSource>
+        </environment>
+        <environment id="test">
+            <transactionManager type="jdbc"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="com.mysql.jdbc.Driver"/>
+                <property name="url" value="jdbc:mysql://hadoopdev.mdb.mig:17567/hadoop_vnn_test"/>
+                <property name="username" value="writeuser"/>
+                <property name="password" value="GCAsQawkMPzzyF9R"/>
+            </dataSource>
+        </environment>
+        <environment id="product">
+            <transactionManager type="jdbc"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="com.mysql.jdbc.Driver"/>
+                <property name="url" value="jdbc:mysql://hadoopdev.mdb.mig:17567/hadoop_vnn"/>
+                <property name="username" value="writeuser"/>
+                <property name="password" value="GCAsQawkMPzzyF9R"/>
+            </dataSource>
+        </environment>
+    </environments>
+    <mappers>
+        <mapper resource="mybatis/mapper/AppInfoMapper.xml" />
+        <mapper resource="mybatis/mapper/DirInfoMapper.xml" />
+        <mapper resource="mybatis/mapper/AppDirRelationMapper.xml" />
+        <mapper resource="mybatis/mapper/SpecialMapper.xml" />
+        <mapper resource="mybatis/mapper/AppRelationMapper.xml" />
+        <mapper resource="mybatis/mapper/AppRootMapper.xml" />
+    </mappers>
+</configuration>

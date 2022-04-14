@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.tencent.mdfs.provider.orm.AppDirRelationMapper" >
+
+  <resultMap id="BaseResultMap" type="AppDirRelation">
+    <id column="id" jdbcType="INTEGER" property="id" />
+    <result column="app_id" jdbcType="INTEGER" property="appId" />
+    <result column="online_type" jdbcType="TINYINT" property="onlineType" />
+    <result column="dir_id" jdbcType="INTEGER" property="dirId" />
+    <result column="type" jdbcType="TINYINT" property="type" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+
+  <select id="selectAll" resultMap="BaseResultMap" >
+    select
+    <include refid="Base_Column_List" />
+    from t_app_dir_relation where state=1
+  </select>
+
+  <sql id="Base_Column_List" >
+    id, app_id, dir_id, online_type,type, create_time, update_time, state
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_app_dir_relation
+    where id = #{id} and state=1
+  </select>
+  <insert id="insert" parameterType="AppDirRelation" >
+    insert into t_app_dir_relation (id, app_id, dir_id, type, create_time, update_time, state)
+    values (#{id}, #{appId}, #{dirId}, #{type}, now(), now(), 1)
+  </insert>
+  <insert id="insertSelective" parameterType="AppDirRelation" >
+    insert into t_app_dir_relation
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="id != null" >
+        id,
+      </if>
+      <if test="appId != null" >
+        app_id,
+      </if>
+      <if test="dirId != null" >
+        dir_id,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+      <if test="state != null" >
+        state,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="id != null" >
+        #{id},
+      </if>
+      <if test="appId != null" >
+        #{appId},
+      </if>
+      <if test="dirId != null" >
+        #{dirId},
+      </if>
+      <if test="type != null" >
+        #{type},
+      </if>
+      <if test="createTime != null" >
+        #{createTime},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime},
+      </if>
+      <if test="state != null" >
+        #{state},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="AppDirRelation" >
+    update t_app_dir_relation
+    <set >
+      <if test="appId != null" >
+        app_id = #{appId},
+      </if>
+      <if test="dirId != null" >
+        dir_id = #{dirId},
+      </if>
+      <if test="type != null" >
+        type = #{type},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime},
+      </if>
+      <if test="state != null" >
+        state = #{state},
+      </if>
+    </set>
+    where id = #{id}
+  </update>
+</mapper>

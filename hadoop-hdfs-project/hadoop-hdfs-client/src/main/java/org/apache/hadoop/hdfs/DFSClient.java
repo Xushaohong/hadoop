@@ -251,6 +251,15 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   private final boolean readOnlyClient;
   private final boolean avoidGetTokenInsecurity;
 
+  private String HADOOP_OLD_PCG_CLUSTER_IP = "hadoop.old.pcg.cluster.ip";
+
+  private String PCG_CLOUD_MDFS = "PCG_CLOUD_MDFS";
+
+  private String TQ_USE_UGI = "tq.use.ugi";
+
+  private String HADOOP_JOB_UGI = "hadoop.job.ugi";
+
+
   public DfsClientConf getConf() {
     return dfsClientConf;
   }
@@ -329,6 +338,21 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
               + dtpReplaceDatanodeOnFailureReplication);
     }
     // compatible with some ugi case
+    // In order to solve the problem of insufficient permissions caused by the inconsistency
+    // between system users and HDFS cluster users, a proxy identity is adopted in DFSClient
+    // instance. Set proxy user by using hadoop.proxy.user to override user's HADOOP_JOB_UGI.
+
+    String pcgOldClusterHosts = conf.get(HADOOP_OLD_PCG_CLUSTER_IP);
+    boolean proxyClusterEnable = DFSUtilClient.needProxy(pcgOldClusterHosts, nameNodeUri);
+    boolean isMDFS = conf.getBoolean(PCG_CLOUD_MDFS, false);
+    if (proxyClusterEnable && !isMDFS) {
+      conf.setBoolean(TQ_USE_UGI, true);
+      String hadoopTqClusterUser = conf.get("hadoop.cluster.user");
+      Preconditions.checkNotNull(hadoopTqClusterUser);
+      conf.set(HADOOP_JOB_UGI, hadoopTqClusterUser);
+    } else {
+      conf.setBoolean(TQ_USE_UGI, false);
+    }
     this.ugi = UserGroupInformation.getCurrentUser(conf);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Using user[" + ugi.getShortUserName() + "] for " + nameNodeUri);

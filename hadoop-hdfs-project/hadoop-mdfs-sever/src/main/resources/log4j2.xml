@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="debug" strict="true" name="XMLConfigTest"
+  packages="org.apache.logging.log4j.test">
+  <Properties>
+    <Property name="LOG_BASE_DIR">/data/mqq/mdfs/logs</Property>
+    <Property name="LOG_HOME">${LOG_BASE_DIR}</Property>
+    <Property name="FILE_NAME">vnn-server</Property>
+    <Property name="AUDIT_FILE_NAME">vnn-audit</Property>
+    <Property name="PATH_LOG_FILE_NAME">vnn-path</Property>
+    <Property name="STD_LOG_FILE_NAME">vnn-path</Property>
+  </Properties>
+  <Filter type="ThresholdFilter" level="trace"/>
+
+  <Appenders>
+    <RollingRandomAccessFile name="RollingRandomAccessFile" fileName="${LOG_HOME}/${FILE_NAME}.log" filePattern="${LOG_HOME}/${FILE_NAME}-%d{yyyy-MM-dd_HH-mm}-%i.log">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %level %logger{36} %msg%n"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy interval="60"/>
+        <SizeBasedTriggeringPolicy size="500MB"/>
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingRandomAccessFile>
+    <RollingRandomAccessFile name="AuditRollingRandomAccessFile" fileName="${LOG_HOME}/${AUDIT_FILE_NAME}.log" filePattern="${LOG_HOME}/${AUDIT_FILE_NAME}-%d{yyyy-MM-dd_HH-mm}-%i.log">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} %msg%n"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy interval="60"/>
+        <SizeBasedTriggeringPolicy size="500MB"/>
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingRandomAccessFile>
+
+    <RollingRandomAccessFile name="PathRollingRandomAccessFile" fileName="${LOG_HOME}/${PATH_LOG_FILE_NAME}.log" filePattern="${LOG_HOME}/${PATH_LOG_FILE_NAME}-%d{yyyy-MM-dd_HH-mm}-%i.log">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} %msg%n"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy interval="60"/>
+        <SizeBasedTriggeringPolicy size="500MB"/>
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingRandomAccessFile>
+
+    <RollingRandomAccessFile name="StdRollingRandomAccessFile" fileName="${LOG_HOME}/${STD_LOG_FILE_NAME}.log" filePattern="${LOG_HOME}/${STD_LOG_FILE_NAME}-%d{yyyy-MM-dd_HH-mm}-%i.log">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} %msg%n"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy interval="60"/>
+        <SizeBasedTriggeringPolicy size="500MB"/>
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingRandomAccessFile>
+
+    <Async name="AsyncAppender">
+      <AppenderRef ref="RollingRandomAccessFile"/>
+    </Async>
+    <Async name="AuditAsyncAppender">
+      <AppenderRef ref="AuditRollingRandomAccessFile"/>
+    </Async>
+    <Async name="PathAsyncAppender">
+      <AppenderRef ref="PathRollingRandomAccessFile"/>
+    </Async>
+    <Async name="StdAsyncAppender">
+      <AppenderRef ref="StdRollingRandomAccessFile"/>
+    </Async>
+  </Appenders>
+
+  <Loggers>
+
+    <Root level="info">
+      <AppenderRef ref="AsyncAppender"/>
+    </Root>
+    <Logger name="vnnaudit" level="info" additivity="false">
+      <AppenderRef ref="AuditAsyncAppender"/>
+    </Logger>
+    <Logger name="path" level="info" additivity="false">
+      <AppenderRef ref="PathAsyncAppender"/>
+    </Logger>
+    <Logger name="std" level="info" additivity="false">
+      <AppenderRef ref="StdAsyncAppender"/>
+    </Logger>
+  </Loggers>
+
+</Configuration>

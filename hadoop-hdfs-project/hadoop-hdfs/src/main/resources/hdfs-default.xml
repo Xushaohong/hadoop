@@ -1672,6 +1672,14 @@
 </property>
 
 <property>
+  <name>mdfs.client.rbf.enabled</name>
+  <value>false</value>
+  <description>
+    Whether mdfs implement use rbf.
+  </description>
+</property>
+
+<property>
   <name>dfs.nameservices</name>
   <value></value>
   <description>

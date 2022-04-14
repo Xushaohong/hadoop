@@ -159,7 +159,7 @@ extends AbstractDelegationTokenIdentifier>
     this.storeTokenTrackingId = false;
     this.unionDelegationTokenManager = unionDelegationTokenManager;
   }
-
+  
   /** should be called before this object is used */
   public void startThreads() throws IOException {
     Preconditions.checkState(!running);

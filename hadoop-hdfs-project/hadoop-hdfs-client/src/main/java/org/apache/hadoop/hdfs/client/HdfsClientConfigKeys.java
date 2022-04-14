@@ -26,6 +26,10 @@ import java.util.concurrent.TimeUnit;
 /** Client configuration properties */
 @InterfaceAudience.Private
 public interface HdfsClientConfigKeys {
+  String  MDFS_VNN_ADDRESS = "mdfs.vnn.address";
+  String  MDFS_CLIENT_RBF_ENABLED_KEY ="mdfs.client.rbf.enabled";
+  boolean MDFS_CLIENT_RBF_ENABLED_DEFAULT = false;
+
   long SECOND = 1000L;
   long MINUTE = 60 * SECOND;
 

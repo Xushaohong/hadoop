@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.tencent.mdfs.provider.orm.DirInfoMapper" >
+
+  <resultMap id="BaseResultMap" type="DirInfo">
+    <result column="dir_id" jdbcType="INTEGER" property="dirId" />
+    <result column="app_id" jdbcType="INTEGER" property="appId" />
+    <result column="logic_path" jdbcType="VARCHAR" property="logicPath" />
+    <result column="real_path" jdbcType="VARCHAR" property="realPath" />
+    <result column="namenode_addr" jdbcType="VARCHAR" property="namenodeAddr" />
+    <result column="cluster_infos" jdbcType="VARCHAR" property="clusterInfos" />
+    <result column="cluster_id" jdbcType="VARCHAR" property="clusterId" />
+    <result column="share_type" jdbcType="TINYINT" property="shareType" />
+    <result column="type" jdbcType="TINYINT" property="type" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="state" jdbcType="TINYINT" property="state" />
+  </resultMap>
+
+  <select id="selectAll" resultMap="BaseResultMap" >
+    select
+    <include refid="Base_Column_List" />
+    from t_dir_info where state=1
+  </select>
+
+  <sql id="Base_Column_List" >
+    dir_id, app_id, logic_path, real_path, type, namenode_addr,cluster_infos,cluster_id ,create_time, update_time,
+    state
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_dir_info
+    where dir_id = #{dirId} and state=1
+  </select>
+
+  <select id="dirInfoSelectByConditions" resultMap="BaseResultMap"
+          parameterType="DirInfo" >
+    select
+    <include refid="Base_Column_List" />
+    from t_dir_info
+    where  state=1
+    <if test="logicPath !=null ">
+      AND logic_path=#{logicPath}
+    </if>
+    <if test="realPath !=null ">
+      AND real_path=#{realPath}
+    </if>
+
+
+  </select>
+
+  <insert id="insert" parameterType="DirInfo" >
+    insert into t_dir_info (dir_id, app_id, logic_path, real_path, type,share_type, namenode_addr,
+      cluster_infos,create_time, update_time, state,cluster_id)
+    values (#{dirId}, #{appId}, #{logicPath}, #{realPath}, #{type}, #{shareType},#{namenodeAddr},
+    #{clusterInfos},
+      now(), now(), 1,#{clusterId})
+  </insert>
+  <insert id="insertSelective" parameterType="DirInfo" >
+    insert into t_dir_info
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="dirId != null" >
+        dir_id,
+      </if>
+      <if test="appId != null" >
+        app_id,
+      </if>
+      <if test="logicPath != null" >
+        logic_path,
+      </if>
+      <if test="realPath != null" >
+        real_path,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="shareType != null" >
+        share_type,
+      </if>
+      <if test="namenodeAddr != null" >
+        namenode_addr,
+      </if>
+      <if test="clusterInfos != null" >
+        cluster_infos,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+      <if test="clusterId != null">
+        cluster_id,
+      </if>
+      <if test="state != null" >
+        state,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="dirId != null" >
+        #{dirId},
+      </if>
+      <if test="appId != null" >
+        #{appId},
+      </if>
+      <if test="logicPath != null" >
+        #{logicPath},
+      </if>
+      <if test="realPath != null" >
+        #{realPath},
+      </if>
+      <if test="type != null" >
+        #{type},
+      </if>
+      <if test="shareType != null" >
+        #{shareType},
+      </if>
+      <if test="namenodeAddr != null" >
+        #{namenodeAddr},
+      </if>
+      <if test="clusterInfos != null" >
+        #{clusterInfos},
+      </if>
+      <if test="createTime != null" >
+        #{createTime},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime},
+      </if>
+      <if test="clusterId != null">
+        #{clusterId},
+      </if>
+      <if test="state != null" >
+        #{state},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="DirInfo" >
+    update t_dir_info
+    <set >
+      <if test="appId != null" >
+        app_id = #{appId},
+      </if>
+      <if test="logicPath != null" >
+        logic_path = #{logicPath},
+      </if>
+      <if test="realPath != null" >
+        real_path = #{realPath},
+      </if>
+      <if test="type != null" >
+        type = #{type},
+      </if>
+      <if test="shareType != null" >
+        share_type = #{shareType},
+      </if>
+      <if test="namenodeAddr != null" >
+        namenode_addr = #{namenodeAddr},
+      </if>
+      <if test="clusterInfos != null" >
+        cluster_infos = #{clusterInfos},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime},
+      </if>
+      <if test="clusterId != null">
+        cluster_id = #{clusterId},
+      </if>
+      <if test="state != null" >
+        state = #{state},
+      </if>
+    </set>
+    where dir_id = #{dirId}
+  </update>
+
+  <insert id ="batchInsert" parameterType="java.util.List" >
+
+    insert into t_dir_info (dir_id, app_id, logic_path, real_path, type,share_type, namenode_addr,
+    cluster_infos,create_time, update_time, state,cluster_id)
+    values
+    <foreach collection ="list" item="DirInfo" index= "index" separator =",">
+      (
+      #{DirInfo.dirId}, #{DirInfo.appId}, #{DirInfo.logicPath}, #{DirInfo.realPath},
+      #{DirInfo.type}, #{DirInfo.shareType},#{DirInfo.namenodeAddr},#{DirInfo.clusterInfos},
+      now(), now(), 1, #{clusterId}
+      )
+    </foreach >
+  </insert >
+
+</mapper>

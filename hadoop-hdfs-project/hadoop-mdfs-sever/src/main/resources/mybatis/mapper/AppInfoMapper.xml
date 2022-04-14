@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.tencent.mdfs.provider.orm.AppInfoMapper" >
+
+
+  <resultMap id="BaseResultMap" type="AppInfo">
+    <result column="app_id" jdbcType="INTEGER" property="appId" />
+    <result column="app_name" jdbcType="VARCHAR" property="appName" />
+    <result column="app_code" jdbcType="VARCHAR" property="appCode" />
+    <result column="bg" jdbcType="CHAR" property="bg" />
+    <result column="product" jdbcType="CHAR" property="product" />
+    <result column="business" jdbcType="CHAR" property="business" />
+    <result column="owner" jdbcType="VARCHAR" property="owner" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="state" jdbcType="TINYINT" property="state" />
+  </resultMap>
+
+  <select id="selectAll" resultMap="BaseResultMap" >
+    select
+    <include refid="Base_Column_List" />
+    from t_app_info where state=1
+  </select>
+
+  <sql id="Base_Column_List" >
+    app_id, app_name, app_code, type, bg, product, business, owner, create_time,
+    update_time, state
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_app_info
+    where app_id = #{appId} and state=1
+  </select>
+  <insert id="insert" parameterType="AppInfo" >
+    insert into t_app_info (app_name, app_code, type, bg, product, business,
+      owner, create_time, update_time, state)
+    values (#{appName}, #{appCode}, #{type}, #{bg}, #{product}, #{business},
+      #{owner}, now(), now(), 1)
+  </insert>
+  <insert id="insertSelective" parameterType="AppInfo" >
+    insert into t_app_info
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="appId != null" >
+        app_id,
+      </if>
+      <if test="appName != null" >
+        app_name,
+      </if>
+      <if test="appCode != null" >
+        app_code,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="bg != null" >
+        bg,
+      </if>
+      <if test="product != null" >
+        product,
+      </if>
+      <if test="business != null" >
+        business,
+      </if>
+      <if test="owner != null" >
+        owner,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+      <if test="state != null" >
+        state,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="appId != null" >
+        #{appId},
+      </if>
+      <if test="appName != null" >
+        #{appName},
+      </if>
+      <if test="appCode != null" >
+        #{appCode},
+      </if>
+      <if test="type != null" >
+        #{type},
+      </if>
+      <if test="bg != null" >
+        #{bg},
+      </if>
+      <if test="product != null" >
+        #{product},
+      </if>
+      <if test="business != null" >
+        #{business},
+      </if>
+      <if test="owner != null" >
+        #{owner},
+      </if>
+      <if test="createTime != null" >
+        #{createTime},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime},
+      </if>
+      <if test="state != null" >
+        #{state},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="AppInfo" >
+    update t_app_info
+    <set >
+      <if test="appName != null" >
+        app_name = #{appName},
+      </if>
+      <if test="appCode != null" >
+        app_code = #{appCode},
+      </if>
+      <if test="type != null" >
+        type = #{type},
+      </if>
+      <if test="bg != null" >
+        bg = #{bg},
+      </if>
+      <if test="product != null" >
+        product = #{product},
+      </if>
+      <if test="business != null" >
+        business = #{business},
+      </if>
+      <if test="owner != null" >
+        owner = #{owner},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime},
+      </if>
+      <if test="state != null" >
+        state = #{state},
+      </if>
+    </set>
+    where app_id = #{appId}
+  </update>
+
+  <update id="updateByAppId" parameterType="AppInfo" >
+    update t_app_info
+    <set >
+      <if test="appName != null" >
+        app_name = #{appName},
+      </if>
+      <if test="appCode != null" >
+        app_code = #{appCode},
+      </if>
+      <if test="type != null" >
+        type = #{type},
+      </if>
+      <if test="bg != null" >
+        bg = #{bg},
+      </if>
+      <if test="product != null" >
+        product = #{product},
+      </if>
+      <if test="business != null" >
+        business = #{business},
+      </if>
+      <if test="owner != null" >
+        owner = #{owner},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime},
+      </if>
+      <if test="state != null" >
+        state = #{state},
+      </if>
+    </set>
+    where app_id = #{appId}
+  </update>
+</mapper>

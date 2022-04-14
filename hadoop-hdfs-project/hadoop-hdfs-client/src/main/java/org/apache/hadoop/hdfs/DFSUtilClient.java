@@ -128,6 +128,22 @@ public class DFSUtilClient {
   }
 
   /**
+   * Converts a string to a set.
+   * @param str
+   * @return
+   */
+  public static Set stringToSet(String str) {
+    HashSet<String> result = new HashSet<>();
+    if (str != null) {
+      String [] array = str.split(",");
+      for (String s : array) {
+        result.add(s.trim());
+      }
+    }
+    return result;
+  }
+
+  /**
    * Converts a byte array to array of arrays of bytes
    * on byte separator.
    */
@@ -826,6 +842,27 @@ public class DFSUtilClient {
     final InterruptedIOException iioe = new InterruptedIOException(message);
     iioe.initCause(e);
     return iioe;
+  }
+
+  /**
+   * When ips is empty, return default value.
+   * When ips contains the ip of HDFS uri, return true else return false.
+   * @param hosts host list, separated by commas
+   * @param uri HDFS URI
+   * @param defaultValue
+   * @return
+   */
+  public static boolean needProxy(String hosts, URI uri, boolean defaultValue) {
+    String host = uri.getHost();
+    if (hosts == null) {
+      return defaultValue;
+    } else {
+      return stringToSet(hosts).contains(host);
+    }
+  }
+
+  public static boolean needProxy(String hosts, URI uri) {
+    return needProxy(hosts, uri, false);
   }
 
   /**
