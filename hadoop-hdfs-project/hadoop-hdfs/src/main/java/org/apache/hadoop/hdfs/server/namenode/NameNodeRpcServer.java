@@ -197,6 +197,7 @@ import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.ipc.RefreshRegistry;
 import org.apache.hadoop.ipc.RefreshResponse;
 import org.apache.hadoop.net.Node;
+import org.apache.hadoop.security.AbstractRemoteAddressFilter;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.SecurityUtil;
@@ -2951,5 +2952,14 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       return HdfsConstants.HDFS_URI_SCHEME + "://" +nameServiceId + src;
     }
     return src;
+  }
+
+  /**
+   * Update address filter for client rpc server.
+   * Right now address filter only works for client rpc server.
+   * @param addressFilter - addressFilter
+   */
+  public void updateClientRpcWhiteList(AbstractRemoteAddressFilter addressFilter) {
+    this.clientRpcServer.setAddressFilter(addressFilter);
   }
 }

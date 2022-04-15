@@ -82,6 +82,7 @@ import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.AbstractRemoteAddressFilter;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.SecurityUtil;
@@ -177,6 +178,10 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_STRE
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION_DEFAULT;
 
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_ENABLED;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_ENABLED_DEFAULT;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_REQUEST_PASSWORD;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_REQUEST_USER;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.ToolRunner.confirmPrompt;
 import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_BACKOFF_ENABLE;
@@ -410,6 +415,7 @@ public class NameNode extends ReconfigurableBase implements
   private List<ServicePlugin> plugins;
   
   private NameNodeRpcServer rpcServer;
+  private WhiteListService whiteListService;
 
   private JvmPauseMonitor pauseMonitor;
   private ObjectName nameNodeStatusBeanName;
@@ -739,6 +745,14 @@ public class NameNode extends ReconfigurableBase implements
 
     rpcServer = createRpcServer(conf);
 
+    // setup white list
+    boolean enableWhiteList = conf.getBoolean(TQ_AUTH_WHITELIST_ENABLED, TQ_AUTH_WHITELIST_ENABLED_DEFAULT);
+    if (enableWhiteList) {
+      whiteListService = new WhiteListService(this);
+      whiteListService.init(conf);
+      whiteListService.start();
+    }
+
     initReconfigurableBackoffKey();
 
     if (clientNamenodeAddress == null) {
@@ -863,6 +877,7 @@ public class NameNode extends ReconfigurableBase implements
     if(rpcServer != null) rpcServer.stop();
     if(namesystem != null) namesystem.close();
     if (pauseMonitor != null) pauseMonitor.stop();
+    if (whiteListService != null) whiteListService.stop();
     if (plugins != null) {
       for (ServicePlugin p : plugins) {
         try {
@@ -2336,5 +2351,9 @@ public class NameNode extends ReconfigurableBase implements
   @Override  // ReconfigurableBase
   protected Configuration getNewConf() {
     return new HdfsConfiguration();
+  }
+
+  void updateWhiteListForRpc(AbstractRemoteAddressFilter addressFilter) {
+    rpcServer.updateClientRpcWhiteList(addressFilter);
   }
 }

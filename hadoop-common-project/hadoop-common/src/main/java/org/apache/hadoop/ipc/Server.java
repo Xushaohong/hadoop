@@ -24,11 +24,23 @@ import static org.apache.hadoop.ipc.RpcConstants.CONNECTION_CONTEXT_CALL_ID;
 import static org.apache.hadoop.ipc.RpcConstants.CURRENT_VERSION;
 import static org.apache.hadoop.ipc.RpcConstants.HEADER_LEN_AFTER_HRPC_PART;
 import static org.apache.hadoop.ipc.RpcConstants.PING_CALL_ID;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_COMPATIBLE;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_COMPATIBLE_DEFAULT;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_ENABLED;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_ENABLED_DEFAULT;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_PORT;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_PORT_DEFAULT;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_REQUEST_INTERVAL;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_REQUEST_INTERVAL_DEFAULT;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_REQUEST_PASSWORD;
+import static org.apache.hadoop.security.ipfilter.FilterConstants.TQ_AUTH_WHITELIST_REQUEST_USER;
 import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_PROTOCOL_NAME_KEY;
 
+import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.BindException;
@@ -99,6 +111,7 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslAuth;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslState;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.AbstractRemoteAddressFilter;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.AuthConfigureHolder;
 import org.apache.hadoop.security.SaslPropertiesResolver;
@@ -112,6 +125,7 @@ import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
+import org.apache.hadoop.security.ipfilter.RuleBasedAddressFilter;
 import org.apache.hadoop.security.sasl.TqNegotiationToken;
 import org.apache.hadoop.security.sasl.TqSaslMessage;
 import org.apache.hadoop.security.sasl.TqSaslState;
@@ -144,6 +158,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Evolving
 public abstract class Server {
   private final boolean authorize;
+  private AbstractRemoteAddressFilter addressFilter;
   private List<AuthMethod> enabledAuthMethods;
   private RpcSaslProto negotiateResponse;
   private ExceptionsHandler exceptionsHandler = new ExceptionsHandler();
@@ -2161,10 +2176,27 @@ public abstract class Server {
           saslToken);
     }
 
-    private void switchToSimple() {
+    private void switchToSimple() throws AccessControlException {
+      // if ip is not valid, throw exception to stop connection.
+      if (checkRemoteIpNotValid()) {
+        throw new AccessControlException("SIMPLE not enabled for " + getHostAddress());
+      }
       // disable SASL and blank out any SASL server
       authProtocol = AuthProtocol.NONE;
       disposeSasl();
+    }
+
+    /**
+     * check whether remote ip is in white list.
+     * @return - if not, return true, else return false.
+     */
+    private boolean checkRemoteIpNotValid() throws AccessControlException {
+      AbstractRemoteAddressFilter filter = getAddressFilter();
+      if (filter != null) {
+        return !filter.accept(getHostInetAddress());
+      }
+      // if filter is null, that means filter is not enabled, return false to disable filtering ip.
+      return false;
     }
 
     private RpcSaslProto buildSaslResponse(SaslState state, byte[] replyToken) {
@@ -2343,6 +2375,12 @@ public abstract class Server {
             IOException ioe = new AccessControlException(
                 "SIMPLE authentication is not enabled."
                     + "  Available:" + enabledAuthMethods);
+            doSaslReply(ioe);
+            throw ioe;
+          }
+          if (checkRemoteIpNotValid()) {
+            IOException ioe = new AccessControlException(
+                    "SIMPLE authentication is not enabled.");
             doSaslReply(ioe);
             throw ioe;
           }
@@ -2895,6 +2933,22 @@ public abstract class Server {
     }
   }
 
+  /**
+   * Update address filter if rules is updated.
+   * @param addressFilter
+   */
+  public void setAddressFilter(AbstractRemoteAddressFilter addressFilter) {
+    this.addressFilter = addressFilter;
+  }
+
+  /**
+   * get address filter.
+   * @return
+   */
+  public AbstractRemoteAddressFilter getAddressFilter() {
+    return this.addressFilter;
+  }
+
   public void queueCall(Call call) throws IOException, InterruptedException {
     // external non-rpc calls don't need server exception wrapper.
     try {
@@ -3136,8 +3190,10 @@ public abstract class Server {
       conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, 
                       false);
 
+    int authPort = conf.getInt(TQ_AUTH_WHITELIST_PORT, TQ_AUTH_WHITELIST_PORT_DEFAULT);
+
     // configure supported authentications
-    boolean authCompatible = conf.getBoolean("tq.auth.compatible", false);
+    boolean authCompatible = conf.getBoolean(TQ_AUTH_COMPATIBLE, TQ_AUTH_COMPATIBLE_DEFAULT);
     this.enabledAuthMethods = getAuthMethods(secretManager, conf, authCompatible);
     this.negotiateResponse = buildNegotiateResponse(enabledAuthMethods);
     
@@ -3431,6 +3487,7 @@ public abstract class Server {
 
   /** Starts the service.  Must be called before any calls will be handled. */
   public synchronized void start() {
+
     responder.start();
     listener.start();
     if (auxiliaryListenerMap != null && auxiliaryListenerMap.size() > 0) {
