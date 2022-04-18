@@ -20,12 +20,12 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-project-dist</artifactId>
-    <version>3.2.1-tq-0.2.5</version>
+    <version>3.2.1-tq-0.2.6</version>
     <relativePath>../../hadoop-project-dist</relativePath>
   </parent>
   <groupId>org.apache.hadoop</groupId>
   <artifactId>hadoop-odfs-client</artifactId>
-  <version>3.2.1-tq-0.2.5</version>
+  <version>3.2.1-tq-0.2.6</version>
   <description>Apache Hadoop ODFS Client</description>
   <name>Apache Hadoop ODFS Client</name>
   <packaging>pom</packaging>

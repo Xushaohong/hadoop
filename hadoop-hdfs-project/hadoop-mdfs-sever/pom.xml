@@ -5,7 +5,7 @@
   <parent>
     <artifactId>hadoop-hdfs-project</artifactId>
     <groupId>org.apache.hadoop</groupId>
-    <version>3.2.1-tq-0.2.5</version>
+    <version>3.2.1-tq-0.2.6</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
@@ -77,11 +77,6 @@
     <groupId>qq-central</groupId>
     <artifactId>taf-client</artifactId>
     <version>3.0.2-SNAPSHOT</version>
-    </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>2.9.9</version>
     </dependency>
     <dependency>
       <groupId>qq-central</groupId>
