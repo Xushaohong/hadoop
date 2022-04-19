@@ -44,9 +44,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -495,12 +497,13 @@ public class DelegationTokenRenewer extends AbstractService {
     Set<DelegationTokenToRenew> tokenList = new HashSet<DelegationTokenToRenew>();
     boolean hasHdfsToken = false;
     for (Token<?> token : tokens) {
+      AtomicLong tokenExpiredTime = new AtomicLong(now);
       if (token.isManaged()) {
         if (token.getKind().equals(HDFS_DELEGATION_KIND)) {
           LOG.info(applicationId + " found existing hdfs token " + token);
           hasHdfsToken = true;
         }
-        if (skipTokenRenewal(token)) {
+        if (skipTokenRenewalAndUpdateExpiredTime(token, tokenExpiredTime)) {
           continue;
         }
 
@@ -526,10 +529,14 @@ public class DelegationTokenRenewer extends AbstractService {
           }  else {
             tokenConf = getConfig();
           }
-          dttr = new DelegationTokenToRenew(Arrays.asList(applicationId), token,
-              tokenConf, now, shouldCancelAtEnd, evt.getUser());
+          dttr = new DelegationTokenToRenew(Arrays.asList(applicationId),
+              token, tokenConf, tokenExpiredTime.get(), shouldCancelAtEnd, evt.getUser());
+
           try {
-            renewToken(dttr);
+            // if expire date is not greater than now, renew token.
+            if (tokenExpiredTime.get() <= now) {
+              renewToken(dttr);
+            }
           } catch (IOException ioe) {
             if (ioe instanceof SecretManager.InvalidToken
                 && dttr.maxDate < Time.now()
@@ -621,8 +628,10 @@ public class DelegationTokenRenewer extends AbstractService {
    * Skip renewing token if the renewer of the token is set to ""
    * Caller is expected to have examined that token.isManaged() returns
    * true before calling this method.
+   * if renewer is not empty, get the max expired time from token identifier.
+   * if identifier is not null, get the max expired time from token identifier.
    */
-  private boolean skipTokenRenewal(Token<?> token)
+  private boolean skipTokenRenewalAndUpdateExpiredTime(Token<?> token, AtomicLong expiredTime)
       throws IOException {
 
     @SuppressWarnings("unchecked")
@@ -631,6 +640,7 @@ public class DelegationTokenRenewer extends AbstractService {
     if (identifier == null) {
       return false;
     }
+    expiredTime.set(identifier.getMaxDate());
     Text renewer = identifier.getRenewer();
     return (renewer != null && renewer.toString().equals(""));
   }
