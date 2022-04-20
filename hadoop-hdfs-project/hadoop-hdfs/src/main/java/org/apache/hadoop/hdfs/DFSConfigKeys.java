@@ -1706,6 +1706,12 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final long    DFS_CLIENT_DATANODE_RESTART_TIMEOUT_DEFAULT =
       HdfsClientConfigKeys.DFS_CLIENT_DATANODE_RESTART_TIMEOUT_DEFAULT;
 
+  public static final String DFS_DATANODE_LOCKMANAGER_TRACE =
+          "dfs.datanode.lockmanager.trace";
+
+  public static final boolean
+          DFS_DATANODE_LOCKMANAGER_TRACE_DEFAULT = false;
+
   public static final String  DFS_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY =
       HdfsClientConfigKeys.DeprecatedKeys.DFS_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY;
   public static final String  DFS_CLIENT_HTTPS_KEYSTORE_RESOURCE_DEFAULT = "ssl-client.xml";

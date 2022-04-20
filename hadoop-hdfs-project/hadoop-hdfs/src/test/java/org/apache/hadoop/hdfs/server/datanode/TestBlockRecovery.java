@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import org.apache.hadoop.hdfs.AppendTestUtil;
 import org.apache.hadoop.hdfs.DFSClient;
+import org.apache.hadoop.hdfs.server.common.DataNodeLockManager.LockLevel;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
@@ -803,7 +804,8 @@ public class TestBlockRecovery {
             final RecoveringBlock recoveringBlock = new RecoveringBlock(
                 block.getBlock(), locations, block.getBlock()
                     .getGenerationStamp() + 1);
-            try(AutoCloseableLock lock = dataNode.data.acquireDatasetLock()) {
+            try(AutoCloseableLock lock = dataNode.getDataSetLockManager().writeLock(LockLevel.BLOCK_POOl,
+                    recoveringBlock.getBlock().getBlockPoolId())) {
               Thread.sleep(2000);
               dataNode.initReplicaRecovery(recoveringBlock);
             }

@@ -28,8 +28,6 @@ import java.util.Set;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -135,7 +133,7 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
     ProvidedBlockPoolSlice(String bpid, ProvidedVolumeImpl volume,
         Configuration conf) {
       this.providedVolume = volume;
-      bpVolumeMap = new ReplicaMap(new ReentrantReadWriteLock());
+      bpVolumeMap = new ReplicaMap();
       Class<? extends BlockAliasMap> fmt =
           conf.getClass(DFSConfigKeys.DFS_PROVIDED_ALIASMAP_CLASS,
               TextFileRegionAliasMap.class, BlockAliasMap.class);
@@ -220,7 +218,7 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
     }
 
     public boolean isEmpty() {
-      return bpVolumeMap.replicas(bpid).size() == 0;
+      return bpVolumeMap.size(bpid) == 0;
     }
 
     public void shutdown(BlockListAsLongs blocksListsAsLongs) {

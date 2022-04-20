@@ -35,6 +35,8 @@ import java.util.Set;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdfs.server.common.AutoCloseDataSetLock;
+import org.apache.hadoop.hdfs.server.common.DataNodeLockManager;
 import org.apache.hadoop.util.AutoCloseableLock;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -240,7 +242,7 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * Gets a list of references to the finalized blocks for the given block pool.
    * <p>
    * Callers of this function should call
-   * {@link FsDatasetSpi#acquireDatasetLock} to avoid blocks' status being
+   * {@link FsDatasetSpi#acquireDatasetLockManager} to avoid blocks' status being
    * changed during list iteration.
    * </p>
    * @return a list of references to the finalized blocks for the given block
@@ -656,20 +658,11 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
   ReplicaInfo moveBlockAcrossVolumes(final ExtendedBlock block,
       FsVolumeSpi destination) throws IOException;
 
-  /**
-   * Acquire the lock of the data set. This prevents other threads from
-   * modifying the volume map structure inside the datanode, but other changes
-   * are still possible. For example modifying the genStamp of a block instance.
-   */
-  AutoCloseableLock acquireDatasetLock();
-
   /***
-   * Acquire the read lock of the data set. This prevents other threads from
-   * modifying the volume map structure inside the datanode, but other changes
-   * are still possible. For example modifying the genStamp of a block instance.
-   * @return The AutoClosable read lock instance.
+   * Acquire lock Manager for the data set. This prevents other threads from
+   * modifying the volume map structure inside the datanode.
    */
-  AutoCloseableLock acquireDatasetReadLock();
+  DataNodeLockManager<? extends AutoCloseDataSetLock> acquireDatasetLockManager();
 
   Set<? extends Replica> deepCopyReplica(String bpid) throws IOException;
 }

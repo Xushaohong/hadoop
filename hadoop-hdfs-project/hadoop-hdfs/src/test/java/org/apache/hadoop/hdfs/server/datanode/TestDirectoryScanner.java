@@ -46,6 +46,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdfs.server.common.DataNodeLockManager.LockLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -130,7 +131,8 @@ public class TestDirectoryScanner {
 
   /** Truncate a block file */
   private long truncateBlockFile() throws IOException {
-    try(AutoCloseableLock lock = fds.acquireDatasetLock()) {
+    try (AutoCloseableLock lock = fds.acquireDatasetLockManager().writeLock(
+            LockLevel.BLOCK_POOl, bpid)) {
       for (ReplicaInfo b : FsDatasetTestUtil.getReplicas(fds, bpid)) {
         File f = new File(b.getBlockURI());
         File mf = new File(b.getMetadataURI());
@@ -155,7 +157,8 @@ public class TestDirectoryScanner {
 
   /** Delete a block file */
   private long deleteBlockFile() {
-    try(AutoCloseableLock lock = fds.acquireDatasetLock()) {
+    try (AutoCloseableLock lock = fds.acquireDatasetLockManager().
+            writeLock(LockLevel.BLOCK_POOl, bpid)) {
       for (ReplicaInfo b : FsDatasetTestUtil.getReplicas(fds, bpid)) {
         File f = new File(b.getBlockURI());
         File mf = new File(b.getMetadataURI());
@@ -171,7 +174,8 @@ public class TestDirectoryScanner {
 
   /** Delete block meta file */
   private long deleteMetaFile() {
-    try(AutoCloseableLock lock = fds.acquireDatasetLock()) {
+    try (AutoCloseableLock lock = fds.acquireDatasetLockManager().
+            writeLock(LockLevel.BLOCK_POOl, bpid)) {
       for (ReplicaInfo b : FsDatasetTestUtil.getReplicas(fds, bpid)) {
         // Delete a metadata file
         if (b.metadataExists() && b.deleteMetadata()) {
@@ -189,7 +193,8 @@ public class TestDirectoryScanner {
    * @throws IOException
    */
   private void duplicateBlock(long blockId) throws IOException {
-    try(AutoCloseableLock lock = fds.acquireDatasetLock()) {
+    try (AutoCloseableLock lock = fds.acquireDatasetLockManager().
+            writeLock(LockLevel.BLOCK_POOl, bpid)) {
       ReplicaInfo b = FsDatasetTestUtil.fetchReplicaInfo(fds, bpid, blockId);
       try (FsDatasetSpi.FsVolumeReferences volumes =
           fds.getFsVolumeReferences()) {
