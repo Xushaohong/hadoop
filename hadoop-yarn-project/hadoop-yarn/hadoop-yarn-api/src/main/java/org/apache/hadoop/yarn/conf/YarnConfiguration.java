@@ -231,6 +231,11 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_BIND_HOST =
     RM_PREFIX + "bind-host";
 
+  /** a flag to disable move app between queues.*/
+  public static final String RM_CLIENT_MOVEQUEUE_ENABLED =
+    RM_PREFIX + "client.movequeue.enabled";
+  public static final boolean DEFAULT_RM_CLIENT_MOVEQUEUE_ENABLED = true;
+
   /** The number of threads used to handle applications manager requests.*/
   public static final String RM_CLIENT_THREAD_COUNT =
     RM_PREFIX + "client.thread-count";

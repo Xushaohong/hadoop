@@ -233,6 +233,8 @@ public class ClientRMService extends AbstractService implements
   private ReservationSystem reservationSystem;
   private ReservationInputValidator rValidator;
 
+  private boolean enableMoveQueue;
+
   private SubmissionContextPreProcessor contextPreProcessor;
 
   private boolean filterAppsByUser = false;
@@ -307,6 +309,10 @@ public class ClientRMService extends AbstractService implements
     this.filterAppsByUser  = conf.getBoolean(
         YarnConfiguration.FILTER_ENTITY_LIST_BY_USER,
         YarnConfiguration.DEFAULT_DISPLAY_APPS_FOR_LOGGED_IN_USER);
+
+    enableMoveQueue = conf.getBoolean(
+        YarnConfiguration.RM_CLIENT_MOVEQUEUE_ENABLED,
+        YarnConfiguration.DEFAULT_RM_CLIENT_MOVEQUEUE_ENABLED);
 
     this.server.start();
     clientBindAddress = conf.updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
@@ -1233,6 +1239,17 @@ public class ClientRMService extends AbstractService implements
     RMApp application = verifyUserAccessForRMApp(applicationId, callerUGI,
         AuditConstants.MOVE_APP_REQUEST, ApplicationAccessType.MODIFY_APP,
         true);
+
+    if (!enableMoveQueue) {
+      RMAuditLogger.logFailure(callerUGI.getShortUserName(),
+          AuditConstants.MOVE_APP_REQUEST,
+         "User doesn't have permissions to "
+          + ApplicationAccessType.MODIFY_APP.toString(), "ClientRMService",
+          AuditConstants.UNAUTHORIZED_USER, applicationId);
+      throw RPCUtil.getRemoteException(new AccessControlException("User "
+          + callerUGI.getShortUserName() + " cannot perform operation move queue"
+          + " on " + applicationId));
+    }
 
     String targetQueue = request.getTargetQueue();
     if (!accessToTargetQueueAllowed(callerUGI, application, targetQueue)) {
