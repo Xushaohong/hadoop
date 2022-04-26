@@ -259,6 +259,10 @@ public class ContainerLogsPage extends NMView {
       for (File containerLogsDir : containerLogsDirs) {
         File[] logFiles = containerLogsDir.listFiles();
         if (logFiles != null) {
+          html.p()
+              .a("https://iwiki.woa.com/pages/viewpage.action?pageId=1524208429",
+              "如果在US、太极或者IDEX使用Pyspark出现" +
+               " ImportError: no module named xxx问题，请查看该Wiki!").__();
           Arrays.sort(logFiles);
           for (File logFile : logFiles) {
             foundLogFile = true;
