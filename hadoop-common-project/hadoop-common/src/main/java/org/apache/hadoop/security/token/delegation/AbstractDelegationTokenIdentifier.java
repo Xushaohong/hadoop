@@ -247,7 +247,12 @@ extends TokenIdentifier {
   public byte[] getBytes() {
     DataOutputBuffer buf = new DataOutputBuffer(4096);
     try {
-      this.write(buf, TOKEN_IDENTIFIER_TRANSMISSION_VERSION);
+      if (TOKEN_IDENTIFIER_TRANSMISSION_VERSION == UNION_DELEGATION_TOKEN_IDENTIFIER_VERSION) {
+        this.write(buf, TOKEN_IDENTIFIER_TRANSMISSION_VERSION);
+      } else {
+        this.write(buf);
+      }
+
     } catch (IOException ie) {
       throw new RuntimeException("i/o error in getBytes", ie);
     }
