@@ -1041,6 +1041,9 @@ public interface MRJobConfig {
 
   public static final String JOB_SPLIT_METAINFO = "job.splitmetainfo";
 
+  public static final String MR_JOB_SPLIT_IN_APPMASTER =
+      "mapreduce.job.split.in.appmaster";
+
   public static final String APPLICATION_MASTER_CLASS =
       "org.apache.hadoop.mapreduce.v2.app.MRAppMaster";
 

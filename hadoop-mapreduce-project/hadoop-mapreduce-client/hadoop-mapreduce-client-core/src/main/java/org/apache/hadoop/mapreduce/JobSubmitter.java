@@ -68,7 +68,7 @@ import com.google.common.base.Charsets;
 
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-class JobSubmitter {
+public class JobSubmitter {
   protected static final Logger LOG =
       LoggerFactory.getLogger(JobSubmitter.class);
   private static final String SHUFFLE_KEYGEN_ALGORITHM = "HmacSHA1";
@@ -201,18 +201,20 @@ class JobSubmitter {
       Path submitJobFile = JobSubmissionFiles.getJobConfPath(submitJobDir);
       
       // Create the splits for the job
-      LOG.debug("Creating splits at " + jtFs.makeQualified(submitJobDir));
-      startTime = System.currentTimeMillis();
-      int maps = writeSplits(job, submitJobDir);
-      LOG.info(jobId + " write splits cost:" + (System.currentTimeMillis() - startTime) + "ms");
-      conf.setInt(MRJobConfig.NUM_MAPS, maps);
-      LOG.info("number of splits:" + maps);
+      if (!conf.getBoolean(MRJobConfig.MR_JOB_SPLIT_IN_APPMASTER, false)) {
+        LOG.debug("Creating splits at " + jtFs.makeQualified(submitJobDir));
+        startTime = System.currentTimeMillis();
+        int maps = writeSplits(job, submitJobDir);
+        LOG.info(jobId + " write splits cost:" + (System.currentTimeMillis() - startTime) + "ms");
+        conf.setInt(MRJobConfig.NUM_MAPS, maps);
+        LOG.info("number of splits:" + maps);
 
-      int maxMaps = conf.getInt(MRJobConfig.JOB_MAX_MAP,
-          MRJobConfig.DEFAULT_JOB_MAX_MAP);
-      if (maxMaps >= 0 && maxMaps < maps) {
-        throw new IllegalArgumentException("The number of map tasks " + maps +
-            " exceeded limit " + maxMaps);
+        int maxMaps = conf.getInt(MRJobConfig.JOB_MAX_MAP,
+            MRJobConfig.DEFAULT_JOB_MAX_MAP);
+        if (maxMaps >= 0 && maxMaps < maps) {
+          throw new IllegalArgumentException("The number of map tasks " + maps +
+              " exceeded limit " + maxMaps);
+        }
       }
 
       // write "queue admins of the queue to which job is being submitted"
@@ -320,7 +322,7 @@ class JobSubmitter {
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends InputSplit>
+  private static <T extends InputSplit>
   int writeNewSplits(JobContext job, Path jobSubmitDir) throws IOException,
       InterruptedException, ClassNotFoundException {
     Configuration conf = job.getConfiguration();
@@ -338,7 +340,7 @@ class JobSubmitter {
     return array.length;
   }
   
-  private int writeSplits(org.apache.hadoop.mapreduce.JobContext job,
+  public static int writeSplits(org.apache.hadoop.mapreduce.JobContext job,
       Path jobSubmitDir) throws IOException,
       InterruptedException, ClassNotFoundException {
     JobConf jConf = (JobConf)job.getConfiguration();
@@ -352,7 +354,7 @@ class JobSubmitter {
   }
   
   //method to write splits for old api mapper.
-  private int writeOldSplits(JobConf job, Path jobSubmitDir) 
+  private static int writeOldSplits(JobConf job, Path jobSubmitDir)
   throws IOException {
     org.apache.hadoop.mapred.InputSplit[] splits =
     job.getInputFormat().getSplits(job, job.getNumMapTasks());

@@ -429,13 +429,15 @@ public class YARNRunner implements ClientProtocol {
     }
 
     // TODO gross hack
-    for (String s : new String[] {
-        MRJobConfig.JOB_SPLIT,
-        MRJobConfig.JOB_SPLIT_METAINFO }) {
-      localResources.put(
-          MRJobConfig.JOB_SUBMIT_DIR + "/" + s,
-          createApplicationResource(defaultFileContext,
-              new Path(jobSubmitDir, s), LocalResourceType.FILE));
+    if (!conf.getBoolean(MRJobConfig.MR_JOB_SPLIT_IN_APPMASTER, false)) {
+      for (String s : new String[]{
+              MRJobConfig.JOB_SPLIT,
+              MRJobConfig.JOB_SPLIT_METAINFO}) {
+        localResources.put(
+                MRJobConfig.JOB_SUBMIT_DIR + "/" + s,
+                createApplicationResource(defaultFileContext,
+                        new Path(jobSubmitDir, s), LocalResourceType.FILE));
+      }
     }
 
     return localResources;

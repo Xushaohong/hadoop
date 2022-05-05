@@ -56,6 +56,7 @@ import org.apache.hadoop.mapred.TaskUmbilicalProtocol;
 import org.apache.hadoop.mapreduce.CryptoUtils;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus.State;
+import org.apache.hadoop.mapreduce.JobSubmitter;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.OutputFormat;
@@ -978,6 +979,61 @@ public class MRAppMaster extends CompositeService {
       }
       ((Service)this.containerAllocator).init(getConfig());
       ((Service)this.containerAllocator).start();
+
+      boolean initFailed = false;
+      if (!errorHappenedShutDown) {
+        Configuration conf = getConfig();
+        if (conf.getBoolean(MRJobConfig.MR_JOB_SPLIT_IN_APPMASTER, false)) {
+          ((Service) containerAllocator).start();
+          String submitJobDir = conf.get(MRJobConfig.MAPREDUCE_JOB_DIR);
+          LOG.debug("Creating splits at " + submitJobDir);
+          long startTime = System.currentTimeMillis();
+          int maps = JobSubmitter.writeSplits(new org.apache.hadoop.mapreduce.Job(conf), new Path(submitJobDir));
+          LOG.info(jobId + " write splits cost:" + (System.currentTimeMillis() - startTime) + "ms");
+          conf.setInt(MRJobConfig.NUM_MAPS, maps);
+          LOG.info("number of splits:" + maps);
+        }
+
+        // create a job event for job intialization
+        JobEvent initJobEvent = new JobEvent(job.getID(), JobEventType.JOB_INIT);
+        // Send init to the job (this does NOT trigger job execution)
+        // This is a synchronous call, not an event through dispatcher. We want
+        // job-init to be done completely here.
+        jobEventDispatcher.handle(initJobEvent);
+
+        // If job is still not initialized, an error happened during
+        // initialization. Must complete starting all of the services so failure
+        // events can be processed.
+        initFailed = (((JobImpl)job).getInternalState() != JobStateInternal.INITED);
+
+        // JobImpl's InitTransition is done (call above is synchronous), so the
+        // "uber-decision" (MR-1220) has been made.  Query job and switch to
+        // ubermode if appropriate (by registering different container-allocator
+        // and container-launcher services/event-handlers).
+
+        if (job.isUber()) {
+          speculatorEventDispatcher.disableSpeculation();
+          LOG.info("MRAppMaster uberizing job " + job.getID()
+                  + " in local container (\"uber-AM\") on node "
+                  + nmHost + ":" + nmPort + ".");
+        } else {
+          // send init to speculator only for non-uber jobs.
+          // This won't yet start as dispatcher isn't started yet.
+          dispatcher.getEventHandler().handle(
+                  new SpeculatorEvent(job.getID(), clock.getTime()));
+          LOG.info("MRAppMaster launching normal, non-uberized, multi-container "
+                  + "job " + job.getID() + ".");
+        }
+      }
+
+      if (initFailed) {
+        JobEvent initFailedEvent = new JobEvent(job.getID(), JobEventType.JOB_INIT_FAILED);
+        jobEventDispatcher.handle(initFailedEvent);
+      } else {
+        // All components have started, start the job.
+        startJobs();
+      }
+
       super.serviceStart();
     }
 
@@ -1254,38 +1310,7 @@ public class MRAppMaster extends CompositeService {
     // It's more test friendly to put it here.
     DefaultMetricsSystem.initialize("MRAppMaster");
 
-    boolean initFailed = false;
     if (!errorHappenedShutDown) {
-      // create a job event for job initialization
-      JobEvent initJobEvent = new JobEvent(job.getID(), JobEventType.JOB_INIT);
-      // Send init to the job (this does NOT trigger job execution)
-      // This is a synchronous call, not an event through dispatcher. We want
-      // job-init to be done completely here.
-      jobEventDispatcher.handle(initJobEvent);
-
-      // If job is still not initialized, an error happened during
-      // initialization. Must complete starting all of the services so failure
-      // events can be processed.
-      initFailed = (((JobImpl)job).getInternalState() != JobStateInternal.INITED);
-
-      // JobImpl's InitTransition is done (call above is synchronous), so the
-      // "uber-decision" (MR-1220) has been made.  Query job and switch to
-      // ubermode if appropriate (by registering different container-allocator
-      // and container-launcher services/event-handlers).
-
-      if (job.isUber()) {
-        speculatorEventDispatcher.disableSpeculation();
-        LOG.info("MRAppMaster uberizing job " + job.getID()
-            + " in local container (\"uber-AM\") on node "
-            + nmHost + ":" + nmPort + ".");
-      } else {
-        // send init to speculator only for non-uber jobs. 
-        // This won't yet start as dispatcher isn't started yet.
-        dispatcher.getEventHandler().handle(
-            new SpeculatorEvent(job.getID(), clock.getTime()));
-        LOG.info("MRAppMaster launching normal, non-uberized, multi-container "
-            + "job " + job.getID() + ".");
-      }
       // Start ClientService here, since it's not initialized if
       // errorHappenedShutDown is true
       clientService.start();
@@ -1296,13 +1321,6 @@ public class MRAppMaster extends CompositeService {
     // finally set the job classloader
     MRApps.setClassLoader(jobClassLoader, getConfig());
 
-    if (initFailed) {
-      JobEvent initFailedEvent = new JobEvent(job.getID(), JobEventType.JOB_INIT_FAILED);
-      jobEventDispatcher.handle(initFailedEvent);
-    } else {
-      // All components have started, start the job.
-      startJobs();
-    }
   }
 
   @Override
