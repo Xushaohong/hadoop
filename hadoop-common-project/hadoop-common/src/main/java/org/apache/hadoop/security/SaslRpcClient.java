@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.security;
 
+import com.tencent.tdw.security.authentication.TAuthAuthentication;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -53,6 +54,7 @@ import com.tencent.tdw.security.authentication.SecurityCenterProvider;
 import com.tencent.tdw.security.authentication.ServiceTarget;
 import com.tencent.tdw.security.authentication.TAuthAuthentication;
 import com.tencent.tdw.security.authentication.client.SecureClient;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -95,6 +97,8 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_NOKEY_FALLBACK_ALLOWED;
 import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_NOKEY_FALLBACK_ALLOWED_DEFAULT;
+import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_SESSION_TICKET;
+
 /**
  * A utility class that encapsulates SASL logic for RPC client
  */
@@ -290,9 +294,33 @@ public class SaslRpcClient {
           LOG.debug("client isn't using tauth");
           return null;
         }
+
         UserGroupInformation authorizeUser = ugi;
         if(ugi.getRealUser() != null) {
           authorizeUser = ugi.getRealUser();
+        }
+
+        String realUser = null;
+        if(ugi.getRealUser() != null) {
+          realUser = ugi.getRealUser().getUserName();
+        }
+
+        String protocolName;
+        ProtocolInfo protocolInfo = protocol.getAnnotation(ProtocolInfo.class);
+        if (protocolInfo != null) {
+          protocolName = protocolInfo.protocolName();
+        } else {
+          protocolName = protocol.getName();
+        }
+        protocolName = protocolName.replaceAll("PB", "");
+
+        // try to get session ticket from system env
+        String sessionTicket = System.getenv(TAUTH_SESSION_TICKET);
+        if (StringUtils.isNotBlank(sessionTicket)) {
+          LOG.debug("Using session ticket from system env");
+          saslCallback = new TqAuthClientWithEnvCallbackHandler(ugi.getUserName(),
+                  realUser, sessionTicket, protocolName);
+          break;
         }
 
         TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.getFromSubject(authorizeUser.getSubject());
@@ -307,22 +335,10 @@ public class SaslRpcClient {
         if (LOG.isDebugEnabled()) {
           LOG.debug("RPC Server ask TAUTH version:" + version);
         }
-        String protocolName;
-        ProtocolInfo protocolInfo = protocol.getAnnotation(ProtocolInfo.class);
-        if (protocolInfo != null) {
-          protocolName = protocolInfo.protocolName();
-        } else {
-          protocolName = protocol.getName();
-        }
-        protocolName = protocolName.replaceAll("PB", "");
         Preconditions.checkNotNull(principal, TAuthLoginModule.TAuthPrincipal.class.getName());
         if (version == TAuthConst.VERSION) {
           saslCallback = new TAuthSaslClient.DefaultTAuthSaslCallbackHandler(principal.getName(), serverAddr, protocolName);
         } else if (version == TqAuthConst.VERSION) {
-          String realUser = null;
-          if(ugi.getRealUser() != null) {
-            realUser = ugi.getRealUser().getUserName();
-          }
           saslCallback = new TqAuthClientCallbackHandler(ugi.getUserName(),
               realUser, credential.getLocalKeyManager(), protocolName);
         }
@@ -785,6 +801,44 @@ public class SaslRpcClient {
     }
   }
 
+  private class TqAuthClientWithEnvCallbackHandler extends TqClientCallbackHandler {
+
+    private final String sessionTicket;
+    private final String user;
+    private final String realUser;
+    private final String protocolName;
+
+    public TqAuthClientWithEnvCallbackHandler(String user, String realUser, String sessionTicket, String protocolName) {
+      this.sessionTicket = sessionTicket;
+      this.user = user;
+      this.realUser = realUser;
+      this.protocolName = protocolName;
+    }
+
+    @Override
+    protected Tuple<byte[], byte[]> processChallenge(String target) throws Exception {
+      TAuthAuthentication tAuthAuthentication = TAuthAuthentication.valueOf(sessionTicket);
+      return Tuple.of(tAuthAuthentication.getSessionKey(),
+              new TqTicketResponseToken(tAuthAuthentication.getAuthenticator(),
+                      tAuthAuthentication.getServiceTicket(), tAuthAuthentication.getSmkEpoch()).toBytes());
+    }
+
+    @Override
+    protected String getUserName() {
+      // using auth user instead.
+      if (fallBackAuthUser.get() && realUser != null) {
+        LOG.debug("using real user " + realUser);
+        return realUser;
+      }
+      return user;
+    }
+
+    @Override
+    protected byte[] getExtraId() {
+      return protocolName.getBytes();
+    }
+  }
+
   private class TqAuthClientCallbackHandler extends TqClientCallbackHandler {
     private final String user;
     private final String realUser;
@@ -812,6 +866,9 @@ public class SaslRpcClient {
       }
       TAuthAuthentication tAuthAuthentication = (TAuthAuthentication)secureClient.getAuthentication(
           serviceTarget, realUser != null? user : null);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("session ticket: {}", tAuthAuthentication.encode());
+      }
       return Tuple.of(tAuthAuthentication.getSessionKey(),
           new TqTicketResponseToken(tAuthAuthentication.getAuthenticator(),
               tAuthAuthentication.getServiceTicket(), tAuthAuthentication.getSmkEpoch()).toBytes());

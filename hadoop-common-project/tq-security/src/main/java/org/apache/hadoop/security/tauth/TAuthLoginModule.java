@@ -29,6 +29,7 @@ public class TAuthLoginModule implements LoginModule {
   public final static String TAUTH_PRINCIPAL = "pricipal";
   public final static String TAUTH_KEY = "tauthKey";
   public final static String TAUTH_KEY_PATH = "tauthKeyPath";
+  public static final String TAUTH_CUSTOM_USER = "TAUTH_CUSTOM_USER";
 
   public final static String TAUTH_SERVICE_KEY_FIRST = "tq.tauth.service.key.first";
   public final static String TAUTH_CUSTOM_ENABLE = "tq.tauth.custom.enable";
@@ -94,28 +95,46 @@ public class TAuthLoginModule implements LoginModule {
     if (principal == null) {
       final Class<?> principalClass = (Class<?>) options.get(OS_PRINCIPAL_CLASS);
       if (principalClass != null && Principal.class.isAssignableFrom(principalClass)) {
-        Principal osUser = getCanonicalUser((Class<Principal>) principalClass);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("using local user:" + osUser);
+
+        // if key is not found, try custom user first, then use os user if custom user is empty
+        String envUser = System.getenv(TAUTH_CUSTOM_USER);
+        if (envUser == null) {
+          envUser = System.getProperty(TAUTH_CUSTOM_USER);
         }
-        if (osUser != null) {
-          principal = osUser.getName();
+
+        if (envUser == null) {
+          Principal osUser = getCanonicalUser((Class<Principal>) principalClass);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("using local user:" + osUser);
+          }
+          if (osUser != null) {
+            principal = osUser.getName();
+          }
+        } else {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("using tauth custom user:" + envUser);
+          }
+          setPrincipalAndCredential(Tuple.of(new TAuthPrincipal(envUser),
+                  new TAuthCredential(envUser, null, null)));
+          return true;
         }
       }
     }
-
     if (principal == null) {
       LOG.error("User name for " + subject + " is not found");
       throw new LoginException("User name is not found");
     }
+    setPrincipalAndCredential(buildTAuthPrincipalAndCredential(principal, masterKey, keyPath));
+    return true;
+  }
 
-    Tuple<TAuthPrincipal, TAuthCredential> tauthTuple = buildTAuthPrincipalAndCredential(principal, masterKey, keyPath);
+  private void setPrincipalAndCredential(Tuple<TAuthPrincipal, TAuthCredential> tauthTuple) {
+
     subject.getPrincipals().add(tauthTuple._1());
     subject.getPrivateCredentials().add(tauthTuple._2());
     if (LOG.isDebugEnabled()) {
       LOG.debug(TAuthConst.TAUTH + " principal:" + tauthTuple._1() + " ,credential:" + tauthTuple._2());
     }
-    return true;
   }
 
   public static Tuple<TAuthPrincipal, TAuthCredential> buildCustomPrincipalAndCredentialTupleIfEnabled() {

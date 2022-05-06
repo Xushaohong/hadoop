@@ -4,6 +4,9 @@ public class TAuthConst {
 
   public static final String TAUTH = "TAUTH";
 
+  // session ticket
+  public static final String TAUTH_SESSION_TICKET = "TAUTH_SESSION_TICKET";
+
   public static final String TAUTH_NOKEY_FALLBACK_ALLOWED = "tauth.no-key.fallback.allowed";
   public static final boolean TAUTH_NOKEY_FALLBACK_ALLOWED_DEFAULT = false;
 
