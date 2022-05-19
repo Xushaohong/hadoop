@@ -179,6 +179,11 @@ public abstract class FSQueue implements Queue, Schedulable {
   public Resource getMaxShare() {
     Resource maxResource = maxShare.getResource(scheduler.getClusterResource());
 
+    // If maxShare is not configured maxResources in terms of percentage, maxResource should not be
+    // less than minShare, so we could skip comparing maxResources with minShare for performance.
+    if (null == maxShare.getPercentages()){
+      return maxResource;
+    }
     // Max resource should be greater than or equal to min resource
     Resource result = Resources.componentwiseMax(maxResource, minShare);
 
