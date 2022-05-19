@@ -227,16 +227,17 @@ public class FSParentQueue extends FSQueue {
     readLock.lock();
     List<FSQueue> queues = new ArrayList<>();
     for (FSQueue queue : childQueues) {
-      if (!queue.fitsInMaxShare(minResource)) {
+      if (!queue.isNeedResource()) {
+        continue;
+      }
+      if(!Resources.fitsIn(Resources.add(getResourceUsage(), minResource), getMaxShare())){
         if (LOG.isDebugEnabled()) {
-          LOG.info("Queue " + getName() + " could not get more resource, skip it, current usage: "
-                  + queue.getResourceUsage() + ", max share: " + queue.getMaxShare());
+          LOG.debug("Queue " + getName() + " could not get more resource, skip it, current usage: "
+              + queue.getResourceUsage() + ", max share: " + queue.getMaxShare());
         }
         continue;
       }
-      if (queue.isNeedResource()) {
-        queues.add(queue);
-      }
+      queues.add(queue);
     }
     heap.initElementsFromCollection(queues);
     readLock.unlock();
