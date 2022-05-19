@@ -240,16 +240,9 @@ public class FairSchedulerConfiguration extends Configuration {
   public static final String SORT_APPS_ENABLED = CONF_PREFIX + "sort-apps-enabled";
   public static final boolean DEFAULT_SORT_APPS_ENABLED = true;
 
-  /** Whether try to allocate all node resource at every FSLeafQueue.AssignContainer*/
-  public static final String ASSIGN_ALL_RESOURCE_ENABLED = CONF_PREFIX + "assign-all-resource-enabled";
-  public static final boolean DEFAULT_ASSIGN_ALL_RESOURCE_ENABLED = false;
-
   /** Whether to sort nodes when doing continous scheduling. */
   public static final String SORT_NODES_ENABLED = CONF_PREFIX + "sort-nodes-enabled";
   public static final boolean DEFAULT_SORT_NODES_ENABLED = true;
-
-  public static final String MAX_ASSIGN_FOR_SAME_APP = CONF_PREFIX + "max-assign-for-same-app";
-  public static final int DEFAULT_MAX_ASSIGN_FOR_SAME_APP = -1;
 
   public FairSchedulerConfiguration() {
     super();
@@ -482,16 +475,8 @@ public class FairSchedulerConfiguration extends Configuration {
     return getBoolean(SORT_APPS_ENABLED, DEFAULT_SORT_APPS_ENABLED);
   }
 
-  public boolean isAssignAllResourceEnabled() {
-    return getBoolean(ASSIGN_ALL_RESOURCE_ENABLED, DEFAULT_ASSIGN_ALL_RESOURCE_ENABLED);
-  }
-
   public boolean isSortNodesEnabled() {
     return getBoolean(SORT_NODES_ENABLED, DEFAULT_SORT_NODES_ENABLED);
-  }
-
-  public int getMaxAssignForSameApp() {
-    return getInt(MAX_ASSIGN_FOR_SAME_APP, DEFAULT_MAX_ASSIGN_FOR_SAME_APP);
   }
 
   /**

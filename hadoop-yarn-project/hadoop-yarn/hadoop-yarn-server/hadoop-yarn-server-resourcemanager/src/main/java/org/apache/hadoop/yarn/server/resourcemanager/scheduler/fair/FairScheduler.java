@@ -1578,7 +1578,6 @@ public class FairScheduler extends
 
       if (LOG.isDebugEnabled()){
         LOG.debug("isSortAppsEnabled: " + this.conf.isSortAppsEnabled());
-        LOG.debug("isAssignAllResourceEnabled: " + this.conf.isAssignAllResourceEnabled());
       }
 
       updateInterval = this.conf.getUpdateInterval();
