@@ -103,9 +103,6 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
   private static final Logger LOG = LoggerFactory
       .getLogger(SchedulerApplicationAttempt.class);
 
-  private FastDateFormat fdf =
-      FastDateFormat.getInstance("EEE MMM dd HH:mm:ss Z yyyy");
-
   private static final long MEM_AGGREGATE_ALLOCATION_CACHE_MSECS = 3000;
   protected long lastMemoryAggregateAllocationUpdateTime = 0;
   private Map<String, Long> lastResourceSecondsMap = new HashMap<>();
@@ -1363,7 +1360,7 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
     }
     StringBuilder diagnosticMessageBldr = new StringBuilder();
     diagnosticMessageBldr.append("[")
-        .append(fdf.format(System.currentTimeMillis()))
+        .append(System.currentTimeMillis())
         .append("] ");
     switch (state) {
     case INACTIVATED:

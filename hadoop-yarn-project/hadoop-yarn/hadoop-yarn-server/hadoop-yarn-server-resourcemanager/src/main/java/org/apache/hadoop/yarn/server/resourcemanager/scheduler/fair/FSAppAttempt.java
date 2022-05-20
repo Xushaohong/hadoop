@@ -1108,8 +1108,7 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
     } else if (!getQueue().fitsInMaxShare(resource)) {
       // The requested container must fit in queue maximum share
       updateAMDiagnosticMsg(resource,
-          " exceeds current queue or its parents maximum resource allowed). " +
-                  "Max share of queue: " + getQueue().getMaxShare());
+          " exceeds current queue or its parents maximum resource allowed). ");
 
       ret = false;
     }
