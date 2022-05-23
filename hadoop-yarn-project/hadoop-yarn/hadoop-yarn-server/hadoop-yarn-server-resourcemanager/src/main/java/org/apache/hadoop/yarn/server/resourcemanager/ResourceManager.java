@@ -213,6 +213,7 @@ public class ResourceManager extends CompositeService
   private AppReportFetcher fetcher = null;
   protected ResourceTrackerService resourceTracker;
   private JvmMetrics jvmMetrics;
+  private boolean jvmMetricsEnabled = true;
   private boolean curatorEnabled = false;
   private ZKCuratorManager zkManager;
   private final String zkRootNodePassword =
@@ -828,16 +829,22 @@ public class ResourceManager extends CompositeService
       rmContext.setResourceTrackerService(resourceTracker);
 
       MetricsSystem ms = DefaultMetricsSystem.initialize("ResourceManager");
-      if (fromActive) {
-        JvmMetrics.reattach(ms, jvmMetrics);
-        UserGroupInformation.reattachMetrics();
-      } else {
-        jvmMetrics = JvmMetrics.initSingleton("ResourceManager", null);
-      }
 
-      JvmPauseMonitor pauseMonitor = new JvmPauseMonitor();
-      addService(pauseMonitor);
-      jvmMetrics.setPauseMonitor(pauseMonitor);
+      jvmMetricsEnabled =
+          conf.getBoolean(YarnConfiguration.JVM_METRICS_ENABLED,
+              YarnConfiguration.DEFAULT_JVM_METRICS_ENABLED);
+      if (jvmMetricsEnabled) {
+        if (fromActive) {
+          JvmMetrics.reattach(ms, jvmMetrics);
+          UserGroupInformation.reattachMetrics();
+        } else {
+          jvmMetrics = JvmMetrics.initSingleton("ResourceManager", null);
+        }
+
+        JvmPauseMonitor pauseMonitor = new JvmPauseMonitor();
+        addService(pauseMonitor);
+        jvmMetrics.setPauseMonitor(pauseMonitor);
+      }
 
       // Initialize the Reservation system
       if (conf.getBoolean(YarnConfiguration.RM_RESERVATION_SYSTEM_ENABLE,

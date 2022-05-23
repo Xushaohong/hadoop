@@ -3045,6 +3045,16 @@ public class YarnConfiguration extends Configuration {
   public static final boolean DEFAULT_APPLICATION_HISTORY_ENABLED = false;
 
   /**
+   *  The setting that controls whether JvmMetrics is
+   *  enabled or not.
+   */
+  @Private
+  public static final String JVM_METRICS_ENABLED =
+    RM_PREFIX + "jvm.metrics.enabled";
+  @Private
+  public static final boolean DEFAULT_JVM_METRICS_ENABLED = true;
+
+  /**
    *  The setting that controls whether yarn application metrics is published on the
    *  disk.
    */
