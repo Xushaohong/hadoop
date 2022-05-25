@@ -81,6 +81,19 @@ public abstract class QueuePlacementRule {
       return "";
     }
   }
+
+  public String assignAppToQueue(String requestedQueue, String user,
+      Groups groups, Map<FSQueueType, Set<String>> configuredQueues)
+      throws IOException {
+    String queue = getQueueForApp(requestedQueue, user, groups,
+        configuredQueues);
+    if (create || configuredQueues.get(FSQueueType.LEAF).contains(queue)
+        || configuredQueues.get(FSQueueType.PARENT).contains(queue)) {
+      return queue;
+    } else {
+      return "";
+    }
+  }
   
   public void initializeFromXml(Element el)
       throws AllocationConfigurationException {
@@ -123,6 +136,10 @@ public abstract class QueuePlacementRule {
       Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr)
       throws IOException;
 
+  protected abstract String getQueueForApp(String requestedQueue, String user,
+      Groups groups, Map<FSQueueType, Set<String>> configuredQueues)
+      throws IOException;
+
   /**
    * Places apps in queues by username of the submitter
    */
@@ -130,6 +147,12 @@ public abstract class QueuePlacementRule {
     @Override
     protected String getQueueForApp(String requestedQueue, String user,
         Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr) {
+      return "root." + cleanName(user);
+    }
+
+    @Override
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues){
       return "root." + cleanName(user);
     }
     
@@ -153,7 +176,13 @@ public abstract class QueuePlacementRule {
       }
       return "root." + cleanName(groupList.get(0));
     }
-    
+
+    @Override
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) throws IOException{
+      return getQueueForApp(requestedQueue, user, groups, configuredQueues, null);
+    }
+
     @Override
     public boolean isTerminal() {
       return create;
@@ -180,10 +209,16 @@ public abstract class QueuePlacementRule {
           return "root." + group;
         }
       }
-      
+
       return "";
     }
-        
+
+    @Override
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) throws IOException {
+      return getQueueForApp(requestedQueue, user, groups, configuredQueues, null);
+    }
+
     @Override
     public boolean isTerminal() {
       return false;
@@ -256,6 +291,28 @@ public abstract class QueuePlacementRule {
     }
 
     @Override
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) throws IOException {
+      // Apply the nested rule
+      String queueName = nestedRule.assignAppToQueue(requestedQueue, user,
+          groups, configuredQueues);
+
+      if (queueName != null && queueName.length() != 0) {
+        if (!queueName.startsWith("root.")) {
+          queueName = "root." + queueName;
+        }
+
+        // Verify if the queue returned by the nested rule is an configured leaf queue,
+        // if yes then skip to next rule in the queue placement policy
+        if (configuredQueues.get(FSQueueType.LEAF).contains(queueName)) {
+          return "";
+        }
+        return queueName + "." + cleanName(user);
+      }
+      return queueName;
+    }
+
+    @Override
     public boolean isTerminal() {
       return false;
     }
@@ -277,7 +334,13 @@ public abstract class QueuePlacementRule {
         return requestedQueue;
       }
     }
-    
+
+    @Override
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) {
+      return getQueueForApp(requestedQueue, user, groups, configuredQueues, null);
+    }
+
     @Override
     public boolean isTerminal() {
       return false;
@@ -322,6 +385,12 @@ public abstract class QueuePlacementRule {
     }
 
     @Override
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) {
+      return defaultQueueName;
+    }
+
+    @Override
     public boolean isTerminal() {
       return true;
     }
@@ -340,6 +409,12 @@ public abstract class QueuePlacementRule {
     @Override
     protected String getQueueForApp(String requestedQueue, String user,
         Groups groups, Map<FSQueueType, Set<String>> configuredQueues, QueueManager queueMgr) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Map<FSQueueType, Set<String>> configuredQueues) {
       throw new UnsupportedOperationException();
     }
     

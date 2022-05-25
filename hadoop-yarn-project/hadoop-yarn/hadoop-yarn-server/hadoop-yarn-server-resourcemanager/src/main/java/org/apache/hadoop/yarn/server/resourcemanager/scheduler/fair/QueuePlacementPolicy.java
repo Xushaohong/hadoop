@@ -173,6 +173,19 @@ public class QueuePlacementPolicy {
     throw new IllegalStateException("Should have applied a rule before " +
     		"reaching here");
   }
+
+  public String assignAppToQueue(String requestedQueue, String user)
+      throws IOException {
+    for (QueuePlacementRule rule : rules) {
+      String queue = rule.assignAppToQueue(requestedQueue, user, groups,
+          configuredQueues);
+      if (queue == null || !queue.isEmpty()) {
+        return queue;
+      }
+    }
+    throw new IllegalStateException("Should have applied a rule before " +
+            "reaching here");
+  }
   
   public List<QueuePlacementRule> getRules() {
     return rules;
