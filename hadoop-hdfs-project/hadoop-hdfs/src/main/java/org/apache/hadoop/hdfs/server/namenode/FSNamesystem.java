@@ -3919,14 +3919,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    */
   void renewLease(String holder) throws IOException {
     checkOperation(OperationCategory.WRITE);
-    readLock();
-    try {
-      checkOperation(OperationCategory.WRITE);
-      checkNameNodeSafeMode("Cannot renew lease for " + holder);
-      leaseManager.renewLease(holder);
-    } finally {
-      readUnlock("renewLease");
-    }
+    checkNameNodeSafeMode("Cannot renew lease for " + holder);
+    leaseManager.renewLease(holder);
     if (RenewLeaseLOG.isDebugEnabled()) {
       logAuditEvent(true, "renewLease", holder);
     }
