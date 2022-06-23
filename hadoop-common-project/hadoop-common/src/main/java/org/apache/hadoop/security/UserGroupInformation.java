@@ -118,6 +118,11 @@ public class UserGroupInformation {
   private static boolean shouldRenewImmediatelyForTests = false;
   static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   static final String HADOOP_PROXY_USER = "HADOOP_PROXY_USER";
+  /**
+   * system properties only used in hdfs client with tauth enabled.
+   */
+  static final String TQ_USER_NAME = "TQ_USER_NAME";
+  static final String TQ_USER_TOKEN = "TQ_USER_TOKEN";
   private static final Map<String,UserGroupInformation> CACHED_SIMPLE_UGIS = new HashMap<String, UserGroupInformation>();
   private static final Map<String,UserGroupInformation> CACHED_AUTH_UGIS = new HashMap<String, UserGroupInformation>();
 
@@ -623,6 +628,31 @@ public class UserGroupInformation {
   }
 
   /**
+   * get user from system properties if TQ_USER_NAME and TQ_USER_KEY is given
+   * @return
+   */
+  private static UserGroupInformation getUserBySystemProperties() {
+    String envUser = System.getenv(TQ_USER_NAME);
+    String token = System.getenv(TQ_USER_TOKEN);
+    LOG.debug("using system env from TQ_USER_TOKEN: {}, TQ_USER_TOKEN: {}", envUser, token);
+    if (org.apache.commons.lang3.StringUtils.isNotBlank(envUser)
+            && org.apache.commons.lang3.StringUtils.isNotBlank(token)) {
+      return createUserByToken(envUser, token);
+    }
+    return null;
+  }
+
+  private static UserGroupInformation createUserByToken(String user, String base64Key) {
+    UserGroupInformation result = CACHED_AUTH_UGIS.get(user);
+    if (result == null) {
+      result = createUserByTAuthKey(user, new String(Base64.getDecoder().decode(base64Key)));
+      CACHED_AUTH_UGIS.put(user, result);
+    }
+    return result;
+  }
+
+
+  /**
    * Return the current user, including any doAs in the current stack.
    * @return the current user
    * @throws IOException if login fails
@@ -643,6 +673,12 @@ public class UserGroupInformation {
   // need to abandon while permission is managed by ranger
   public synchronized
   static UserGroupInformation getCurrentUser(Configuration conf) throws IOException {
+    // check env first
+    UserGroupInformation sysEnvUser = getUserBySystemProperties();
+    if (sysEnvUser != null) {
+      return sysEnvUser;
+    }
+
     if (conf.getBoolean("tq.use.ugi", false)) {
       String[] ugi = conf.getStrings("hadoop.job.ugi");
       if (ugi != null && ugi.length > 0) {
@@ -652,11 +688,7 @@ public class UserGroupInformation {
             UserGroupInformation result = null;
             String base64Key = conf.get(String.format("tq.%s.key", specUserName));
             if (base64Key != null) {
-              result = CACHED_AUTH_UGIS.get(specUserName);
-              if (result == null) {
-                result = createUserByTAuthKey(specUserName, new String(Base64.getDecoder().decode(base64Key)));
-                    CACHED_AUTH_UGIS.put(specUserName, result);
-              }
+              result = createUserByToken(specUserName, base64Key);
             }
             if (result == null) {
               result = CACHED_SIMPLE_UGIS.get(specUserName);
