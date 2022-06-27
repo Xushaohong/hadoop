@@ -575,9 +575,11 @@ public class DistCpUtils {
       sourceChecksum = sourceChecksum != null
           ? sourceChecksum
           : sourceFS.getFileChecksum(source, sourceLen);
+      LOG.info("Source: {} checksum:{}", source, sourceChecksum);
       if (sourceChecksum != null) {
         // iff there's a source checksum, look for one at the destination.
         targetChecksum = targetFS.getFileChecksum(target);
+        LOG.info("Target: {} checksum:{}", target, targetChecksum);
       }
     } catch (IOException e) {
       LOG.error("Unable to retrieve checksum for " + source + " or " + target, e);
