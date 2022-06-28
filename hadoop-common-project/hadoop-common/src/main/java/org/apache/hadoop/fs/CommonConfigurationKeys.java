@@ -402,4 +402,20 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String ZK_RETRY_INTERVAL_MS =
       ZK_PREFIX + "retry-interval-ms";
   public static final int    ZK_RETRY_INTERVAL_MS_DEFAULT = 1000;
+
+  // unknowhostException iwiki
+  public static final String UNKNOWHOSTEXCEPTION_IWIKI=
+      "unknowException-iwiki";
+  public static final String UNKNOWHOSTEXCEPTION_IWIKI_DEFAULT=
+      "https://iwiki.woa.com/pages/viewpage.action?pageId=1639070775";
+  // unknowhostException km
+  public static final String UNKNOWHOSTEXCEPTION_KM =
+      "unknowException-km";
+  public static final String UNKNOWHOSTEXCEPTION_KM_DEFAULT =
+      "https://km.woa.com/articles/show/454799";
+  // address unresolved km
+  public static final String ADDRESS_UNRESOLVED_KM =
+      "address-unresolved-km";
+  public static final String ADDRESS_UNRESOLVED_KM_DEFAULT =
+      "https://km.woa.com/articles/show/454799";
 }

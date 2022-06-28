@@ -250,6 +250,18 @@ public class FsShell extends Configured implements Tool {
     out.println(getUsagePrefix() + " " + instance.getUsage());
   }
 
+  private void printHelpIwiki(PrintStream out) {
+    String iwiki = getConf().get(CommonConfigurationKeys.UNKNOWHOSTEXCEPTION_IWIKI,
+        CommonConfigurationKeys.UNKNOWHOSTEXCEPTION_IWIKI_DEFAULT);
+    out.println("Visit " + iwiki);
+  }
+
+  private void printHelpKm(PrintStream out) {
+    String km = getConf().get(CommonConfigurationKeys.UNKNOWHOSTEXCEPTION_KM,
+        CommonConfigurationKeys.UNKNOWHOSTEXCEPTION_KM_DEFAULT);
+    out.println("Visit " + km);
+  }
+
   private void printInstanceHelp(PrintStream out, Command instance) {
     out.println(instance.getUsage() + " :");
     TableListing listing = null;
@@ -337,6 +349,8 @@ public class FsShell extends Configured implements Tool {
         }
         printUsage(System.err);
         if (instance != null) {
+          printHelpIwiki(System.err);
+          printHelpKm(System.err);
           printInstanceUsage(System.err, instance);
         }
       } catch (Exception e) {

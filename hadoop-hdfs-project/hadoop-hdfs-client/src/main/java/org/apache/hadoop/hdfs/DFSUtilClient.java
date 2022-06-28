@@ -25,6 +25,7 @@ import java.net.URISyntaxException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -456,9 +457,11 @@ public class DFSUtilClient {
       if (address != null) {
         InetSocketAddress isa = NetUtils.createSocketAddr(address);
         if (isa.isUnresolved()) {
+          String km = conf.get(CommonConfigurationKeys.ADDRESS_UNRESOLVED_KM,
+              CommonConfigurationKeys.ADDRESS_UNRESOLVED_KM_DEFAULT);
           LOG.warn("Namenode for {} remains unresolved for ID {}. Check your "
               + "hdfs-site.xml file to ensure namenodes are configured "
-              + "properly.", nsId, nnId);
+              + "properly. faq Visit .{}", nsId, nnId, km);
         }
         ret.put(nnId, isa);
       }
