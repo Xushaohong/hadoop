@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.hdfs.server.namenode.NameNode.OperationCategory;
@@ -148,7 +149,8 @@ abstract public class HAState {
    * @throws StandbyException if a given type of operation is not
    *           supported in standby state
    */
-  public abstract void checkOperation(final HAContext context, final OperationCategory op)
+  public abstract void checkOperation(final HAContext context, final OperationCategory op,
+      final Configuration conf)
       throws StandbyException;
 
   public abstract boolean shouldPopulateReplQueues();

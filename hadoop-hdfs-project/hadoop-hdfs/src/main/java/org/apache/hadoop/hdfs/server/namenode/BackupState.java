@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import java.io.IOException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.hdfs.server.namenode.NameNode.OperationCategory;
@@ -35,7 +36,8 @@ public class BackupState extends HAState {
   }
 
   @Override // HAState
-  public void checkOperation(HAContext context, OperationCategory op)
+  public void checkOperation(HAContext context, OperationCategory op,
+      Configuration conf)
       throws StandbyException {
     context.checkOperation(op);
   }

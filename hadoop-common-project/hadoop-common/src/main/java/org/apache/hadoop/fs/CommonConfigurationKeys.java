@@ -403,6 +403,12 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
       ZK_PREFIX + "retry-interval-ms";
   public static final int    ZK_RETRY_INTERVAL_MS_DEFAULT = 1000;
 
+  // standby error iwiki
+  public static final String STANDBY_ERROR_IWIKI=
+      "standby-error-iwiki";
+  public static final String STANDBY_ERROR_IWIKI_DEFAULT=
+      "https://iwiki.woa.com/pages/viewpage.action?pageId=1888348756";
+
   // unknowhostException iwiki
   public static final String UNKNOWHOSTEXCEPTION_IWIKI=
       "unknowException-iwiki";

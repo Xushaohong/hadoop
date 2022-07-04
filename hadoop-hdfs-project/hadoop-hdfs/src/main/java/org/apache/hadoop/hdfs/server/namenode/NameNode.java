@@ -2060,7 +2060,7 @@ public class NameNode extends ReconfigurableBase implements
     @Override
     public void checkOperation(final OperationCategory op)
         throws StandbyException {
-      state.checkOperation(haContext, op);
+      state.checkOperation(haContext, op, getConf());
     }
     
     @Override

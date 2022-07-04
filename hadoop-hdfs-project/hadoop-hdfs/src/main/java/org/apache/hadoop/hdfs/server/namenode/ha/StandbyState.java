@@ -20,6 +20,8 @@ package org.apache.hadoop.hdfs.server.namenode.ha;
 import java.io.IOException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -87,15 +89,18 @@ public class StandbyState extends HAState {
   }
 
   @Override
-  public void checkOperation(HAContext context, OperationCategory op)
+  public void checkOperation(HAContext context, OperationCategory op,
+      Configuration conf)
       throws StandbyException {
     if (op == OperationCategory.UNCHECKED ||
         (op == OperationCategory.READ && context.allowStaleReads())) {
       return;
     }
     String faq = ". Visit https://s.apache.org/sbnn-error";
+    String iwiki = conf.get(CommonConfigurationKeys.STANDBY_ERROR_IWIKI,
+        CommonConfigurationKeys.STANDBY_ERROR_IWIKI_DEFAULT);
     String msg = "Operation category " + op + " is not supported in state "
-        + context.getState() + faq;
+        + context.getState() + faq + " Visit " + iwiki;
     if (op == OperationCategory.WRITE && isObserver) {
       // If observer receives a write call, return active retry
       // exception to inform client to retry on active.

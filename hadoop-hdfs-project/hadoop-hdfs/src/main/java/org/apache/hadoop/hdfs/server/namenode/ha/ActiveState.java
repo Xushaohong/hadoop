@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode.ha;
 import java.io.IOException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -37,7 +38,8 @@ public class ActiveState extends HAState {
   }
 
   @Override
-  public void checkOperation(HAContext context, OperationCategory op) {
+  public void checkOperation(HAContext context, OperationCategory op,
+    Configuration conf) {
     return; // All operations are allowed in active state
   }
   
