@@ -445,10 +445,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private final String supergroup;
   private final boolean standbyShouldCheckpoint;
   private final int snapshotDiffReportLimit;
-  private final int blockDeletionIncrement;
-  private final int pendingDeletionCountThreshold;
-  private final long sleepTimeForPendingDeletion;
-  private final boolean pendingDeletionEnabled;
 
   /** Interval between each check of lease to release. */
   private final long leaseRecheckIntervalMs;
@@ -952,32 +948,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           DFSConfigKeys.DFS_NAMENODE_LIST_OPENFILES_NUM_RESPONSES +
               " must be a positive integer."
       );
-
-      this.blockDeletionIncrement = conf.getInt(
-          DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_INCREMENT_KEY,
-          DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_INCREMENT_DEFAULT);
-      Preconditions.checkArgument(blockDeletionIncrement > 0,
-          DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_INCREMENT_KEY +
-              " must be a positive integer.");
-
-      this.pendingDeletionCountThreshold = conf.getInt(
-              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_PENDING_THRESHOLD,
-              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_PENDING_THRESHOLD_DEFAULT);
-      Preconditions.checkArgument(this.pendingDeletionCountThreshold > 0,
-              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_PENDING_THRESHOLD +
-                      " must be a positive integer."
-      );
-      this.sleepTimeForPendingDeletion =
-              conf.getTimeDuration(DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_TIME,
-                      DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_TIME_DEFAULT,
-                      TimeUnit.MILLISECONDS);
-      Preconditions.checkArgument(this.sleepTimeForPendingDeletion > 0,
-              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_TIME +
-                      " must be a positive integer."
-      );
-
-      this.pendingDeletionEnabled = conf.getBoolean(DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_ENABLED,
-              DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_SLEEP_ENABLED_DEFAULT);
 
       this.delegationTokenAllowEmptyReturn = conf.getBoolean("tq.delegation.token.allow.empty.return", true);
     } catch(IOException e) {
@@ -2207,8 +2177,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       }
       getEditLog().logSync();
       if (!toRemoveBlocks.getToDeleteList().isEmpty()) {
-        removeBlocks(toRemoveBlocks);
-        toRemoveBlocks.clear();
+        blockManager.addBLocksToMarkedDeleteQueue(
+                toRemoveBlocks.getToDeleteList());
       }
       logAuditEvent(true, operationName, src, null, r.getFileStatus());
     } catch (AccessControlException e) {
@@ -2605,8 +2575,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       if (!skipSync) {
         getEditLog().logSync();
         if (toRemoveBlocks != null) {
-          removeBlocks(toRemoveBlocks);
-          toRemoveBlocks.clear();
+          blockManager.addBLocksToMarkedDeleteQueue(
+              toRemoveBlocks.getToDeleteList());
         }
       }
     }
@@ -3114,8 +3084,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     BlocksMapUpdateInfo collectedBlocks = res.collectedBlocks;
     if (!collectedBlocks.getToDeleteList().isEmpty()) {
-      removeBlocks(collectedBlocks);
-      collectedBlocks.clear();
+      blockManager.addBLocksToMarkedDeleteQueue(
+              collectedBlocks.getToDeleteList());
     }
 
     logAuditEvent(true, operationName + " (options=" +
@@ -3150,7 +3120,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
     getEditLog().logSync();
     if (toRemovedBlocks != null) {
-      removeBlocks(toRemovedBlocks); // Incremental deletion of blocks
+      blockManager.addBLocksToMarkedDeleteQueue(
+              toRemovedBlocks.getToDeleteList());
     }
     logAuditEvent(true, operationName, src);
     return ret;
@@ -3159,44 +3130,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   FSPermissionChecker getPermissionChecker()
       throws AccessControlException {
     return dir.getPermissionChecker();
-  }
-
-  /**
-   * From the given list, incrementally remove the blocks from blockManager
-   * Writelock is dropped and reacquired every BLOCK_DELETION_INCREMENT to
-   * ensure that other waiters on the lock can get in. See HDFS-2938
-   * When the pending deletion blocks exceed the pendingDeletionCountThreshold,
-   * it means so many blocks are pending for deletion,
-   * thread should sleep for sleepTimeForPendingDeletion
-   * to ensure that other waiters on the lock can get in.
-   *
-   * @param blocks
-   *          An instance of {@link BlocksMapUpdateInfo} which contains a list
-   *          of blocks that need to be removed from blocksMap
-   */
-  void removeBlocks(BlocksMapUpdateInfo blocks) {
-    List<BlockInfo> toDeleteList = blocks.getToDeleteList();
-    Iterator<BlockInfo> iter = toDeleteList.iterator();
-    while (iter.hasNext()) {
-      writeLock();
-      try {
-        for (int i = 0; i < blockDeletionIncrement && iter.hasNext(); i++) {
-          blockManager.removeBlock(iter.next());
-        }
-      } finally {
-        writeUnlock("removeBlocks");
-        if (pendingDeletionEnabled && blockManager.getPendingDeletionBlocksCount()
-                > pendingDeletionCountThreshold) {
-          try {
-            LOG.info("remove blocks too fast, sleep " + sleepTimeForPendingDeletion + " ms");
-            Thread.sleep(sleepTimeForPendingDeletion);
-          } catch (Exception e){
-            LOG.error("Sleep for pending too many " +
-                    "deletion blocks with exception", e);
-          }
-        }
-      }
-    }
   }
   
   /**
@@ -4244,7 +4177,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                   INodesInPath.fromINode((INodeFile) bc), false);
           changed |= toRemoveBlocks != null;
           if (toRemoveBlocks != null) {
-            removeBlocks(toRemoveBlocks); // Incremental deletion of blocks
+            blockManager.addBLocksToMarkedDeleteQueue(
+                toRemoveBlocks.getToDeleteList());
           }
         }
       } finally {
@@ -6879,7 +6813,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     // Breaking the pattern as removing blocks have to happen outside of the
     // global lock
     if (blocksToBeDeleted != null) {
-      removeBlocks(blocksToBeDeleted);
+      blockManager.addBLocksToMarkedDeleteQueue(
+              blocksToBeDeleted.getToDeleteList());
     }
     logAuditEvent(success, operationName, rootPath, null, null);
   }

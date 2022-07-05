@@ -52,6 +52,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import java.util.concurrent.atomic.AtomicLong;
 import javax.management.ObjectName;
@@ -193,6 +194,9 @@ public class BlockManager implements BlockStatsMXBean {
   private volatile long lowRedundancyBlocksCount = 0L;
   private volatile long scheduledReplicationBlocksCount = 0L;
 
+  private final long deleteBlockLockTimeMs;
+  private final long deleteBlockUnlockIntervalTimeMs;
+
   /** flag indicating whether replication queues have been initialized */
   private boolean initializedReplQueues;
 
@@ -331,6 +335,12 @@ public class BlockManager implements BlockStatsMXBean {
   private final Daemon invalidationThread =
       new Daemon(new InvalidationMonitor());
 
+  /**
+   * markedDeleteBlockScrubber thread for handling async delete blocks.
+   */
+  private final Daemon markedDeleteBlockScrubberThread =
+          new Daemon(new MarkedDeleteBlockScrubber());
+
   /** Block report thread for handling async reports. */
   private final BlockReportProcessingThread blockReportThread;
 
@@ -425,6 +435,12 @@ public class BlockManager implements BlockStatsMXBean {
   private int numBlocksPerIteration;
 
   /**
+   * The blocks of deleted files are put into the queue,
+   * and the cleanup thread processes these blocks periodically.
+   */
+  private final ConcurrentLinkedQueue<List<BlockInfo>> markedDeleteQueue;
+
+  /**
    * Progress of the Reconstruction queues initialisation.
    */
   private double reconstructionQueuesInitProgress = 0.0;
@@ -475,11 +491,17 @@ public class BlockManager implements BlockStatsMXBean {
     startupDelayBlockDeletionInMs = conf.getLong(
         DFSConfigKeys.DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_SEC_KEY,
         DFSConfigKeys.DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_SEC_DEFAULT) * 1000L;
+    deleteBlockLockTimeMs = conf.getLong(
+        DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_LOCK_THRESHOLD_MS,
+        DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_LOCK_THRESHOLD_MS_DEFAULT);
+    deleteBlockUnlockIntervalTimeMs = conf.getLong(
+        DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_UNLOCK_INTERVAL_MS,
+        DFSConfigKeys.DFS_NAMENODE_BLOCK_DELETION_UNLOCK_INTERVAL_MS_DEFAULT);
     invalidateBlocks = new InvalidateBlocks(
         datanodeManager.getBlockInvalidateLimit(),
         startupDelayBlockDeletionInMs,
         blockIdManager);
-
+    markedDeleteQueue = new ConcurrentLinkedQueue<>();
     // Compute the map capacity by allocating 2% of total memory
     blocksMap = new BlocksMap(
         LightWeightGSet.computeCapacity(2.0, "BlocksMap"));
@@ -731,6 +753,9 @@ public class BlockManager implements BlockStatsMXBean {
     datanodeManager.activate(conf);
     this.redundancyThread.setName("RedundancyMonitor");
     this.redundancyThread.start();
+    this.markedDeleteBlockScrubberThread.
+            setName("MarkedDeleteBlockScrubberThread");
+    this.markedDeleteBlockScrubberThread.start();
     this.blockReportThread.start();
     this.invalidationThread.start();
     mxBeanName = MBeans.register("NameNode", "BlockStats", this);
@@ -746,9 +771,11 @@ public class BlockManager implements BlockStatsMXBean {
       redundancyThread.interrupt();
       invalidationThread.interrupt();
       blockReportThread.interrupt();
+      markedDeleteBlockScrubberThread.interrupt();
       redundancyThread.join(3000);
       invalidationThread.join(3000);
       blockReportThread.join(3000);
+      markedDeleteBlockScrubberThread.join(3000);
     } catch (InterruptedException ie) {
     }
     datanodeManager.close();
@@ -4866,6 +4893,78 @@ public class BlockManager implements BlockStatsMXBean {
   }
 
   /**
+   * Periodically deletes the marked block.
+   */
+  private class MarkedDeleteBlockScrubber implements Runnable {
+    private Iterator<BlockInfo> toDeleteIterator = null;
+    private boolean isSleep;
+    private NameNodeMetrics metrics;
+
+    private void remove(long time) {
+      if (checkToDeleteIterator()) {
+        namesystem.writeLock();
+        try {
+          while (toDeleteIterator.hasNext()) {
+            removeBlock(toDeleteIterator.next());
+            metrics.decrPendingDeleteBlocksCount();
+            if (Time.monotonicNow() - time > deleteBlockLockTimeMs) {
+              isSleep = true;
+              break;
+            }
+          }
+        } finally {
+          namesystem.writeUnlock();
+        }
+      }
+    }
+
+    private boolean checkToDeleteIterator() {
+      return toDeleteIterator != null && toDeleteIterator.hasNext();
+    }
+
+    @Override
+    public void run() {
+      LOG.info("Start MarkedDeleteBlockScrubber thread");
+      while (namesystem.isRunning() &&
+              !Thread.currentThread().isInterrupted()) {
+        if (!markedDeleteQueue.isEmpty() || checkToDeleteIterator()) {
+          try {
+            metrics = NameNode.getNameNodeMetrics();
+            metrics.setDeleteBlocksQueued(markedDeleteQueue.size());
+            isSleep = false;
+            long startTime = Time.monotonicNow();
+            remove(startTime);
+            while (!isSleep && !markedDeleteQueue.isEmpty() &&
+                    !Thread.currentThread().isInterrupted()) {
+              List<BlockInfo> markedDeleteList = markedDeleteQueue.poll();
+              if (markedDeleteList != null) {
+                toDeleteIterator = markedDeleteList.listIterator();
+              }
+              remove(startTime);
+            }
+          } catch (Exception e){
+            LOG.warn("MarkedDeleteBlockScrubber encountered an exception" +
+                            " during the block deletion process, " +
+                            " the deletion of the block will retry in {} millisecond.",
+                    deleteBlockUnlockIntervalTimeMs, e);
+          }
+        }
+        if (isSleep) {
+          LOG.debug("Clear markedDeleteQueue over {}" +
+                  " millisecond to release the write lock", deleteBlockLockTimeMs);
+        }
+        try {
+          Thread.sleep(deleteBlockUnlockIntervalTimeMs);
+        } catch (InterruptedException e) {
+          LOG.info("Stopping MarkedDeleteBlockScrubber.");
+          break;
+        }
+      }
+    }
+  }
+
+
+  /**
    * Periodically calls computeBlockRecoveryWork().
    */
   private class RedundancyMonitor implements Runnable {
@@ -5227,6 +5326,17 @@ public class BlockManager implements BlockStatsMXBean {
 
   public BlockIdManager getBlockIdManager() {
     return blockIdManager;
+  }
+
+  @VisibleForTesting
+  public ConcurrentLinkedQueue<List<BlockInfo>> getMarkedDeleteQueue() {
+    return markedDeleteQueue;
+  }
+
+  public void addBLocksToMarkedDeleteQueue(List<BlockInfo> blockInfos) {
+    markedDeleteQueue.add(blockInfos);
+    NameNode.getNameNodeMetrics().
+        incrPendingDeleteBlocksCount(blockInfos.size());
   }
 
   public long nextGenerationStamp(boolean legacyBlock) throws IOException {
