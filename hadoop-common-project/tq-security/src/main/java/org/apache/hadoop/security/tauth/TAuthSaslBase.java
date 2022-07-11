@@ -1,16 +1,10 @@
 package org.apache.hadoop.security.tauth;
 
+import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_PROTOCOL_NAME_KEY;
+
 import com.tencent.tdw.security.exceptions.SecureException;
 import com.tencent.tdw.security.utils.EncryptUtils;
 import com.tencent.tdw.security.utils.StringUtils;
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.security.Utils;
-
-import javax.security.auth.callback.CallbackHandler;
-import javax.security.sasl.Sasl;
-import javax.security.sasl.SaslException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -18,8 +12,13 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-
-import static org.apache.hadoop.security.tauth.TAuthConst.TAUTH_PROTOCOL_NAME_KEY;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslException;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.security.Utils;
 
 public class TAuthSaslBase {
 

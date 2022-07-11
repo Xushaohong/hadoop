@@ -18,8 +18,8 @@
     <dependency>
       <groupId>com.tencent.tdw</groupId>
       <artifactId>security-common</artifactId>
-      <version>1.1.5</version>
-      <classifier>shaded</classifier>
+      <version>1.1.7-SNAPSHOT</version>
+<!--      <classifier>shaded</classifier>-->
       <exclusions>
         <exclusion>
           <groupId>org.apache.commons</groupId>
@@ -30,6 +30,12 @@
           <artifactId>servlet-api</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <scope>provided</scope>
     </dependency>
 
     <dependency>
@@ -44,6 +50,13 @@
       <artifactId>servlet-api</artifactId>
       <version>2.5</version>
       <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
     </dependency>
 
   </dependencies>

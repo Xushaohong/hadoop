@@ -323,7 +323,7 @@ extends AbstractDelegationTokenIdentifier>
    */
   protected DelegationTokenInformation getTokenInfo(TokenIdent ident) {
     DelegationTokenInformation tokenInformation = currentTokens.get(ident);
-    if (tokenInformation == null && isUnionTokenEnable() && ident.isUnion()) {
+    if (tokenInformation == null && ident.isUnion()) {
       TokenInformation globalTokenInfo = unionDelegationTokenManager.getToken(ident.getId(),
           unionDelegationTokenManager.getConverter().toId(ident));
       if (globalTokenInfo != null) {
@@ -472,27 +472,34 @@ extends AbstractDelegationTokenIdentifier>
   protected synchronized byte[] createPassword(TokenIdent identifier) {
     int sequenceNum;
     long now = Time.now();
+    long renewDate = now + tokenRenewInterval;
     sequenceNum = incrementDelegationTokenSeqNum();
     identifier.setIssueDate(now);
     identifier.setMaxDate(now + tokenMaxLifetime);
     identifier.setMasterKeyId(currentKey.getKeyId());
     identifier.setSequenceNumber(sequenceNum);
+    boolean isSuccess = false;
+    DelegationTokenInformation tokenInfo = null;
+    byte[] password = null;
     if (isUnionTokenEnable()) {
-      long id = unionDelegationTokenManager.pushToken(
-          unionDelegationTokenManager.getConverter().toId(identifier), TOKEN_INFO_PLACEHOLDER);
-      if (id > 0) {
-        identifier.setId(id);
-      }
+      long globalId = unionDelegationTokenManager.getNextId();
+      identifier.setId(globalId);
+      password = createPassword(identifier.getBytes(), currentKey.getKey());
+      tokenInfo = new DelegationTokenInformation(renewDate, password,
+              getTrackingIdIfEnabled(identifier));
+      isSuccess = unionDelegationTokenManager.pushToken(globalId,
+              unionDelegationTokenManager.getConverter().toId(identifier),
+              unionDelegationTokenManager.getConverter().toInfo(tokenInfo));
+    }
+    // if not success, fall back using local token
+    if (!isSuccess) {
+      identifier.setId(0);
+      password = createPassword(identifier.getBytes(), currentKey.getKey());
+      tokenInfo = new DelegationTokenInformation(renewDate, password,
+              getTrackingIdIfEnabled(identifier));
     }
     LOG.info("Creating password for identifier: " + formatTokenId(identifier)
-        + ", currentKey: " + currentKey.getKeyId());
-    byte[] password = createPassword(identifier.getBytes(), currentKey.getKey());
-    DelegationTokenInformation tokenInfo = new DelegationTokenInformation(now
-        + tokenRenewInterval, password, getTrackingIdIfEnabled(identifier));
-    if (isUnionTokenEnable()) {
-      unionDelegationTokenManager.updateToken(identifier.getId(),
-          unionDelegationTokenManager.getConverter().toInfo(tokenInfo));
-    }
+            + ", currentKey: " + currentKey.getKeyId());
     try {
       storeToken(identifier, tokenInfo);
     } catch (IOException ioe) {
@@ -782,6 +789,10 @@ extends AbstractDelegationTokenIdentifier>
           }
           if (lastTokenCacheCleanup + tokenRemoverScanInterval < now) {
             removeExpiredToken();
+            if (unionDelegationTokenManager != null) {
+              // remove global cached token
+              unionDelegationTokenManager.removeExpiredToken();
+            }
             lastTokenCacheCleanup = now;
           }
           try {

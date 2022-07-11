@@ -12,8 +12,9 @@ import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecret
 public class UnionDelegationTokenManager<TOKEN_IDENT extends AbstractDelegationTokenIdentifier>
     extends AbstractAuthTokenDelegationManager<TOKEN_IDENT, DelegationTokenInformation> {
 
-  public UnionDelegationTokenManager(long maxIdleTime, int maxTokenCacheNum, long tokenRemoverScanInterval) {
-    super(maxIdleTime, maxTokenCacheNum, tokenRemoverScanInterval);
+  public UnionDelegationTokenManager(long maxIdleTime, int maxTokenCacheNum,
+          String serviceId) {
+    super(maxIdleTime, maxTokenCacheNum, serviceId);
   }
 
   private static final byte [] PASSWORD_PLACEHOLDER = "nopassword".getBytes();

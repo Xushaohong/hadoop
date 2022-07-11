@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 
+import org.apache.hadoop.security.token.delegation.UnionDelegationTokenManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -73,7 +74,7 @@ public class DelegationTokenSecretManager
       long delegationTokenRemoverScanInterval, FSNamesystem namesystem) {
     this(delegationKeyUpdateInterval, delegationTokenMaxLifetime,
         delegationTokenRenewInterval, delegationTokenRemoverScanInterval, false,
-        namesystem);
+        namesystem, null);
   }
 
   /**
@@ -91,9 +92,9 @@ public class DelegationTokenSecretManager
   public DelegationTokenSecretManager(long delegationKeyUpdateInterval,
       long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
       long delegationTokenRemoverScanInterval, boolean storeTokenTrackingId,
-      FSNamesystem namesystem) {
+      FSNamesystem namesystem, UnionDelegationTokenManager<DelegationTokenIdentifier> unionDelegationTokenManager) {
     super(delegationKeyUpdateInterval, delegationTokenMaxLifetime,
-        delegationTokenRenewInterval, delegationTokenRemoverScanInterval);
+        delegationTokenRenewInterval, delegationTokenRemoverScanInterval, unionDelegationTokenManager);
     this.namesystem = namesystem;
     this.storeTokenTrackingId = storeTokenTrackingId;
   }
@@ -349,6 +350,20 @@ public class DelegationTokenSecretManager
           "Can't update persisted delegation token renewal to a running SecretManager.");
     }
     currentTokens.remove(identifier);
+  }
+
+  public int getGlobalTokenNum() {
+    if (unionDelegationTokenManager != null) {
+      unionDelegationTokenManager.getGlobalTokenNum();
+    }
+    return 0;
+  }
+
+  public int getPendingTokenNum() {
+    if (unionDelegationTokenManager != null) {
+      unionDelegationTokenManager.getPendingTokenNum();
+    }
+    return 0;
   }
   
   /**

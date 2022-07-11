@@ -25,6 +25,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Server;
@@ -86,8 +87,7 @@ public class RouterSecurityManager {
             conf.getLong("tq.union.token.max.idle.time", 30 * 60 * 1000L),
             conf.getInt(
                 "tq.union.token.cache.max.num", 1024 * 100),
-            conf.getLong(
-                "tq.union.token.remover.scan.interval", 15 * 60 * 1000L)));
+                DFSUtil.getNamenodeNameServiceId(conf)));
       }
       this.dtSecretManager.startThreads();
     }

@@ -2,15 +2,18 @@ package org.apache.hadoop.security;
 
 import com.google.common.collect.Sets;
 import com.tencent.tdw.security.utils.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Properties;
+import java.util.Set;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AuthConfigureHolder {
 
@@ -30,6 +33,14 @@ public class AuthConfigureHolder {
   private static String REGULAR_USER_UNIFY_PERMISSION_ENABLE_KEY =
       "tq.regular.user.permission.unify.enable";
 
+  // config for union token, default is 20 ms
+  private static String UNION_TOKEN_ASYNC_INTERVAL_KEY = "union.token.async.interval";
+  private static String UNION_TOKEN_ASYNC_CAPACITY_KEY = "union.token.async.capacity";
+  private static String UNION_TOKEN_ASYNC_BATCH_KEY = "union.token.async.batch";
+  private static String UNION_TOKEN_WORKER_ID_KEY = "union.token.worker.id";
+
+  private static String UNION_TOKEN_MAX_GETTING_REQUEST_KEY = "union.token.max.getting.request";
+
   private static boolean AUTH_WEB_CONFIG_ENABLE = false;
   private static boolean AUTH_ENABLE = true;
   private static boolean AUTH_SMK_ENABLE = true;
@@ -43,6 +54,13 @@ public class AuthConfigureHolder {
   private static boolean REGULAR_USERNAME_ENABLE = false;
   private final static String IRREGULAR_USER_PREFIX = "tdw_";
   private static boolean REGULAR_USER_UNIFY_PERMISSION_ENABLE = true;
+
+  private static long UNION_TOKEN_ASYNC_INTERVAL = 20L;
+  private static int UNION_TOKEN_ASYNC_CAPACITY = 10240;
+  private static int UNION_TOKEN_ASYNC_BATCH = 100;
+  private static int UNION_TOKEN_WORKER_ID = -1;
+
+  private static int UNION_TOKEN_MAX_GETTING_REQUEST = 512;
 
   static {
     refreshAuthConfig();
@@ -71,11 +89,25 @@ public class AuthConfigureHolder {
     REGULAR_USERNAME_ENABLE = Boolean.parseBoolean(Utils.getProperty(authProps, REGULAR_USERNAME_ENABLE_KEY, "false"));
     REGULAR_USER_UNIFY_PERMISSION_ENABLE = Boolean.parseBoolean(Utils.getProperty(authProps, REGULAR_USER_UNIFY_PERMISSION_ENABLE_KEY, "true"));
     AuthConfigureHolder.setAllowUserList(Utils.getProperty(authProps, ALLOW_USER_LIST_KEY, ""));
+    refreshUnionTokenConfig(authProps);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Refresh auth config successfully:" + toDigest());
     }
     return true;
+  }
+
+  private static void refreshUnionTokenConfig(Properties authProps) {
+    long unionAsyncInterval = Long.parseLong(Utils.getProperty(authProps, UNION_TOKEN_ASYNC_INTERVAL_KEY, "20"));
+    if (unionAsyncInterval <= 0) {
+      LOG.error("{} is not allowed to set negative", UNION_TOKEN_ASYNC_INTERVAL_KEY);
+    } else {
+      UNION_TOKEN_ASYNC_INTERVAL = unionAsyncInterval;
+    }
+    UNION_TOKEN_ASYNC_CAPACITY = Integer.parseInt(Utils.getProperty(authProps, UNION_TOKEN_ASYNC_CAPACITY_KEY, "10240"));
+    UNION_TOKEN_WORKER_ID = Integer.parseInt(Utils.getProperty(authProps, UNION_TOKEN_WORKER_ID_KEY, "-1"));
+    UNION_TOKEN_ASYNC_BATCH = Integer.parseInt(Utils.getProperty(authProps, UNION_TOKEN_ASYNC_BATCH_KEY, "100"));
+    UNION_TOKEN_MAX_GETTING_REQUEST = Integer.parseInt(Utils.getProperty(authProps, UNION_TOKEN_MAX_GETTING_REQUEST_KEY, "512"));
   }
 
   public static void setAuthEnable(boolean authEnable) {
@@ -182,6 +214,26 @@ public class AuthConfigureHolder {
 
   public static ProtocolPolicyManagement getProtocolPolicyManagement() {
     return PROTOCOL_POLICY_MANAGEMENT;
+  }
+
+  public static long getUnionTokenAsyncInterval() {
+    return UNION_TOKEN_ASYNC_INTERVAL;
+  }
+
+  public static int getUnionTokenAsyncCapacity() {
+    return UNION_TOKEN_ASYNC_CAPACITY;
+  }
+
+  public static int getUnionTokenMaxGettingRequest() {
+    return UNION_TOKEN_MAX_GETTING_REQUEST;
+  }
+
+  public static int getUnionTokenWorkerId() {
+    return UNION_TOKEN_WORKER_ID;
+  }
+
+  public static int getUnionTokenAsyncBatch() {
+    return UNION_TOKEN_ASYNC_BATCH;
   }
 
   public static class ProtocolPolicyManagement {

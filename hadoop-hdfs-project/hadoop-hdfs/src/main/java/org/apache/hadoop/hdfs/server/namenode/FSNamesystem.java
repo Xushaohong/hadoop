@@ -318,6 +318,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
+import org.apache.hadoop.security.token.delegation.UnionDelegationTokenManager;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -5084,6 +5085,16 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return blockManager.getCapacity();
   }
 
+  @Metric
+  public int getGlobalTokenNum() {
+    return dtSecretManager.getGlobalTokenNum();
+  }
+
+  @Metric
+  public int getPendingTokenNum() {
+    return dtSecretManager.getPendingTokenNum();
+  }
+
   public HAServiceState getState() {
     return haContext == null ? null : haContext.getState().getServiceState();
   }
@@ -5688,6 +5699,18 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    */
   private DelegationTokenSecretManager createDelegationTokenSecretManager(
       Configuration conf) {
+    UnionDelegationTokenManager<DelegationTokenIdentifier> unionDelegationTokenManager = null;
+    boolean unionTokenEnable = conf.getBoolean("tq.hdfs.union.token.enable", false);
+    if(unionTokenEnable) {
+      unionDelegationTokenManager =
+              new UnionDelegationTokenManager<>(conf.getLong(
+                      "tq.union.token.max.idle.time", conf.getLong(DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
+                              DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT)),
+                      conf.getInt(
+                              "tq.union.token.cache.max.num", 1024 * 100),
+                      DFSUtil.getNamenodeNameServiceId(conf));
+      LOG.info("Enable union token manager");
+    }
     return new DelegationTokenSecretManager(conf.getLong(
         DFS_NAMENODE_DELEGATION_KEY_UPDATE_INTERVAL_KEY,
         DFS_NAMENODE_DELEGATION_KEY_UPDATE_INTERVAL_DEFAULT),
@@ -5698,7 +5721,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         DELEGATION_TOKEN_REMOVER_SCAN_INTERVAL,
         conf.getBoolean(DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_KEY,
             DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_DEFAULT),
-        this);
+        this, unionDelegationTokenManager);
   }
 
   public void loadTokenFromLocal() {
@@ -5758,13 +5781,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final String tokenId;
     Token<DelegationTokenIdentifier> token;
     checkOperation(OperationCategory.WRITE);
-    writeLock();
+    readLock();
     try {
       checkOperation(OperationCategory.WRITE);
       checkNameNodeSafeMode("Cannot issue delegation token");
       if (!isAllowedDelegationTokenOp()) {
         // return empty token if allowed
         if(delegationTokenAllowEmptyReturn) {
+          LOG.warn("allow empty return");
           return null;
         }
         throw new IOException(
@@ -5791,7 +5815,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       tokenId = dtId.toStringStable();
       success = true;
     } finally {
-      writeUnlock("getDelegationToken");
+      readUnlock("getDelegationToken");
     }
     getEditLog().logSync();
     logAuditEvent(success, operationName, tokenId);
@@ -5812,7 +5836,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     String tokenId;
     long expiryTime;
     checkOperation(OperationCategory.WRITE);
-    writeLock();
+    readLock();
     try {
       checkOperation(OperationCategory.WRITE);
 
@@ -5833,7 +5857,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       logAuditEvent(success, operationName, tokenId);
       throw ace;
     } finally {
-      writeUnlock("renewDelegationToken");
+      readUnlock("renewDelegationToken");
     }
     getEditLog().logSync();
     logAuditEvent(success, operationName, tokenId);
@@ -5851,7 +5875,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean success = false;
     String tokenId;
     checkOperation(OperationCategory.WRITE);
-    writeLock();
+    readLock();
     try {
       checkOperation(OperationCategory.WRITE);
 
@@ -5868,7 +5892,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       logAuditEvent(success, operationName, tokenId);
       throw ace;
     } finally {
-      writeUnlock("cancelDelegationToken");
+      readUnlock("cancelDelegationToken");
     }
     getEditLog().logSync();
     logAuditEvent(success, operationName, tokenId);
@@ -5949,7 +5973,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         && (authMethod != AuthenticationMethod.KERBEROS)
         && (authMethod != AuthenticationMethod.KERBEROS_SSL)
         && (authMethod != AuthenticationMethod.CERTIFICATE)
-        && (authMethod != AuthenticationMethod.TAUTH)) {
+        && (authMethod != AuthenticationMethod.TAUTH)
+        && (authMethod != AuthenticationMethod.TOKEN)) {
       return false;
     }
     return true;
