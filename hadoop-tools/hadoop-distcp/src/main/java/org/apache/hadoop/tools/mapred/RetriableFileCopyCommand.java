@@ -142,6 +142,11 @@ public class RetriableFileCopyCommand extends RetriableCommand {
       long bytesRead = copyToFile(targetPath, targetFS, source,
           offset, context, fileAttributes, sourceChecksum);
 
+      if (targetFS.getFileStatus(targetPath).getLen() != source.getLen()){
+        throw new IOException("target len: " +
+            targetFS.getFileStatus(targetPath).getLen() + " != source len: " + source.getLen());
+      }
+
       if (!source.isSplit()) {
         DistCpUtils.compareFileLengthsAndChecksums(source.getLen(), sourceFS,
                 sourcePath, sourceChecksum, targetFS,
