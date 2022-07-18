@@ -32,6 +32,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_LOCAL_DELEGATION_TOKEN;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT;
@@ -93,6 +94,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SNAPSHOT_DIFF_LI
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SNAPSHOT_DIFF_LISTING_LIMIT_DEFAULT;
 
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY;
@@ -110,6 +113,7 @@ import org.apache.hadoop.hdfs.protocol.ZoneReencryptionStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReportListing;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.server.common.ECTopologyVerifier;
+import org.apache.hadoop.hdfs.server.namenode.handler.RefreshTokensHandler;
 import org.apache.hadoop.hdfs.server.namenode.metrics.ReplicatedBlocksMBean;
 import org.apache.hadoop.hdfs.server.protocol.SlowDiskReports;
 import static org.apache.hadoop.util.Time.now;
@@ -293,6 +297,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.ObserverRetryOnActiveException;
+import org.apache.hadoop.ipc.RefreshRegistry;
 import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.ipc.RetryCache;
 import org.apache.hadoop.ipc.Server;
@@ -305,11 +310,13 @@ import org.apache.hadoop.metrics2.lib.MutableRatesWithAggregation;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
@@ -458,6 +465,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private static final long DELEGATION_TOKEN_REMOVER_SCAN_INTERVAL =
     TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
   final DelegationTokenSecretManager dtSecretManager;
+  final String localTokenPath;
+  final long tokenRenewInterval;
+  final String haServiceName;
   private final boolean alwaysUseDelegationTokensForTests;
 
   private static final Step STEP_AWAITING_REPORTED_BLOCKS =
@@ -923,6 +933,15 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_DEFAULT);
       
       this.dtSecretManager = createDelegationTokenSecretManager(conf);
+      this.localTokenPath = conf.get(DFS_NAMENODE_LOCAL_DELEGATION_TOKEN);
+      this.tokenRenewInterval = conf.getLong(DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_KEY,
+              DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT);
+      // register handler for refresh token
+      if (localTokenPath != null) {
+        // add refresh handler for tokens refresh
+        RefreshRegistry.defaultRegistry().register("tokens", new RefreshTokensHandler(this));
+      }
+      this.haServiceName = DFSUtil.getNamenodeNameServiceId(conf);
       this.dir = new FSDirectory(this, conf);
       this.snapshotManager = new SnapshotManager(conf, dir);
       this.cacheManager = new CacheManager(this, conf, blockManager);
@@ -1435,6 +1454,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       standbyCheckpointer = new StandbyCheckpointer(conf, this);
       standbyCheckpointer.start();
     }
+    loadTokenFromLocal();
   }
 
   /**
@@ -5679,6 +5699,43 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         conf.getBoolean(DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_KEY,
             DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_DEFAULT),
         this);
+  }
+
+  public void loadTokenFromLocal() {
+    if (this.localTokenPath == null) {
+      LOG.warn("{} is not set, ignore", DFS_NAMENODE_LOCAL_DELEGATION_TOKEN);
+      return;
+    }
+
+    try {
+      long now = Time.now();
+
+      Text serviceName = new Text("ha-hdfs:" + haServiceName);
+      Collection<File> tokenList = FileUtils.listFiles(new File(localTokenPath), null, false);
+      for (File fileName : tokenList) {
+        Credentials cred = Credentials.readTokenStorageFile(fileName, new Configuration());
+        for (Token<? extends TokenIdentifier> token : cred.getAllTokens()) {
+          if (token.getService().equals(serviceName)) {
+
+            byte[] password = token.getPassword();
+            AbstractDelegationTokenSecretManager.DelegationTokenInformation tokenInfo =
+                    new AbstractDelegationTokenSecretManager.DelegationTokenInformation(now
+                            + tokenRenewInterval, password);
+            try {
+              DelegationTokenIdentifier identifier = (DelegationTokenIdentifier) token.decodeIdentifier();
+              dtSecretManager.storeTokenFromFile(identifier, tokenInfo);
+              LOG.info("loadTokenFromLocal {} -> {} -> {}", token.getService(), identifier, tokenInfo.getRenewDate());
+            } catch (Exception ex) {
+              LOG.warn("loadTokenFromLocal {}", ex.getMessage());
+            }
+          } else {
+            LOG.info("loadTokenFromLocal service name not match {} -> {}", token.getService(), serviceName);
+          }
+        }
+      }
+    } catch (Exception ex) {
+      LOG.warn("Cannot load from {} : {}", localTokenPath, ex.getMessage());
+    }
   }
 
   /**

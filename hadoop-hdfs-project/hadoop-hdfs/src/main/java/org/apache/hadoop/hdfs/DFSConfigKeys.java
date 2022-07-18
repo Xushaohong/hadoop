@@ -563,6 +563,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
 
   public static final String  DFS_NAMENODE_LEASE_RECHECK_INTERVAL_MS_KEY =
       "dfs.namenode.lease-recheck-interval-ms";
+
+  public static final String  DFS_NAMENODE_LOCAL_DELEGATION_TOKEN =
+          "dfs.namenode.local-delegation-token";
   public static final long    DFS_NAMENODE_LEASE_RECHECK_INTERVAL_MS_DEFAULT =
       2000;
   public static final String

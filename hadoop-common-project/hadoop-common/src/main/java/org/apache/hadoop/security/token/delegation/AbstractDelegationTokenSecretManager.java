@@ -344,6 +344,18 @@ extends AbstractDelegationTokenIdentifier>
     storeNewToken(ident, tokenInfo.getRenewDate());
   }
 
+
+  public void storeTokenFromFile(TokenIdent ident,
+                            DelegationTokenInformation tokenInfo) throws IOException {
+    if (currentTokens.get(ident) == null) {
+      currentTokens.put(ident, tokenInfo);
+      addTokenForOwnerStats(ident);
+      storeNewToken(ident, tokenInfo.getRenewDate());
+    } else {
+      LOG.warn("storeTokenFromFile ident exists in memory {}", ident);
+    }
+  }
+
   /**
    * For subclasses externalizing the storage, for example Zookeeper
    * based implementations
