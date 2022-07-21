@@ -25,7 +25,10 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.PathExistsException;
+import org.apache.hadoop.fs.TrashPolicyDefault;
 import org.apache.hadoop.fs.shell.CopyCommands.CopyFromLocal;
+
+import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 
 /** Various commands for moving files */
 @InterfaceAudience.Private
@@ -121,6 +124,16 @@ class MoveCommands {
       if (target.exists) {
         throw new PathExistsException(target.toString());
       }
+      // source path should be checked.
+      if (src.path.toString().contains(TRASH_PREFIX) && target.path.toString().contains(TRASH_PREFIX)) {
+        TrashPolicyDefault trashPolicyWhiteList = new TrashPolicyDefault();
+        trashPolicyWhiteList.initialize(getConf(), src.fs);
+        boolean movable = trashPolicyWhiteList.checkWhiteList(src.path);
+        if (!movable) {
+          return;
+        }
+      }
+
       if (!target.fs.rename(src.path, target.path)) {
         // we have no way to know the actual error...
         throw new PathIOException(src.toString());

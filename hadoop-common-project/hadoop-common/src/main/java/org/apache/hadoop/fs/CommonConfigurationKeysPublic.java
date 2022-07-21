@@ -198,6 +198,23 @@ public class CommonConfigurationKeysPublic {
   public static final String  FS_TRASH_INTERVAL_KEY = "fs.trash.interval";
   /** Default value for FS_TRASH_INTERVAL_KEY */
   public static final long    FS_TRASH_INTERVAL_DEFAULT = 0;
+
+  public static final String FS_TRASH_BACK_PREFIX = "fs.trash.white.back.prefix";
+  public static final String FS_TRASH_BACK_PREFIX_DEFAULT = "bak_";
+
+  public static final String FS_TRASH_WHITE_LIST_ENABLE = "fs.trash.white.list.enable";
+  public static final boolean FS_TRASH_WHITE_LIST_ENABLE_DEFAULT = true;
+
+  public static final String FS_TRASH_WHITE_LIST_INTERVAL = "fs.trash.white.list.interval";
+
+  public static final String FS_TRASH_WHITE_LIST = "fs.trash.white.list";
+
+  // default keep white paths with 3 days.
+  public static final int FS_TRASH_WHITE_LIST_INTERVAL_DEFAULT = 3;
+
+  public static final String FS_TRASH_WHITE_LIST_PREFIX = "fs.trash.white.list.prefix";
+  public static final String FS_TRASH_WHITE_LIST_PREFIX_DEFAULT = "whitelist_";
+
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
