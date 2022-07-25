@@ -123,6 +123,7 @@ public class UserGroupInformation {
    */
   static final String TQ_USER_NAME = "TQ_USER_NAME";
   static final String TQ_USER_TOKEN = "TQ_USER_TOKEN";
+  static final String TQ_USER_EPOCH = "TQ_USER_EPOCH";
   private static final Map<String,UserGroupInformation> CACHED_SIMPLE_UGIS = new HashMap<String, UserGroupInformation>();
   private static final Map<String,UserGroupInformation> CACHED_AUTH_UGIS = new HashMap<String, UserGroupInformation>();
 
@@ -634,18 +635,32 @@ public class UserGroupInformation {
   private static UserGroupInformation getUserBySystemProperties() {
     String envUser = System.getenv(TQ_USER_NAME);
     String token = System.getenv(TQ_USER_TOKEN);
-    LOG.debug("using system env from TQ_USER_TOKEN: {}, TQ_USER_TOKEN: {}", envUser, token);
+    String epoch = System.getenv(TQ_USER_EPOCH);
+    LOG.debug("using system env from TQ_USER_TOKEN: {}, TQ_USER_TOKEN: {}, epoch: {}",
+        envUser, token, epoch);
     if (org.apache.commons.lang3.StringUtils.isNotBlank(envUser)
             && org.apache.commons.lang3.StringUtils.isNotBlank(token)) {
-      return createUserByToken(envUser, token);
+      return createUserByToken(envUser, token, epoch);
     }
     return null;
   }
 
-  private static UserGroupInformation createUserByToken(String user, String base64Key) {
+  private static UserGroupInformation createUserByToken(String user, String base64Key, String epoch) {
     UserGroupInformation result = CACHED_AUTH_UGIS.get(user);
     if (result == null) {
-      result = createUserByTAuthKey(user, new String(Base64.getDecoder().decode(base64Key)));
+      if (epoch != null) {
+        try {
+          int epochInt = Integer.parseInt(epoch);
+          result = createUserByTAuthKey(user, new String(Base64.getDecoder().decode(base64Key)),
+              epochInt);
+        } catch (Exception ex) {
+          LOG.debug("Exception caught", ex);
+        }
+      }
+      // if epoch is illegal, try to use default epoch.
+      if (result == null) {
+        result = createUserByTAuthKey(user, new String(Base64.getDecoder().decode(base64Key)));
+      }
       CACHED_AUTH_UGIS.put(user, result);
     }
     return result;
@@ -688,7 +703,7 @@ public class UserGroupInformation {
             UserGroupInformation result = null;
             String base64Key = conf.get(String.format("tq.%s.key", specUserName));
             if (base64Key != null) {
-              result = createUserByToken(specUserName, base64Key);
+              result = createUserByToken(specUserName, base64Key, null);
             }
             if (result == null) {
               result = CACHED_SIMPLE_UGIS.get(specUserName);
@@ -1707,10 +1722,16 @@ public class UserGroupInformation {
     return ugi;
   }
 
-  public static UserGroupInformation createUserByTAuthKey(String userName, String masterKey) {
+  private static UserGroupInformation createUserByTAuthKey(String userName,
+      String masterKey, int epoch) {
     Subject subject = new Subject();
     TAuthLoginModule.TAuthPrincipal principal = new TAuthLoginModule.TAuthPrincipal(userName);
-    TAuthLoginModule.TAuthCredential credential = TAuthLoginModule.TAuthCredential.buildWithMasterKey(masterKey);
+    TAuthLoginModule.TAuthCredential credential;
+    if (epoch > -1) {
+      credential = TAuthLoginModule.TAuthCredential.buildWithMasterKey(masterKey, epoch);
+    } else {
+      credential = TAuthLoginModule.TAuthCredential.buildWithMasterKey(masterKey);
+    }
     User user = new User(userName, AuthenticationMethod.TAUTH, null);
     subject.getPrincipals().add(principal);
     subject.getPrincipals().add(user);
@@ -1718,6 +1739,10 @@ public class UserGroupInformation {
     UserGroupInformation realUser = new UserGroupInformation(subject);
     realUser.setAuthenticationMethod(AuthenticationMethod.TAUTH);
     return realUser;
+  }
+
+  public static UserGroupInformation createUserByTAuthKey(String userName, String masterKey) {
+    return createUserByTAuthKey(userName, masterKey, -1);
   }
 
 

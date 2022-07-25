@@ -238,16 +238,22 @@ public class TAuthLoginModule implements LoginModule {
     private String principal;
     private final String masterKey;
     private final String keyPath;
+    private final int epoch;
 
-    TAuthCredential(String principal, String masterKey, String keyPath) {
+    TAuthCredential(String principal, String masterKey, String keyPath, int epoch) {
       this.principal = principal;
       this.masterKey = masterKey;
       this.keyPath = keyPath;
+      this.epoch = epoch;
 
       localKeyManager = getLocalKeyManager();
       if(localKeyManager != null) {
         this.principal = localKeyManager.getKeyLoader().getSubject();
       }
+    }
+
+    TAuthCredential(String principal, String masterKey, String keyPath) {
+      this(principal, masterKey, keyPath, -1);
     }
 
     private transient LocalKeyManager localKeyManager;
@@ -265,7 +271,13 @@ public class TAuthLoginModule implements LoginModule {
         if (Utils.isNotNullOrEmpty(keyPath)) {
           localKeyManager = LocalKeyManager.generateByDir(keyPath);
         } else if (Utils.isNotNullOrEmpty(masterKey)) {
-          localKeyManager = LocalKeyManager.generateByKeys(Collections.singletonList(masterKey));
+          if (epoch < 0) {
+            localKeyManager = LocalKeyManager.generateByKeys(Collections.singletonList(masterKey));
+          } else {
+            Tuple<Integer, String>[] tupleKeys = new Tuple[1];
+            tupleKeys[0] = new Tuple<>(this.epoch, this.masterKey);
+            localKeyManager = LocalKeyManager.generateByKeys(tupleKeys);
+          }
         } else {
           if (SERVICE_KEY_FIRST) {
             localKeyManager = LocalKeyManager.generateByService(principal);
@@ -289,6 +301,10 @@ public class TAuthLoginModule implements LoginModule {
 
     public static TAuthCredential buildWithMasterKey(String masterKey) {
       return new TAuthCredential(null, masterKey, null);
+    }
+
+    public static TAuthCredential buildWithMasterKey(String masterKey, int epoch) {
+      return new TAuthCredential(null, masterKey, null, epoch);
     }
 
     public static TAuthCredential buildWithPrinciple(String principal) {
