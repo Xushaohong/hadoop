@@ -270,7 +270,7 @@ class Ls extends FsCommand {
   @Override
   protected void processPaths(PathData parent, PathData... items)
       throws IOException {
-    if (parent != null && !isRecursive() && items.length != 0) {
+    if (!isRecursive() && items.length != 0) {
       if (!pathOnly) {
         out.println("Found " + items.length + " items");
       }
