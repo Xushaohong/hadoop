@@ -207,8 +207,8 @@ public final class DistributedConfigHelper {
     Set<String> builtRs = new HashSet<String>();
     Set<String> resourceSet = new HashSet<String>();
 
-    if (configuration == null) {
-      LOG.info("configuration is null.");
+    if (configuration == null || nameNodeUri == null) {
+      LOG.info("configuration or nameNodeUri is null.");
       return configuration;
     }
 
@@ -244,8 +244,7 @@ public final class DistributedConfigHelper {
     }
 
     host = nameNodeUri.getHost();
-    if (nameNodeUri == null || !HDFS.equals(nameNodeUri.getScheme())
-        || host == null) {
+    if (!HDFS.equals(nameNodeUri.getScheme()) || host == null) {
       LOG.info("NameNode URI is NULL or host is defective:" + nameNodeUri);
       return configuration;
     }
