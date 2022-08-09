@@ -28,26 +28,19 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_WHITE_
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_WHITE_LIST_INTERVAL_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_WHITE_LIST_PREFIX;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_WHITE_LIST_PREFIX_DEFAULT;
-import static org.apache.hadoop.fs.Path.SEPARATOR_CHAR;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -77,10 +70,9 @@ public class TrashPolicyDefault extends TrashPolicy {
   private static final DateFormat WHITE_LIST_FORMAT = new SimpleDateFormat("yyyyMMdd");
 
   private static final Path CURRENT = new Path("Current");
-  private static final String BACK_DIR = "bak_";
 
   private static final FsPermission PERMISSION =
-    new FsPermission(FsAction.ALL, FsAction.NONE, FsAction.NONE);
+          new FsPermission(FsAction.ALL, FsAction.NONE, FsAction.NONE);
 
   private static final DateFormat CHECKPOINT = new SimpleDateFormat("yyMMddHHmmss");
   /** Format of checkpoint directories used prior to Hadoop 0.23. */
@@ -151,160 +143,6 @@ public class TrashPolicyDefault extends TrashPolicy {
     return deletionInterval > 0;
   }
 
-
-  /**
-   * Get file path list from white list.
-   * @return list of paths
-   */
-  private List<String> getWhiteList() {
-    try {
-      return FileUtils.readLines(Paths.get(whiteListConfFile).toFile(), StandardCharsets.UTF_8);
-    } catch (Exception ex) {
-      LOG.error("Exception while reading {}", whiteListConfFile, ex);
-    }
-    return null;
-  }
-
-  /**
-   * move old white trash to current path
-   * @param trashRoot
-   * @param protectedWhitePaths
-   */
-  private void moveOldWhiteTrash(Path trashRoot, Set<String> protectedWhitePaths) {
-    try {
-      List<String> bakNameList = new ArrayList<>();
-      FileStatus[] trashChildPaths = fs.listStatus(trashRoot, path -> {
-        String pathName = path.getName();
-        LOG.debug("path name is " + pathName);
-        if (pathName != null && pathName.startsWith(BACK_DIR)) {
-          bakNameList.add(pathName);
-        }
-        return pathName != null && pathName.startsWith(whiteTrashPrefix)
-                && !protectedWhitePaths.contains(pathName);
-      });
-      String oldPath = null;
-      for (String bakName : bakNameList) {
-        if (StringUtils.compare(oldPath, bakName) < 0) {
-          oldPath = bakName;
-        }
-      }
-      if (oldPath == null) {
-        oldPath = CURRENT.getName();
-      }
-      Path trashCurrent = new Path(trashRoot, oldPath);
-      for (FileStatus fileStatus : trashChildPaths) {
-        // move back to current or old bak directory
-        String pathName = fileStatus.getPath().getName();
-        Path trashPath = new Path(trashCurrent, pathName);
-        Path trashPathParent = trashPath.getParent();
-        if (fs.mkdirs(trashPathParent, PERMISSION)) {
-          LOG.debug("start rename " + fileStatus.getPath() + " to " + trashPath);
-          fs.rename(fileStatus.getPath(), trashPath, Options.Rename.TO_TRASH);
-        }
-      }
-    } catch (Exception ex) {
-      LOG.debug("moveOldWhiteTrash got exception", ex);
-    }
-  }
-
-  /**
-   * rename path to target, if target exists, add with timestamp
-   */
-  private void renamePathOrWithTimestamp(Path sourcePath, Path targetPath, boolean isTargetExist) throws IOException {
-    if (!isTargetExist) {
-      Path targetPathParent = targetPath.getParent();
-      fs.mkdirs(targetPathParent, PERMISSION);
-    } else {
-      targetPath = new Path(targetPath.toString() + Time.now());
-    }
-    LOG.debug("Rename {} -> {}", sourcePath, targetPath);
-    fs.rename(sourcePath, targetPath);
-  }
-
-  private void recursiveMoveProtectedPath(Path sourcePath, Path targetPath) {
-    try {
-      LOG.debug("recursiveMoveProtectedPath {} -> {}", sourcePath, targetPath);
-      // if target path not exists, move directly.
-      if (!fs.exists(targetPath)) {
-        renamePathOrWithTimestamp(sourcePath, targetPath, false);
-      } else {
-        FileStatus sourceStatus = fs.getFileStatus(sourcePath);
-        if (sourceStatus.isDirectory()) {
-          FileStatus[] childList = fs.listStatus(sourcePath);
-          // no child
-          if (childList == null || childList.length < 1) {
-            renamePathOrWithTimestamp(sourcePath, targetPath, true);
-          } else {
-            for (FileStatus child : childList) {
-              Path childPath = child.getPath();
-              recursiveMoveProtectedPath(childPath, new Path(targetPath, childPath.getName()));
-            }
-          }
-        } else {
-          // just try to rename it to target
-          renamePathOrWithTimestamp(sourcePath, targetPath, true);
-        }
-      }
-    } catch (Exception ex) {
-      LOG.debug("moveOldWhiteTrash got exception", ex);
-    }
-  }
-
-  /**
-   * protect white list paths.
-   */
-  private boolean protectWhiteList(Path relativePathBase, Path relativePath) {
-    boolean isProtected = false;
-    try {
-      LOG.debug("protectWhiteList for " + relativePath);
-
-      // start to protect delete path
-      List<String> whiteListPaths = getWhiteList();
-      List<String> pendingWhiteList = new ArrayList<>();
-
-      if (whiteListPaths != null) {
-        for (String whitePathStr : whiteListPaths) {
-          if (whitePathStr.startsWith(relativePath.toString())) {
-            pendingWhiteList.add(whitePathStr);
-          }
-          if (relativePath.toString().startsWith(whitePathStr)) {
-            isProtected = true;
-          }
-        }
-        for (String whitePathStr : pendingWhiteList) {
-          Path sourceBase = Path.mergePaths(fs.getTrashRoot(relativePathBase), relativePathBase);
-          Path whitePath = Path.mergePaths(sourceBase, new Path(whitePathStr));
-          Path trashTarget = new Path(fs.getTrashRoot(relativePathBase),
-                  whiteTrashPrefix + WHITE_LIST_FORMAT.format(new Date(Time.now())));
-          recursiveMoveProtectedPath(whitePath, Path.mergePaths(trashTarget, new Path(whitePathStr)));
-        }
-      }
-    } catch (Exception ex) {
-      LOG.debug("protectWhiteList got exception", ex);
-    }
-    return isProtected;
-  }
-
-  private Pair<Path, Path> getRelativePath(String trashRootStr, String pathStr) {
-    LOG.debug("{} - {}", trashRootStr, pathStr);
-    String tmpStr = pathStr.substring(trashRootStr.length());
-    String[] tmpStrList = StringUtils.split(tmpStr, SEPARATOR_CHAR);
-    String[] resultList = new String[tmpStrList.length + 1];
-    if (tmpStrList.length < 1) {
-      return null;
-    }
-    resultList[0] = "";
-    System.arraycopy(tmpStrList,0, resultList, 1, tmpStrList.length);
-
-    Path relativeWithBase = new Path(StringUtils.join(resultList, SEPARATOR_CHAR, 0, 2));
-    resultList[1] = "";
-    String relativeStr = StringUtils.join(resultList, SEPARATOR_CHAR);
-    if (StringUtils.isBlank(relativeStr)) {
-      return Pair.of(relativeWithBase, new Path("/"));
-    }
-    return Pair.of(relativeWithBase, new Path(relativeStr));
-  }
-
   /**
    * if path is not under protected, return false, else return true.
    * @param path
@@ -314,45 +152,31 @@ public class TrashPolicyDefault extends TrashPolicy {
     LOG.debug("using white list for " + path);
 
     if (whiteListEnabled) {
-      String pathStr = fs.makeQualified(path).toString();
-      Path trashRoot = fs.getTrashRoot(path);
-      String trashRootStr = trashRoot.toString();
+      WhiteListTrash whiteListTrash = new WhiteListTrash(fs.getConf(), fs, path);
+      // if path extract success, then continue to protect
+      if (whiteListTrash.extractInfoFromTrashPath()) {
 
-      if (pathStr.equals(trashRootStr)) {
-        LOG.warn("Cannot delete trash directory directly : {} if you want to delete it please set {} = false",
-                pathStr, FS_TRASH_WHITE_LIST_ENABLE);
-        return false;
-      }
+        Path trashRoot = whiteListTrash.getBaseTrashPath();
+        String pathStr = Path.getPathWithoutSchemeAndAuthority(path).toString();
 
-      // if path not starts with /user/userName/.Trash, ignore it.
-      if (!pathStr.startsWith(trashRootStr)) {
-        LOG.debug(pathStr + " is not a trash path, ignore checking protection");
-        return true;
-      }
-
-      // white path filter.
-      final long currentTime = Time.now();
-      Set<String> protectedPaths = new HashSet<>();
-      for (int day = 0; day < whiteTrashInterval; day++) {
-        long dayBefore = currentTime - (long) day * 24 * 60 * 60 * 1000;
-        String pathName = whiteTrashPrefix + WHITE_LIST_FORMAT.format(new Date(dayBefore));
-        Path trashPrefix = new Path(trashRoot, pathName);
-        if (pathStr.startsWith(trashPrefix.toString())) {
-          LOG.info(pathStr + " is now protected by white list, if you want to delete it please set "
-                  + FS_TRASH_WHITE_LIST_ENABLE + " to false");
-          return false;
+        // white path filter.
+        final long currentTime = Time.now();
+        Set<String> protectedPaths = new HashSet<>();
+        for (int day = 0; day < whiteTrashInterval; day++) {
+          long dayBefore = currentTime - (long) day * 24 * 60 * 60 * 1000;
+          String pathName = whiteTrashPrefix + WHITE_LIST_FORMAT.format(new Date(dayBefore));
+          Path trashPrefix = new Path(trashRoot, pathName);
+          if (pathStr.startsWith(trashPrefix.toString())) {
+            LOG.info(pathStr + " is now protected by white list, if you want to delete it please set "
+                    + FS_TRASH_WHITE_LIST_ENABLE + " to false");
+            return false;
+          }
+          protectedPaths.add(pathName);
         }
-        protectedPaths.add(pathName);
-      }
-      // check /user/userName/.Trash/whitelist_*, move old dirs back to /user/userName/.Trash/current or
-      // oldest /user/userName/.Trash/bak_xxxx
-      moveOldWhiteTrash(trashRoot, protectedPaths);
-
-      // protect from trash path
-      Pair<Path, Path> relativePaths = getRelativePath(trashRootStr, pathStr);
-      if (relativePaths != null) {
-        boolean isProtected = protectWhiteList(relativePaths.getLeft(), relativePaths.getRight());
-        return !isProtected;
+        // check /user/userName/.Trash/whitelist_*, move old dirs back to /user/userName/.Trash/current or
+        // oldest /user/userName/.Trash/bak_xxxx
+        whiteListTrash.moveOldWhiteTrash(protectedPaths);
+        return !whiteListTrash.protectWhiteList();
       }
     }
     // default behavior is deletable.
