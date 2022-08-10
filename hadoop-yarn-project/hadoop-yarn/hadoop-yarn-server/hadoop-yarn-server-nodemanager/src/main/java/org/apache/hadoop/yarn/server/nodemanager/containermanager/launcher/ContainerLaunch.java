@@ -142,6 +142,7 @@ public class ContainerLaunch implements Callable<Integer> {
   private final Lock launchLock = new ReentrantLock();
 
   private boolean logDirsCreateAllDisable = false;
+  private String adminJvmParameters = "";
 
   public ContainerLaunch(Context context, Configuration configuration,
       Dispatcher dispatcher, ContainerExecutor exec, Application app,
@@ -161,6 +162,8 @@ public class ContainerLaunch implements Callable<Integer> {
     this.logDirsCreateAllDisable =
         conf.getBoolean(YarnConfiguration.NM_LOG_DIRS_CREATE_ALL_DISABLE,
             YarnConfiguration.DEFAULT_NM_LOG_DIRS_CREATE_ALL_DISABLE);
+    this.adminJvmParameters = conf.get(YarnConfiguration.NM_ADMIN_USER_JVM_PARAMETERS,
+        YarnConfiguration.DEFAULT_NM_ADMIN_USER_JVM_PARAMETERS);
   }
 
   @VisibleForTesting
@@ -247,6 +250,11 @@ public class ContainerLaunch implements Callable<Integer> {
       for (String str : command) {
         // TODO: Should we instead work via symlinks without this grammar?
         newCmds.add(expandEnvironment(str, containerLogDir));
+
+        //inject jvm parameters into commands after Xmx
+        if (!"".equals(adminJvmParameters) && str.contains("-Xmx")){
+          newCmds.add(adminJvmParameters);
+        }
       }
       launchContext.setCommands(newCmds);
 

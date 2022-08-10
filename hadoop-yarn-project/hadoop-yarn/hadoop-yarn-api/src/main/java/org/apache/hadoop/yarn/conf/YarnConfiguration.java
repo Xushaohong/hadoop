@@ -1252,6 +1252,10 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_ADMIN_USER_ENV = NM_PREFIX + "admin-env";
   public static final String DEFAULT_NM_ADMIN_USER_ENV = "MALLOC_ARENA_MAX=$MALLOC_ARENA_MAX";
 
+  /** jvm parameters that will be append to containers's commands.*/
+  public static final String NM_ADMIN_USER_JVM_PARAMETERS = NM_PREFIX + "admin-jvm-parameters";
+  public static final String DEFAULT_NM_ADMIN_USER_JVM_PARAMETERS = "";
+
   /** Environment variables that containers may override rather than use NodeManager's default.*/
   public static final String NM_ENV_WHITELIST = NM_PREFIX + "env-whitelist";
   public static final String DEFAULT_NM_ENV_WHITELIST = StringUtils.join(",",
