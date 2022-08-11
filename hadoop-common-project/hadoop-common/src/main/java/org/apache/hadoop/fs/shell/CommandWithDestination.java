@@ -46,6 +46,8 @@ import org.apache.hadoop.fs.permission.AclUtil;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_PUT_MKDIR_PARENT_DIR;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_PUT_MKDIR_PARENT_DIR_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.fs.CreateFlag.CREATE;
@@ -222,8 +224,13 @@ abstract class CommandWithDestination extends FsCommand {
         throw new PathExistsException(dst.toString());
       }
     } else if (!dst.parentExists()) {
-      throw new PathNotFoundException(dst.toString())
-          .withFullyQualifiedPath(dst.path.toUri().toString());
+      boolean createParent = getConf().getBoolean(HADOOP_PUT_MKDIR_PARENT_DIR, HADOOP_PUT_MKDIR_PARENT_DIR_DEFAULT);
+      if (createParent) {
+        dst.fs.mkdirs(dst.path.getParent());
+      } else {
+        throw new PathNotFoundException(dst.toString())
+            .withFullyQualifiedPath(dst.path.toUri().toString());
+      }
     }
     super.processArguments(args);
   }

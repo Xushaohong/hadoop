@@ -1003,5 +1003,8 @@ public class CommonConfigurationKeysPublic {
       "hadoop.distributed.config.base.path";
   public static final String HADOOP_DISTRIBUTED_CONFIG_BASE_PATH_DEFAULT =
       "/hadoop-distributed-config";
+
+  public static final String HADOOP_PUT_MKDIR_PARENT_DIR = "hadoop.put.mkdir.parent.dir";
+  public static final boolean HADOOP_PUT_MKDIR_PARENT_DIR_DEFAULT = false;
 }
 
