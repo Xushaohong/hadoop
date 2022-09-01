@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.io;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -37,6 +38,7 @@ import org.apache.avro.reflect.Stringable;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.util.StringUtils;
 
 /** This class stores text using standard UTF8 encoding.  It provides methods
  * to serialize, deserialize, and compare texts at byte level.  The type of
@@ -57,7 +59,7 @@ public class Text extends BinaryComparable
     new ThreadLocal<CharsetEncoder>() {
       @Override
       protected CharsetEncoder initialValue() {
-        return Charset.forName("UTF-8").newEncoder().
+        return Charset.forName(getDefaultCharset()).newEncoder().
                onMalformedInput(CodingErrorAction.REPORT).
                onUnmappableCharacter(CodingErrorAction.REPORT);
     }
@@ -67,11 +69,24 @@ public class Text extends BinaryComparable
     new ThreadLocal<CharsetDecoder>() {
     @Override
     protected CharsetDecoder initialValue() {
-      return Charset.forName("UTF-8").newDecoder().
+      return Charset.forName(getDefaultCharset()).newDecoder().
              onMalformedInput(CodingErrorAction.REPORT).
              onUnmappableCharacter(CodingErrorAction.REPORT);
     }
   };
+
+  private static final String DEFAULT_ENCODING="UTF-8";
+
+  //兼容venus
+  @VisibleForTesting
+  public static String getDefaultCharset() {
+    String tmp = StringUtils.getPropOrEnvVar("custom.file.encoding",null,DEFAULT_ENCODING);
+    tmp = tmp.trim().toUpperCase();
+    if (tmp.replaceAll("-","").equals("ISO88591")) {
+      tmp = DEFAULT_ENCODING;
+    }
+    return tmp;
+  }
   
   private static final byte [] EMPTY_BYTES = new byte[0];
   

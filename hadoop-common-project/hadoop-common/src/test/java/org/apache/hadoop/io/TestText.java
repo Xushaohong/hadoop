@@ -25,6 +25,7 @@ import java.nio.charset.CharacterCodingException;
 import java.util.Random;
 import com.google.common.base.Charsets;
 import com.google.common.primitives.Bytes;
+import org.junit.Assert;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -227,6 +228,28 @@ public class TestText {
               comparator.compare(out1.getData(), 0, out3.getLength(),
                       out3.getData(), 0, out3.getLength()));
     }
+  }
+
+  @Test
+  public void testGetDefaultCharset(){
+    String value = Text.getDefaultCharset();
+    Assert.assertEquals("UTF-8",value);
+
+    System.setProperty("custom.file.encoding","GBK");
+    String gbkValue = Text.getDefaultCharset();
+    Assert.assertEquals("GBK",gbkValue);
+
+    System.setProperty("custom.file.encoding","ISO-8859-1");
+    String utf8Value = Text.getDefaultCharset();
+    Assert.assertEquals("UTF-8",utf8Value);
+
+    System.setProperty("custom.file.encoding","ISO8859-1");
+    String utf82Value = Text.getDefaultCharset();
+    Assert.assertEquals("UTF-8",utf82Value);
+
+    System.setProperty("custom.file.encoding","UTF-8");
+    String utf83Value = Text.getDefaultCharset();
+    Assert.assertEquals("UTF-8",utf83Value);
   }
 
   @Test
