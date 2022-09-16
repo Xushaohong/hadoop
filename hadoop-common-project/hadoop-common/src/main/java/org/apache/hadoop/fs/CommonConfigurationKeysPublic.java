@@ -893,6 +893,11 @@ public class CommonConfigurationKeysPublic {
   public static final boolean HADOOP_SHELL_MISSING_DEFAULT_FS_WARNING_DEFAULT =
       false;
 
+  public static final String HADOOP_SHELL_ALLOW_DELETING_LOCAL_FS =
+          "hadoop.shell.allow.deleting.local.fs";
+  public static final boolean HADOOP_SHELL_ALLOW_DELETING_LOCAL_FS_DEFAULT =
+          true;
+
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">

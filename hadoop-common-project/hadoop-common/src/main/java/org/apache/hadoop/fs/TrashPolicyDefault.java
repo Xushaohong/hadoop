@@ -126,7 +126,7 @@ public class TrashPolicyDefault extends TrashPolicy {
     this.whiteListConfFile = conf.get(FS_TRASH_WHITE_LIST);
     this.whiteListEnabled = conf.getBoolean(FS_TRASH_WHITE_LIST_ENABLE, FS_TRASH_WHITE_LIST_ENABLE_DEFAULT);
     if (whiteListEnabled && StringUtils.isBlank(whiteListConfFile)) {
-      LOG.warn("white list is enabled but not set " + FS_TRASH_WHITE_LIST + " in config file");
+      LOG.debug("white list is enabled but not set " + FS_TRASH_WHITE_LIST + " in config file");
       this.whiteListEnabled = false;
     }
     this.whiteTrashPrefix = conf.get(FS_TRASH_WHITE_LIST_PREFIX, FS_TRASH_WHITE_LIST_PREFIX_DEFAULT);

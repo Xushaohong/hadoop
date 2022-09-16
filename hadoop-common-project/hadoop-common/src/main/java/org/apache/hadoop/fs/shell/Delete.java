@@ -27,6 +27,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.PathIsDirectoryException;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
@@ -35,6 +36,8 @@ import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.util.ToolRunner;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SHELL_ALLOW_DELETING_LOCAL_FS;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SHELL_ALLOW_DELETING_LOCAL_FS_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SHELL_SAFELY_DELETE_LIMIT_NUM_FILES;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SHELL_SAFELY_DELETE_LIMIT_NUM_FILES_DEFAULT;
 
@@ -131,6 +134,16 @@ class Delete {
     private boolean canBeSafelyDeleted(PathData item)
         throws IOException {
       boolean shouldDelete = true;
+
+      if (item.fs instanceof LocalFileSystem) {
+        final boolean allowDeletingLocal = getConf().getBoolean(HADOOP_SHELL_ALLOW_DELETING_LOCAL_FS,
+                HADOOP_SHELL_ALLOW_DELETING_LOCAL_FS_DEFAULT);
+        if (!allowDeletingLocal) {
+          out.println("Warning: Not allowed deleting local : " + item.path);
+          return false;
+        }
+      }
+
       if (safeDelete) {
         final long deleteLimit = getConf().getLong(
             HADOOP_SHELL_SAFELY_DELETE_LIMIT_NUM_FILES,
