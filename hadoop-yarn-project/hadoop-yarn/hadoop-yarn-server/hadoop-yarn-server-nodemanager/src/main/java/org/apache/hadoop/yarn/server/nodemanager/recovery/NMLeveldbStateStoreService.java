@@ -728,6 +728,7 @@ public class NMLeveldbStateStoreService extends NMStateStoreService {
         batch.delete(bytes(keyPrefix + CONTAINER_REMAIN_RETRIES_KEY_SUFFIX));
         batch.delete(bytes(keyPrefix + CONTAINER_RESTART_TIMES_SUFFIX));
         batch.delete(bytes(keyPrefix + CONTAINER_WORK_DIR_KEY_SUFFIX));
+        batch.delete(bytes(keyPrefix + CONTAINER_ASSIGNED_RESOURCES_KEY_SUFFIX));
         List<String> unknownKeysForContainer = containerUnknownKeySuffixes
             .removeAll(containerId);
         for (String unknownKeySuffix : unknownKeysForContainer) {
