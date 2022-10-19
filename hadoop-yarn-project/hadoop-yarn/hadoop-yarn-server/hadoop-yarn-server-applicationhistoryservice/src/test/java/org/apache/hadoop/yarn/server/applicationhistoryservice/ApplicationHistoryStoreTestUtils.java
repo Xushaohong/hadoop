@@ -79,7 +79,7 @@ public class ApplicationHistoryStoreTestUtils {
   protected void writeContainerFinishData(ContainerId containerId)
       throws IOException {
     store.containerFinished(ContainerFinishData.newInstance(containerId, 0,
-      containerId.toString(), 0, ContainerState.COMPLETE));
+      containerId.toString(), 0, ContainerState.COMPLETE, NodeId.newInstance("localhost", 0)));
   }
 
 }

@@ -110,4 +110,5 @@ message ContainerFinishDataProto {
   optional string diagnostics_info = 3;
   optional int32 container_exit_status = 4;
   optional ContainerStateProto container_state = 5;
+  optional NodeIdProto assigned_node_id = 6;
 }

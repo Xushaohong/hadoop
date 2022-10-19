@@ -20,10 +20,13 @@ package org.apache.hadoop.yarn.server.applicationhistoryservice.records.impl.pb;
 
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerIdPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
 import org.apache.hadoop.yarn.proto.ApplicationHistoryServerProtos.ContainerFinishDataProto;
 import org.apache.hadoop.yarn.proto.ApplicationHistoryServerProtos.ContainerFinishDataProtoOrBuilder;
+import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStateProto;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerFinishData;
@@ -38,6 +41,7 @@ public class ContainerFinishDataPBImpl extends ContainerFinishData {
   boolean viaProto = false;
 
   private ContainerId containerId;
+  private NodeId nodeId;
 
   public ContainerFinishDataPBImpl() {
     builder = ContainerFinishDataProto.newBuilder();
@@ -46,6 +50,29 @@ public class ContainerFinishDataPBImpl extends ContainerFinishData {
   public ContainerFinishDataPBImpl(ContainerFinishDataProto proto) {
     this.proto = proto;
     viaProto = true;
+  }
+
+  @Override
+  public NodeId getAssignedNode() {
+    if (this.nodeId != null) {
+      return this.nodeId;
+    }
+    ContainerFinishDataProtoOrBuilder p = viaProto ? proto : builder;
+
+    if (!p.hasAssignedNodeId()) {
+      return null;
+    }
+    this.nodeId = convertFromProtoFormat(p.getAssignedNodeId());
+    return this.nodeId;
+  }
+
+  @Override
+  public void setAssignedNode(NodeId nodeId) {
+    maybeInitBuilder();
+    if (nodeId == null) {
+      builder.clearAssignedNodeId();
+    }
+    this.nodeId = nodeId;
   }
 
   @Override
@@ -199,6 +226,10 @@ public class ContainerFinishDataPBImpl extends ContainerFinishData {
   private ContainerState convertFromProtoFormat(
       ContainerStateProto containerState) {
     return ProtoUtils.convertFromProtoFormat(containerState);
+  }
+
+  private NodeIdPBImpl convertFromProtoFormat(YarnProtos.NodeIdProto nodeId) {
+    return new NodeIdPBImpl(nodeId);
   }
 
 }

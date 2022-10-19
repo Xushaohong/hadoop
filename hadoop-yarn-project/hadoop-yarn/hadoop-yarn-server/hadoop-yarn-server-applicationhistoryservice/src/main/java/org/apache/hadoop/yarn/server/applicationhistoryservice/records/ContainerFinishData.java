@@ -22,6 +22,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
@@ -36,7 +37,7 @@ public abstract class ContainerFinishData {
   @Unstable
   public static ContainerFinishData newInstance(ContainerId containerId,
       long finishTime, String diagnosticsInfo, int containerExitCode,
-      ContainerState containerState) {
+      ContainerState containerState, NodeId nodeId) {
     ContainerFinishData containerFD =
         Records.newRecord(ContainerFinishData.class);
     containerFD.setContainerId(containerId);
@@ -44,8 +45,17 @@ public abstract class ContainerFinishData {
     containerFD.setDiagnosticsInfo(diagnosticsInfo);
     containerFD.setContainerExitStatus(containerExitCode);
     containerFD.setContainerState(containerState);
+    containerFD.setAssignedNode(nodeId);
     return containerFD;
   }
+
+  @Public
+  @Unstable
+  public abstract NodeId getAssignedNode();
+
+  @Public
+  @Unstable
+  public abstract void setAssignedNode(NodeId nodeId);
 
   @Public
   @Unstable

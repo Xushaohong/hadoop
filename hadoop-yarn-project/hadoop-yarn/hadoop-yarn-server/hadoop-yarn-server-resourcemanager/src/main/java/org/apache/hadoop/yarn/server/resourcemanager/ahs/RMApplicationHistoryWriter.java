@@ -326,7 +326,8 @@ public class RMApplicationHistoryWriter extends CompositeService {
           ContainerFinishData.newInstance(container.getContainerId(),
             container.getFinishTime(), container.getDiagnosticsInfo(),
             container.getContainerExitStatus(),
-            container.getContainerState())));
+            container.getContainerState(),
+            container.getAllocatedNode())));
       if (LOG.isDebugEnabled()) {
         LOG.debug("the finish data of container details: "+ container.getContainerId()+"|"+container.getFinishTime()
             +"|"+container.getDiagnosticsInfo()+"|"+container.getContainerExitStatus()+"|"+container.getContainerState());
