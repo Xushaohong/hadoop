@@ -34,9 +34,6 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Arrays;
 
-import static org.apache.hadoop.security.token.delegation.DelegationTokenVersionHolder.TOKEN_IDENTIFIER_SERIALIZATION_VERSION;
-import static org.apache.hadoop.security.token.delegation.DelegationTokenVersionHolder.TOKEN_IDENTIFIER_TRANSMISSION_VERSION;
-
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public abstract class AbstractDelegationTokenIdentifier 
@@ -226,7 +223,11 @@ extends TokenIdentifier {
 
   @VisibleForTesting
   void writeImpl(DataOutput out) throws IOException {
-    writeImpl(out, TOKEN_IDENTIFIER_SERIALIZATION_VERSION);
+    if (isUnion()) {
+      writeImpl(out, UNION_DELEGATION_TOKEN_IDENTIFIER_VERSION);
+    } else {
+      writeImpl(out, DEFAULT_DELEGATION_TOKEN_IDENTIFIER_VERSION);
+    }
   }
 
   private void writeImpl(DataOutput out, int serialVersion) throws IOException {
@@ -247,12 +248,7 @@ extends TokenIdentifier {
   public byte[] getBytes() {
     DataOutputBuffer buf = new DataOutputBuffer(4096);
     try {
-      if (TOKEN_IDENTIFIER_TRANSMISSION_VERSION == UNION_DELEGATION_TOKEN_IDENTIFIER_VERSION) {
-        this.write(buf, TOKEN_IDENTIFIER_TRANSMISSION_VERSION);
-      } else {
-        this.write(buf);
-      }
-
+      this.write(buf);
     } catch (IOException ie) {
       throw new RuntimeException("i/o error in getBytes", ie);
     }
@@ -261,10 +257,6 @@ extends TokenIdentifier {
 
   @Override
   public void write(DataOutput out) throws IOException {
-    write(out, TOKEN_IDENTIFIER_SERIALIZATION_VERSION);
-  }
-
-  private void write(DataOutput out, int serialVersion) throws IOException {
     if (owner.getLength() > Text.DEFAULT_MAX_LEN) {
       throw new IOException("owner is too long to be serialized!");
     }
@@ -274,7 +266,7 @@ extends TokenIdentifier {
     if (realUser.getLength() > Text.DEFAULT_MAX_LEN) {
       throw new IOException("realuser is too long to be serialized!");
     }
-    writeImpl(out, serialVersion);
+    writeImpl(out);
   }
 
   @Override
