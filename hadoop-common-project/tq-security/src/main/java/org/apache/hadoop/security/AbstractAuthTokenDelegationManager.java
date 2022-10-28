@@ -133,12 +133,6 @@ public abstract class AbstractAuthTokenDelegationManager<TOKEN_ID, TOKEN_INFO> {
 
 
   public Token pullToken(long globalId) {
-    if (!AuthConfigureHolder.isUnionTokenEnable()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("AuthConfigureHolder is disable, won't pull");
-      }
-      return null;
-    }
     Preconditions.checkArgument(globalId > -1);
 
     Token token = null;
