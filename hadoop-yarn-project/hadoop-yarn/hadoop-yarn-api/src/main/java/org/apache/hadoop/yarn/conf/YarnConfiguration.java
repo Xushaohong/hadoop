@@ -1658,6 +1658,10 @@ public class YarnConfiguration extends Configuration {
   public static final boolean DEFAULT_NM_ENABLE_HARDWARE_CAPABILITY_DETECTION =
       false;
 
+  public static final String NM_HELPER_WIKI_ENABLE =
+      NM_PREFIX + "helper.wiki.enable";
+  public static final boolean DEFAULT_NM_HELPER_WIKI_ENABLE = false;
+
   @Private
   public static final String NM_MEMORY_RESOURCE_PREFIX = NM_PREFIX
       + "resource.memory.";

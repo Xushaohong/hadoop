@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp;
 
+
+import static org.apache.hadoop.yarn.conf.YarnConfiguration.DEFAULT_NM_HELPER_WIKI_ENABLE;
+import static org.apache.hadoop.yarn.conf.YarnConfiguration.NM_HELPER_WIKI_ENABLE;
 import static org.apache.hadoop.yarn.util.StringHelper.join;
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.CONTAINER_ID;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.ACCORDION;
@@ -40,6 +43,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -259,10 +263,14 @@ public class ContainerLogsPage extends NMView {
       for (File containerLogsDir : containerLogsDirs) {
         File[] logFiles = containerLogsDir.listFiles();
         if (logFiles != null) {
-          html.p()
-              .a("https://iwiki.woa.com/pages/viewpage.action?pageId=1524208429",
-              "如果在US、太极或者IDEX使用Pyspark出现" +
-               " ImportError: no module named xxx问题，请查看该Wiki!").__();
+          Configuration conf =  nmContext.getNMStateStore().getConfig();
+          boolean helperWikiEnable = conf.getBoolean(NM_HELPER_WIKI_ENABLE, DEFAULT_NM_HELPER_WIKI_ENABLE);
+          if (helperWikiEnable) {
+            html.p()
+                .a("https://iwiki.woa.com/pages/viewpage.action?pageId=1524208429",
+                    "如果在US、太极或者IDEX使用Pyspark出现" +
+                     " ImportError: no module named xxx问题，请查看该Wiki!").__();
+          }
           Arrays.sort(logFiles);
           for (File logFile : logFiles) {
             foundLogFile = true;
