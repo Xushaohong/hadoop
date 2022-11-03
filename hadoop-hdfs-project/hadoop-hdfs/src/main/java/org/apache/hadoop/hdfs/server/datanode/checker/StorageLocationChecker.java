@@ -23,6 +23,9 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -33,6 +36,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation.CheckContext;
+import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
 import org.slf4j.Logger;
@@ -73,6 +77,8 @@ public class StorageLocationChecker {
    */
   private final long maxAllowedTimeForCheckMs;
 
+  private final boolean checkMountPoint;
+
 
   /**
    * Expected filesystem permissions on the storage directory.
@@ -91,6 +97,9 @@ public class StorageLocationChecker {
         DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY,
         DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
+
+    checkMountPoint = conf.getBoolean(DFS_DATANODE_DISK_CHECK_MOUNT,
+        DFS_DATANODE_DISK_CHECK_MOUNT_DEFAULT);
 
     if (maxAllowedTimeForCheckMs <= 0) {
       throw new DiskErrorException("Invalid value configured for "
@@ -212,6 +221,15 @@ public class StorageLocationChecker {
             e.getCause());
         failedLocations.add(location);
         goodLocations.remove(location);
+      }
+
+      if (checkMountPoint) {
+        Path mountedPath = DiskChecker.mountOf(new File(location.getUri()).toPath());
+        if (mountedPath.equals(Paths.get("/"))) {
+          LOG.warn("{} is mounted to root path, ignore it", location.toString());
+          failedLocations.add(location);
+          goodLocations.remove(location);
+        }
       }
     }
 

@@ -22,6 +22,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.FileStore;
+import java.nio.file.Files;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -114,6 +116,24 @@ public class DiskChecker {
                               FsPermission expected)
       throws DiskErrorException, IOException {
     checkDirInternal(localFS, dir, expected);
+  }
+
+
+  /**
+   * Get root mounted path for compare
+   * @param p - source path
+   * @return
+   * @throws IOException
+   */
+  public static java.nio.file.Path mountOf(java.nio.file.Path p) throws IOException {
+    FileStore fs = Files.getFileStore(p);
+    java.nio.file.Path temp = p.toAbsolutePath();
+    java.nio.file.Path mountp = temp;
+
+    while( (temp = temp.getParent()) != null && fs.equals(Files.getFileStore(temp)) ) {
+      mountp = temp;
+    }
+    return mountp;
   }
 
 

@@ -802,6 +802,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT =
       "10m";
 
+  public static final String DFS_DATANODE_DISK_CHECK_MOUNT = "dfs.datanode.disk.check.mount";
+  public static final boolean DFS_DATANODE_DISK_CHECK_MOUNT_DEFAULT = false;
+
   public static final String  DFS_NAMENODE_EC_POLICIES_MAX_CELLSIZE_KEY = "dfs.namenode.ec.policies.max.cellsize";
   public static final int     DFS_NAMENODE_EC_POLICIES_MAX_CELLSIZE_DEFAULT = 4 * 1024 * 1024;
   public static final String DFS_NAMENODE_EC_POLICIES_USERPOLICIES_ALLOWED_KEY =
